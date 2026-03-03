@@ -1,8 +1,5 @@
 import type { TOCItemType } from "fumadocs-core/toc";
-import {
-  Accordion,
-  Accordions,
-} from "fumadocs-ui/components/accordion";
+import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
@@ -85,7 +82,7 @@ function splitSummary(entity: SdkEntity): SummaryParts {
   if (entity.description.length === 0) {
     return {
       remarks: "",
-      summary: "No summary documentation is available for this member.",
+      summary: "",
     };
   }
 
@@ -245,7 +242,10 @@ function TypeExpression({
       );
     } else {
       chunks.push(
-        <span key={`${token}-${index}`} title={token.includes(".") ? token : undefined}>
+        <span
+          key={`${token}-${index}`}
+          title={token.includes(".") ? token : undefined}
+        >
           {displayValue}
         </span>
       );
@@ -285,11 +285,7 @@ function ParametersTable({
   parameters: SdkParameter[];
 }) {
   if (parameters.length === 0) {
-    return (
-      <Callout title="Info" type="info">
-        <p>This member has no parameters.</p>
-      </Callout>
-    );
+    return null;
   }
 
   return (
@@ -304,9 +300,13 @@ function ParametersTable({
       <tbody>
         {parameters.map((parameter) => {
           const details = parameter.description?.trim();
-          const defaultPart = parameter.defaultValue
-            ? ` Default: ${parameter.defaultValue}`
-            : "";
+          const detailsParts: string[] = [];
+          if (details && details.length > 0) {
+            detailsParts.push(details);
+          }
+          if (parameter.defaultValue) {
+            detailsParts.push(`Default: ${parameter.defaultValue}`);
+          }
 
           return (
             <tr key={`${parameter.name}-${parameter.type}`}>
@@ -316,13 +316,7 @@ function ParametersTable({
               <td>
                 <TypeExpression lookup={lookup} value={parameter.type} />
               </td>
-              <td>
-                {details && details.length > 0
-                  ? `${details}${defaultPart}`
-                  : defaultPart.length > 0
-                    ? defaultPart.trim()
-                    : "No parameter description."}
-              </td>
+              <td>{detailsParts.join(" ")}</td>
             </tr>
           );
         })}
@@ -338,11 +332,14 @@ function ReturnsTable({
   entity: SdkEntity;
   lookup: TypeLinkLookup;
 }) {
-  const description = entity.returnsDescription || entity.returnType
-    ? entity.returnsDescription || "No explicit return description."
-    : "Not applicable.";
+  const hasReturnType = (entity.returnType ?? "").length > 0;
+  const hasDescription = entity.returnsDescription.length > 0;
 
-  if (entity.entityKind === "constructor") {
+  if (!hasReturnType && !hasDescription) {
+    return null;
+  }
+
+  if (hasReturnType && hasDescription) {
     return (
       <table className="sdk-table">
         <thead>
@@ -354,30 +351,28 @@ function ReturnsTable({
         <tbody>
           <tr>
             <td>
-              <code>{entity.class.split(".").at(-1) ?? entity.class}</code>
+              <TypeExpression lookup={lookup} value={entity.returnType ?? ""} />
             </td>
-            <td>Creates a new instance of the containing type.</td>
+            <td>{entity.returnsDescription}</td>
           </tr>
         </tbody>
       </table>
     );
   }
 
-  if (!entity.returnType) {
+  if (hasReturnType) {
     return (
       <table className="sdk-table">
         <thead>
           <tr>
             <th>Type</th>
-            <th>Description</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>
-              <code>void</code>
+              <TypeExpression lookup={lookup} value={entity.returnType ?? ""} />
             </td>
-            <td>{description}</td>
           </tr>
         </tbody>
       </table>
@@ -388,16 +383,12 @@ function ReturnsTable({
     <table className="sdk-table">
       <thead>
         <tr>
-          <th>Type</th>
           <th>Description</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>
-            <TypeExpression lookup={lookup} value={entity.returnType} />
-          </td>
-          <td>{description}</td>
+          <td>{entity.returnsDescription}</td>
         </tr>
       </tbody>
     </table>
@@ -412,11 +403,7 @@ function ExceptionsTable({
   lookup: TypeLinkLookup;
 }) {
   if (exceptions.length === 0) {
-    return (
-      <Callout title="Info" type="info">
-        <p>No documented exceptions.</p>
-      </Callout>
-    );
+    return null;
   }
 
   return (
@@ -433,7 +420,7 @@ function ExceptionsTable({
             <td>
               <TypeExpression lookup={lookup} value={exception.type} />
             </td>
-            <td>{exception.description || "No condition details provided."}</td>
+            <td>{exception.description?.trim() ?? ""}</td>
           </tr>
         ))}
       </tbody>
@@ -443,11 +430,7 @@ function ExceptionsTable({
 
 function ExamplesBlock({ examples }: { examples: string[] }) {
   if (examples.length === 0) {
-    return (
-      <Callout title="Info" type="info">
-        <p>No documented examples.</p>
-      </Callout>
-    );
+    return null;
   }
 
   if (examples.length === 1) {
@@ -487,13 +470,7 @@ function ExamplesBlock({ examples }: { examples: string[] }) {
   );
 }
 
-function MemberHeader({
-  anchor,
-  title,
-}: {
-  anchor: string;
-  title: string;
-}) {
+function MemberHeader({ anchor, title }: { anchor: string; title: string }) {
   return (
     <h3 className="sdk-member-title" id={anchor}>
       <a aria-label={`Anchor for ${title}`} href={`#${anchor}`}>
@@ -512,19 +489,30 @@ function MemberReference({
 }) {
   const anchor = buildEntityAnchor(entity);
   const { remarks, summary } = splitSummary(entity);
+  const hasReturnsSection =
+    (entity.returnType ?? "").length > 0 ||
+    entity.returnsDescription.length > 0;
 
   return (
     <article className="sdk-member-card">
       <MemberHeader anchor={anchor} title={entity.displaySignature} />
 
-      <section aria-labelledby={`${anchor}-summary`} className="sdk-subsection">
-        <h4 id={`${anchor}-summary`}>Summary</h4>
-        <p>{summary}</p>
-      </section>
+      {summary.length > 0 ? (
+        <section
+          aria-labelledby={`${anchor}-summary`}
+          className="sdk-subsection"
+        >
+          <h4 id={`${anchor}-summary`}>Summary</h4>
+          <p>{summary}</p>
+        </section>
+      ) : null}
 
       <AdvisoryCallout remarks={remarks} />
 
-      <section aria-labelledby={`${anchor}-signature`} className="sdk-subsection">
+      <section
+        aria-labelledby={`${anchor}-signature`}
+        className="sdk-subsection"
+      >
         <h4 id={`${anchor}-signature`}>Signature</h4>
         <DynamicCodeBlock
           code={entity.displaySignature}
@@ -533,25 +521,45 @@ function MemberReference({
         />
       </section>
 
-      <section aria-labelledby={`${anchor}-parameters`} className="sdk-subsection">
-        <h4 id={`${anchor}-parameters`}>Parameters</h4>
-        <ParametersTable lookup={lookup} parameters={entity.parameters} />
-      </section>
+      {entity.parameters.length > 0 ? (
+        <section
+          aria-labelledby={`${anchor}-parameters`}
+          className="sdk-subsection"
+        >
+          <h4 id={`${anchor}-parameters`}>Parameters</h4>
+          <ParametersTable lookup={lookup} parameters={entity.parameters} />
+        </section>
+      ) : null}
 
-      <section aria-labelledby={`${anchor}-returns`} className="sdk-subsection">
-        <h4 id={`${anchor}-returns`}>Returns</h4>
-        <ReturnsTable entity={entity} lookup={lookup} />
-      </section>
+      {hasReturnsSection ? (
+        <section
+          aria-labelledby={`${anchor}-returns`}
+          className="sdk-subsection"
+        >
+          <h4 id={`${anchor}-returns`}>Returns</h4>
+          <ReturnsTable entity={entity} lookup={lookup} />
+        </section>
+      ) : null}
 
-      <section aria-labelledby={`${anchor}-exceptions`} className="sdk-subsection">
-        <h4 id={`${anchor}-exceptions`}>Exceptions</h4>
-        <ExceptionsTable exceptions={entity.exceptions} lookup={lookup} />
-      </section>
+      {entity.exceptions.length > 0 ? (
+        <section
+          aria-labelledby={`${anchor}-exceptions`}
+          className="sdk-subsection"
+        >
+          <h4 id={`${anchor}-exceptions`}>Exceptions</h4>
+          <ExceptionsTable exceptions={entity.exceptions} lookup={lookup} />
+        </section>
+      ) : null}
 
-      <section aria-labelledby={`${anchor}-example`} className="sdk-subsection">
-        <h4 id={`${anchor}-example`}>Example</h4>
-        <ExamplesBlock examples={entity.examples} />
-      </section>
+      {entity.examples.length > 0 ? (
+        <section
+          aria-labelledby={`${anchor}-example`}
+          className="sdk-subsection"
+        >
+          <h4 id={`${anchor}-example`}>Example</h4>
+          <ExamplesBlock examples={entity.examples} />
+        </section>
+      ) : null}
     </article>
   );
 }
@@ -571,11 +579,7 @@ function MemberGroups({
   sectionId: string;
 }) {
   if (groups.length === 0) {
-    return (
-      <Callout title="Info" type="info">
-        <p>No documented members in this section.</p>
-      </Callout>
-    );
+    return null;
   }
 
   return (
@@ -592,11 +596,23 @@ function MemberGroups({
         }
 
         return (
-          <Accordions className="my-4" defaultValue={[]} key={group.key} type="multiple">
-            <Accordion id={group.anchor} title={`${group.label} (${group.members.length})`}>
+          <Accordions
+            className="my-4"
+            defaultValue={[]}
+            key={group.key}
+            type="multiple"
+          >
+            <Accordion
+              id={group.anchor}
+              title={`${group.label} (${group.members.length})`}
+            >
               <div className="sdk-member-overloads">
                 {group.members.map((member) => (
-                  <MemberReference entity={member} key={member.id} lookup={lookup} />
+                  <MemberReference
+                    entity={member}
+                    key={member.id}
+                    lookup={lookup}
+                  />
                 ))}
               </div>
             </Accordion>
@@ -608,6 +624,7 @@ function MemberGroups({
 }
 
 function buildToc(
+  hasSummary: boolean,
   constructorGroups: Array<{
     anchor: string;
     members: SdkEntity[];
@@ -621,18 +638,21 @@ function buildToc(
     members: SdkEntity[];
   }>
 ): TOCItemType[] {
-  const items: TOCItemType[] = [
-    {
+  const items: TOCItemType[] = [];
+
+  if (hasSummary) {
+    items.push({
       depth: 2,
       title: "Summary",
       url: "#summary",
-    },
-    {
-      depth: 2,
-      title: "Type Declaration",
-      url: "#type-declaration",
-    },
-  ];
+    });
+  }
+
+  items.push({
+    depth: 2,
+    title: "Type Declaration",
+    url: "#type-declaration",
+  });
 
   if (constructorGroups.length > 0) {
     items.push({
@@ -709,7 +729,10 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
   const typeEntity =
     selectedEntity.type === "class" || selectedEntity.type === "enum"
       ? selectedEntity
-      : await getTypeEntityByClass(selectedEntity.namespace, selectedEntity.class);
+      : await getTypeEntityByClass(
+          selectedEntity.namespace,
+          selectedEntity.class
+        );
 
   if (!typeEntity) {
     notFound();
@@ -733,28 +756,36 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
   const methods = allTypeEntities.filter(
     (entity) => entity.type === "method" && entity.entityKind !== "constructor"
   );
-  const properties = allTypeEntities.filter((entity) => entity.type === "property");
+  const properties = allTypeEntities.filter(
+    (entity) => entity.type === "property"
+  );
 
   const constructorGroups = groupOverloads(constructors, typeEntity);
   const methodGroups = groupOverloads(methods, typeEntity);
   const propertyGroups = groupOverloads(properties, typeEntity);
 
-  const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const summary = splitSummary(typeEntity);
+  const hasSummary = summary.summary.length > 0 || summary.remarks.length > 0;
+  const toc = buildToc(
+    hasSummary,
+    constructorGroups,
+    methodGroups,
+    propertyGroups
+  );
   const selectedAnchor = buildEntityAnchor(selectedEntity);
 
   return (
     <DocsPage full tableOfContent={{ enabled: true }} toc={toc}>
       <DocsTitle>{typeEntity.name}</DocsTitle>
-      <DocsDescription>
-        {summary.summary ||
-          `${typeEntity.entityKind} in namespace ${typeEntity.namespace}`}
-      </DocsDescription>
+      {summary.summary.length > 0 ? (
+        <DocsDescription>{summary.summary}</DocsDescription>
+      ) : null}
       <DocsBody className="sdk-reference">
         {selectedEntity.id !== typeEntity.id ? (
           <Callout title="Info" type="info">
             <p>
-              Opened from member route <code>{selectedEntity.name}</code>. Jump to
+              Opened from member route <code>{selectedEntity.name}</code>. Jump
+              to
               <a className="ms-1 sdk-inline-link" href={`#${selectedAnchor}`}>
                 selected member
               </a>
@@ -763,11 +794,13 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
           </Callout>
         ) : null}
 
-        <section id="summary">
-          <h2>Summary</h2>
-          <p>{summary.summary}</p>
-          <AdvisoryCallout remarks={summary.remarks} />
-        </section>
+        {hasSummary ? (
+          <section id="summary">
+            <h2>Summary</h2>
+            {summary.summary.length > 0 ? <p>{summary.summary}</p> : null}
+            <AdvisoryCallout remarks={summary.remarks} />
+          </section>
+        ) : null}
 
         <section id="type-declaration">
           <h2>Type Declaration</h2>
@@ -778,32 +811,38 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
           />
         </section>
 
-        <section id="constructors">
-          <h2>Constructors</h2>
-          <MemberGroups
-            groups={constructorGroups}
-            lookup={typeLookup}
-            sectionId="constructors-groups"
-          />
-        </section>
+        {constructorGroups.length > 0 ? (
+          <section id="constructors">
+            <h2>Constructors</h2>
+            <MemberGroups
+              groups={constructorGroups}
+              lookup={typeLookup}
+              sectionId="constructors-groups"
+            />
+          </section>
+        ) : null}
 
-        <section id="methods">
-          <h2>Methods</h2>
-          <MemberGroups
-            groups={methodGroups}
-            lookup={typeLookup}
-            sectionId="methods-groups"
-          />
-        </section>
+        {methodGroups.length > 0 ? (
+          <section id="methods">
+            <h2>Methods</h2>
+            <MemberGroups
+              groups={methodGroups}
+              lookup={typeLookup}
+              sectionId="methods-groups"
+            />
+          </section>
+        ) : null}
 
-        <section id="properties">
-          <h2>Properties</h2>
-          <MemberGroups
-            groups={propertyGroups}
-            lookup={typeLookup}
-            sectionId="properties-groups"
-          />
-        </section>
+        {propertyGroups.length > 0 ? (
+          <section id="properties">
+            <h2>Properties</h2>
+            <MemberGroups
+              groups={propertyGroups}
+              lookup={typeLookup}
+              sectionId="properties-groups"
+            />
+          </section>
+        ) : null}
 
         <section id="metadata">
           <h2>Metadata</h2>
@@ -863,7 +902,10 @@ export async function generateMetadata(
   const typeEntity =
     selectedEntity.type === "class" || selectedEntity.type === "enum"
       ? selectedEntity
-      : await getTypeEntityByClass(selectedEntity.namespace, selectedEntity.class);
+      : await getTypeEntityByClass(
+          selectedEntity.namespace,
+          selectedEntity.class
+        );
 
   if (!typeEntity) {
     return {
@@ -877,10 +919,7 @@ export async function generateMetadata(
       : `${selectedEntity.name} - ${typeEntity.name}`;
 
   return {
-    description:
-      typeEntity.summary ||
-      typeEntity.description ||
-      `${typeEntity.entityKind} in ${typeEntity.namespace}`,
+    description: typeEntity.summary || typeEntity.description || undefined,
     title: titleSuffix,
   };
 }
