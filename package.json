@@ -1,0 +1,30 @@
+{
+  "name": "sdocs",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "build": "bun run --filter '*' build",
+    "check-types": "bun run --filter '*' check-types",
+    "dev:native": "bun run --filter native dev",
+    "dev:web": "bun run --filter web dev",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@sdocs/config": "workspace:*",
+    "oxfmt": "latest",
+    "oxlint": "latest",
+    "typescript": "^5",
+    "ultracite": "7.2.4"
+  },
+  "packageManager": "bun@1.3.5"
+}
