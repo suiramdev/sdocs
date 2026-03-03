@@ -14,6 +14,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { SdkSignatureText } from "@/components/sdk-signature-text";
 import {
   getEntitiesByClass,
   getEntityByUrl,
@@ -474,7 +475,7 @@ function MemberHeader({ anchor, title }: { anchor: string; title: string }) {
   return (
     <h3 className="sdk-member-title" id={anchor}>
       <a aria-label={`Anchor for ${title}`} href={`#${anchor}`}>
-        {title}
+        <SdkSignatureText value={title} />
       </a>
     </h3>
   );
@@ -495,31 +496,18 @@ function MemberReference({
 
   return (
     <article className="sdk-member-card">
-      <MemberHeader anchor={anchor} title={entity.displaySignature} />
+      <header className="sdk-member-header">
+        <MemberHeader anchor={anchor} title={entity.displaySignature} />
+        {summary.length > 0 ? (
+          <p className="sdk-member-summary">{summary}</p>
+        ) : null}
+      </header>
 
-      {summary.length > 0 ? (
-        <section
-          aria-labelledby={`${anchor}-summary`}
-          className="sdk-subsection"
-        >
-          <h4 id={`${anchor}-summary`}>Summary</h4>
-          <p>{summary}</p>
+      {remarks.length > 0 ? (
+        <section className="sdk-subsection">
+          <AdvisoryCallout remarks={remarks} />
         </section>
       ) : null}
-
-      <AdvisoryCallout remarks={remarks} />
-
-      <section
-        aria-labelledby={`${anchor}-signature`}
-        className="sdk-subsection"
-      >
-        <h4 id={`${anchor}-signature`}>Signature</h4>
-        <DynamicCodeBlock
-          code={entity.displaySignature}
-          codeblock={{ title: "C#" }}
-          lang="csharp"
-        />
-      </section>
 
       {entity.parameters.length > 0 ? (
         <section
@@ -624,7 +612,6 @@ function MemberGroups({
 }
 
 function buildToc(
-  hasSummary: boolean,
   constructorGroups: Array<{
     anchor: string;
     members: SdkEntity[];
@@ -639,20 +626,6 @@ function buildToc(
   }>
 ): TOCItemType[] {
   const items: TOCItemType[] = [];
-
-  if (hasSummary) {
-    items.push({
-      depth: 2,
-      title: "Summary",
-      url: "#summary",
-    });
-  }
-
-  items.push({
-    depth: 2,
-    title: "Type Declaration",
-    url: "#type-declaration",
-  });
 
   if (constructorGroups.length > 0) {
     items.push({
@@ -765,18 +738,16 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
   const propertyGroups = groupOverloads(properties, typeEntity);
 
   const summary = splitSummary(typeEntity);
-  const hasSummary = summary.summary.length > 0 || summary.remarks.length > 0;
-  const toc = buildToc(
-    hasSummary,
-    constructorGroups,
-    methodGroups,
-    propertyGroups
-  );
+  const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const selectedAnchor = buildEntityAnchor(selectedEntity);
 
   return (
     <DocsPage full tableOfContent={{ enabled: true }} toc={toc}>
-      <DocsTitle>{typeEntity.name}</DocsTitle>
+      <DocsTitle>
+        <span className="sdk-page-signature">
+          <SdkSignatureText value={typeEntity.displaySignature} />
+        </span>
+      </DocsTitle>
       {summary.summary.length > 0 ? (
         <DocsDescription>{summary.summary}</DocsDescription>
       ) : null}
@@ -794,22 +765,9 @@ export default async function SdkEntityPage(props: SdkEntityPageProps) {
           </Callout>
         ) : null}
 
-        {hasSummary ? (
-          <section id="summary">
-            <h2>Summary</h2>
-            {summary.summary.length > 0 ? <p>{summary.summary}</p> : null}
-            <AdvisoryCallout remarks={summary.remarks} />
-          </section>
+        {summary.remarks.length > 0 ? (
+          <AdvisoryCallout remarks={summary.remarks} />
         ) : null}
-
-        <section id="type-declaration">
-          <h2>Type Declaration</h2>
-          <DynamicCodeBlock
-            code={typeEntity.displaySignature}
-            codeblock={{ title: "C#" }}
-            lang="csharp"
-          />
-        </section>
 
         {constructorGroups.length > 0 ? (
           <section id="constructors">
