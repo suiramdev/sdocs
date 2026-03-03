@@ -7,13 +7,17 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "bun run --filter '*' dev",
+    "dev": "bun run --filter fumadocs dev",
+    "dev:all": "bun run --filter '*' dev",
     "build": "bun run --filter '*' build",
     "check-types": "bun run --filter '*' check-types",
-    "dev:native": "bun run --filter native dev",
-    "dev:web": "bun run --filter web dev",
+    "dev:native": "bun run --filter tui dev",
+    "dev:web": "bun run --filter fumadocs dev",
     "check": "ultracite check",
-    "fix": "ultracite fix"
+    "fix": "ultracite fix",
+    "sdk:generate": "bun run --filter fumadocs sdk:generate",
+    "sdk:index": "bun run --filter fumadocs sdk:index",
+    "sdk:index:reset": "bun run --filter fumadocs sdk:index:reset"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

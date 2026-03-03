@@ -39,3 +39,5 @@ sdocs/
 - `bun run dev:web`: Start only the web application
 - `bun run check-types`: Check TypeScript types across all apps
 - `bun run check`: Run Oxlint and Oxfmt
+- `bun run sdk:generate`: Generate latest SDK entities (single source of truth)
+- `bun run sdk:index`: Sync generated entities to Meilisearch

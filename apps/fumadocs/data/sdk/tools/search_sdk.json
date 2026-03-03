@@ -1,0 +1,26 @@
+{
+  "name": "search_sdk",
+  "description": "Search SDK entities using natural language and return exact signatures and documentation URLs.",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Natural language query."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Maximum number of results."
+      }
+    },
+    "required": ["query"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/sdk/tools/search-sdk",
+    "calls": "/api/search"
+  }
+}

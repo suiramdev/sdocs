@@ -1,45 +1,58 @@
-# fumadocs
+# Fumadocs SDK Platform
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+This app serves generated C# SDK docs with Meilisearch-backed natural language search and AI retrieval routes.
 
-Run development server:
+## Local Setup
+
+1. Start Meilisearch:
 
 ```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
+docker compose -f infra/meilisearch/docker-compose.yml up -d
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+2. Copy environment defaults:
 
-## Explore
+```bash
+cp .env.example .env.local
+```
 
-In the project, you can see:
+3. Generate docs + normalized index docs (latest only):
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+```bash
+bun run sdk:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.json
+```
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+4. Index documents into Meilisearch:
 
-### Fumadocs MDX
+```bash
+bun run sdk:index --reset
+```
 
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
+5. Run the app:
 
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
+```bash
+bun run dev
+```
 
-## Learn More
+If you hit `EMFILE: too many open files, watch` while developing with a fully generated SDK tree, increase your file descriptor limit before running dev:
 
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
+```bash
+ulimit -n 65536
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+## SDK Service Layer
+
+- `GET|POST /api/search`
+- `GET|POST /api/sdk/search`
+- `GET /api/sdk/describe`
+- `GET /api/sdk/get-signature`
+- `GET /api/sdk/tools/definitions`
+- `POST /api/sdk/tools/search-sdk`
+- `POST /api/sdk/ask`
+
+## Generation Outputs
+
+- Docs (optional MDX output): `content/sdk-generated/...`
+- Entities: `data/sdk/entities/latest.json`
+
+All AI answers should be grounded in search results and return exact indexed signatures.
