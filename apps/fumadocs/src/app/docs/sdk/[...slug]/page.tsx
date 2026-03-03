@@ -1,14 +1,30 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-
+import type { TOCItemType } from "fumadocs-core/toc";
+import {
+  Accordion,
+  Accordions,
+} from "fumadocs-ui/components/accordion";
+import { Callout } from "fumadocs-ui/components/callout";
+import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import {
   DocsBody,
   DocsDescription,
   DocsPage,
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { getEntityByUrl } from "@/lib/sdk/data";
+import {
+  getEntitiesByClass,
+  getEntityByUrl,
+  getTypeEntityByClass,
+  loadSdkEntities,
+} from "@/lib/sdk/data";
+import { buildSdkEntityAnchor, safeAnchorSegment } from "@/lib/sdk/reference";
+import type { SdkEntity, SdkException, SdkParameter } from "@/lib/sdk/schemas";
 
 interface SdkEntityPageProps {
   params: Promise<{
@@ -16,93 +32,816 @@ interface SdkEntityPageProps {
   }>;
 }
 
+interface SummaryParts {
+  summary: string;
+  remarks: string;
+}
+
+interface TypeLinkLookup {
+  byFullName: Map<string, SdkEntity>;
+  bySimpleName: Map<string, SdkEntity | null>;
+}
+
+const SYSTEM_TYPE_ALIASES: Record<string, string> = {
+  "System.Boolean": "bool",
+  "System.Byte": "byte",
+  "System.Char": "char",
+  "System.Decimal": "decimal",
+  "System.Double": "double",
+  "System.Int16": "short",
+  "System.Int32": "int",
+  "System.Int64": "long",
+  "System.Object": "object",
+  "System.SByte": "sbyte",
+  "System.Single": "float",
+  "System.String": "string",
+  "System.UInt16": "ushort",
+  "System.UInt32": "uint",
+  "System.UInt64": "ulong",
+  "System.Void": "void",
+};
+
+const WARNING_HINT = /\b(warning|obsolete|deprecated|breaking)\b/iu;
+const PERFORMANCE_HINT =
+  /\b(performance|allocation|allocates|expensive|slow|cache)\b/iu;
+const TYPE_TOKEN = /[A-Za-z_][A-Za-z0-9_.`]*/gu;
+
 function buildUrl(slug: string[]): string {
   return `/docs/sdk/${slug.join("/")}`;
+}
+
+function buildEntityAnchor(entity: SdkEntity): string {
+  return buildSdkEntityAnchor(entity);
+}
+
+function splitSummary(entity: SdkEntity): SummaryParts {
+  if (entity.summary.length > 0 || entity.remarks.length > 0) {
+    return {
+      remarks: entity.remarks,
+      summary: entity.summary || entity.description,
+    };
+  }
+
+  if (entity.description.length === 0) {
+    return {
+      remarks: "",
+      summary: "No summary documentation is available for this member.",
+    };
+  }
+
+  const chunks = entity.description
+    .split(/\n{2,}/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  if (chunks.length <= 1) {
+    return {
+      remarks: "",
+      summary: entity.description,
+    };
+  }
+
+  return {
+    remarks: chunks.slice(1).join("\n\n"),
+    summary: chunks[0],
+  };
+}
+
+function compareEntities(left: SdkEntity, right: SdkEntity): number {
+  const nameCompare = left.name.localeCompare(right.name);
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+
+  return left.signature.localeCompare(right.signature);
+}
+
+function groupOverloads(
+  members: SdkEntity[],
+  typeEntity: SdkEntity
+): Array<{
+  anchor: string;
+  key: string;
+  label: string;
+  members: SdkEntity[];
+}> {
+  const grouped = new Map<string, SdkEntity[]>();
+
+  for (const member of members.toSorted(compareEntities)) {
+    const key = member.entityKind === "constructor" ? ".ctor" : member.name;
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(member);
+    grouped.set(key, bucket);
+  }
+
+  return [...grouped.entries()]
+    .map(([key, groupedMembers]) => {
+      const label =
+        key === ".ctor"
+          ? `${typeEntity.name} constructors`
+          : `${key} overloads`;
+
+      return {
+        anchor: `${safeAnchorSegment(key)}-overloads-${buildEntityAnchor(typeEntity).slice(-4)}`,
+        key,
+        label,
+        members: groupedMembers,
+      };
+    })
+    .toSorted((left, right) => left.key.localeCompare(right.key));
+}
+
+function buildTypeLookup(entities: SdkEntity[]): TypeLinkLookup {
+  const byFullName = new Map<string, SdkEntity>();
+  const bySimpleName = new Map<string, SdkEntity | null>();
+
+  for (const entity of entities) {
+    if (entity.type !== "class" && entity.type !== "enum") {
+      continue;
+    }
+
+    byFullName.set(entity.class, entity);
+
+    const existing = bySimpleName.get(entity.name);
+    if (!existing) {
+      bySimpleName.set(entity.name, entity);
+      continue;
+    }
+
+    if (existing.id !== entity.id) {
+      bySimpleName.set(entity.name, null);
+    }
+  }
+
+  return {
+    byFullName,
+    bySimpleName,
+  };
+}
+
+function resolveTypeEntity(
+  token: string,
+  lookup: TypeLinkLookup
+): SdkEntity | null {
+  const withoutArity = token.replace(/`\d+$/u, "");
+
+  const full = lookup.byFullName.get(withoutArity);
+  if (full) {
+    return full;
+  }
+
+  const simpleName = withoutArity.split(".").at(-1) ?? withoutArity;
+  const simple = lookup.bySimpleName.get(simpleName);
+  return simple ?? null;
+}
+
+function simplifyTypeToken(token: string): string {
+  const withoutArity = token.replace(/`\d+$/u, "");
+  const alias = SYSTEM_TYPE_ALIASES[withoutArity];
+
+  if (alias) {
+    return alias;
+  }
+
+  if (withoutArity.includes(".")) {
+    return withoutArity.split(".").at(-1) ?? withoutArity;
+  }
+
+  return withoutArity;
+}
+
+function TypeExpression({
+  lookup,
+  value,
+}: {
+  lookup: TypeLinkLookup;
+  value: string;
+}) {
+  const chunks: ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of value.matchAll(TYPE_TOKEN)) {
+    const token = match[0];
+    const index = match.index ?? 0;
+
+    if (index > lastIndex) {
+      chunks.push(value.slice(lastIndex, index));
+    }
+
+    const target = resolveTypeEntity(token, lookup);
+    const displayValue = simplifyTypeToken(token);
+
+    if (target) {
+      chunks.push(
+        <Link
+          className="sdk-type-link"
+          href={target.url}
+          key={`${token}-${index}`}
+          prefetch={false}
+          title={target.class}
+        >
+          {displayValue}
+        </Link>
+      );
+    } else {
+      chunks.push(
+        <span key={`${token}-${index}`} title={token.includes(".") ? token : undefined}>
+          {displayValue}
+        </span>
+      );
+    }
+
+    lastIndex = index + token.length;
+  }
+
+  if (lastIndex < value.length) {
+    chunks.push(value.slice(lastIndex));
+  }
+
+  return <code className="sdk-inline-type">{chunks}</code>;
+}
+
+function AdvisoryCallout({ remarks }: { remarks: string }) {
+  if (remarks.length === 0) {
+    return null;
+  }
+
+  const isWarning = WARNING_HINT.test(remarks);
+  const isPerformance = PERFORMANCE_HINT.test(remarks);
+  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
+
+  return (
+    <Callout title={title} type={isWarning ? "warning" : "info"}>
+      <p>{remarks}</p>
+    </Callout>
+  );
+}
+
+function ParametersTable({
+  lookup,
+  parameters,
+}: {
+  lookup: TypeLinkLookup;
+  parameters: SdkParameter[];
+}) {
+  if (parameters.length === 0) {
+    return (
+      <Callout title="Info" type="info">
+        <p>This member has no parameters.</p>
+      </Callout>
+    );
+  }
+
+  return (
+    <table className="sdk-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {parameters.map((parameter) => {
+          const details = parameter.description?.trim();
+          const defaultPart = parameter.defaultValue
+            ? ` Default: ${parameter.defaultValue}`
+            : "";
+
+          return (
+            <tr key={`${parameter.name}-${parameter.type}`}>
+              <td>
+                <code>{parameter.name}</code>
+              </td>
+              <td>
+                <TypeExpression lookup={lookup} value={parameter.type} />
+              </td>
+              <td>
+                {details && details.length > 0
+                  ? `${details}${defaultPart}`
+                  : defaultPart.length > 0
+                    ? defaultPart.trim()
+                    : "No parameter description."}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function ReturnsTable({
+  entity,
+  lookup,
+}: {
+  entity: SdkEntity;
+  lookup: TypeLinkLookup;
+}) {
+  const description = entity.returnsDescription || entity.returnType
+    ? entity.returnsDescription || "No explicit return description."
+    : "Not applicable.";
+
+  if (entity.entityKind === "constructor") {
+    return (
+      <table className="sdk-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>{entity.class.split(".").at(-1) ?? entity.class}</code>
+            </td>
+            <td>Creates a new instance of the containing type.</td>
+          </tr>
+        </tbody>
+      </table>
+    );
+  }
+
+  if (!entity.returnType) {
+    return (
+      <table className="sdk-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>void</code>
+            </td>
+            <td>{description}</td>
+          </tr>
+        </tbody>
+      </table>
+    );
+  }
+
+  return (
+    <table className="sdk-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <TypeExpression lookup={lookup} value={entity.returnType} />
+          </td>
+          <td>{description}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+function ExceptionsTable({
+  exceptions,
+  lookup,
+}: {
+  exceptions: SdkException[];
+  lookup: TypeLinkLookup;
+}) {
+  if (exceptions.length === 0) {
+    return (
+      <Callout title="Info" type="info">
+        <p>No documented exceptions.</p>
+      </Callout>
+    );
+  }
+
+  return (
+    <table className="sdk-table">
+      <thead>
+        <tr>
+          <th>Exception</th>
+          <th>Condition</th>
+        </tr>
+      </thead>
+      <tbody>
+        {exceptions.map((exception) => (
+          <tr key={`${exception.type}-${exception.description ?? ""}`}>
+            <td>
+              <TypeExpression lookup={lookup} value={exception.type} />
+            </td>
+            <td>{exception.description || "No condition details provided."}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ExamplesBlock({ examples }: { examples: string[] }) {
+  if (examples.length === 0) {
+    return (
+      <Callout title="Info" type="info">
+        <p>No documented examples.</p>
+      </Callout>
+    );
+  }
+
+  if (examples.length === 1) {
+    return (
+      <DynamicCodeBlock
+        code={examples[0]}
+        codeblock={{ title: "Example" }}
+        lang="csharp"
+      />
+    );
+  }
+
+  const labels = examples.map((_, index) => {
+    if (index === 0) {
+      return "Basic Example";
+    }
+
+    if (index === 1) {
+      return "Advanced Example";
+    }
+
+    return `Example ${index + 1}`;
+  });
+
+  return (
+    <Tabs items={labels}>
+      {examples.map((example, index) => (
+        <Tab key={`${example.slice(0, 50)}-${index}`}>
+          <DynamicCodeBlock
+            code={example}
+            codeblock={{ title: labels[index] }}
+            lang="csharp"
+          />
+        </Tab>
+      ))}
+    </Tabs>
+  );
+}
+
+function MemberHeader({
+  anchor,
+  title,
+}: {
+  anchor: string;
+  title: string;
+}) {
+  return (
+    <h3 className="sdk-member-title" id={anchor}>
+      <a aria-label={`Anchor for ${title}`} href={`#${anchor}`}>
+        {title}
+      </a>
+    </h3>
+  );
+}
+
+function MemberReference({
+  entity,
+  lookup,
+}: {
+  entity: SdkEntity;
+  lookup: TypeLinkLookup;
+}) {
+  const anchor = buildEntityAnchor(entity);
+  const { remarks, summary } = splitSummary(entity);
+
+  return (
+    <article className="sdk-member-card">
+      <MemberHeader anchor={anchor} title={entity.displaySignature} />
+
+      <section aria-labelledby={`${anchor}-summary`} className="sdk-subsection">
+        <h4 id={`${anchor}-summary`}>Summary</h4>
+        <p>{summary}</p>
+      </section>
+
+      <AdvisoryCallout remarks={remarks} />
+
+      <section aria-labelledby={`${anchor}-signature`} className="sdk-subsection">
+        <h4 id={`${anchor}-signature`}>Signature</h4>
+        <DynamicCodeBlock
+          code={entity.displaySignature}
+          codeblock={{ title: "C#" }}
+          lang="csharp"
+        />
+      </section>
+
+      <section aria-labelledby={`${anchor}-parameters`} className="sdk-subsection">
+        <h4 id={`${anchor}-parameters`}>Parameters</h4>
+        <ParametersTable lookup={lookup} parameters={entity.parameters} />
+      </section>
+
+      <section aria-labelledby={`${anchor}-returns`} className="sdk-subsection">
+        <h4 id={`${anchor}-returns`}>Returns</h4>
+        <ReturnsTable entity={entity} lookup={lookup} />
+      </section>
+
+      <section aria-labelledby={`${anchor}-exceptions`} className="sdk-subsection">
+        <h4 id={`${anchor}-exceptions`}>Exceptions</h4>
+        <ExceptionsTable exceptions={entity.exceptions} lookup={lookup} />
+      </section>
+
+      <section aria-labelledby={`${anchor}-example`} className="sdk-subsection">
+        <h4 id={`${anchor}-example`}>Example</h4>
+        <ExamplesBlock examples={entity.examples} />
+      </section>
+    </article>
+  );
+}
+
+function MemberGroups({
+  groups,
+  lookup,
+  sectionId,
+}: {
+  groups: Array<{
+    anchor: string;
+    key: string;
+    label: string;
+    members: SdkEntity[];
+  }>;
+  lookup: TypeLinkLookup;
+  sectionId: string;
+}) {
+  if (groups.length === 0) {
+    return (
+      <Callout title="Info" type="info">
+        <p>No documented members in this section.</p>
+      </Callout>
+    );
+  }
+
+  return (
+    <div className="sdk-member-groups" id={sectionId}>
+      {groups.map((group) => {
+        if (group.members.length === 1) {
+          return (
+            <MemberReference
+              entity={group.members[0]}
+              key={group.members[0].id}
+              lookup={lookup}
+            />
+          );
+        }
+
+        return (
+          <Accordions className="my-4" defaultValue={[]} key={group.key} type="multiple">
+            <Accordion id={group.anchor} title={`${group.label} (${group.members.length})`}>
+              <div className="sdk-member-overloads">
+                {group.members.map((member) => (
+                  <MemberReference entity={member} key={member.id} lookup={lookup} />
+                ))}
+              </div>
+            </Accordion>
+          </Accordions>
+        );
+      })}
+    </div>
+  );
+}
+
+function buildToc(
+  constructorGroups: Array<{
+    anchor: string;
+    members: SdkEntity[];
+  }>,
+  methodGroups: Array<{
+    anchor: string;
+    members: SdkEntity[];
+  }>,
+  propertyGroups: Array<{
+    anchor: string;
+    members: SdkEntity[];
+  }>
+): TOCItemType[] {
+  const items: TOCItemType[] = [
+    {
+      depth: 2,
+      title: "Summary",
+      url: "#summary",
+    },
+    {
+      depth: 2,
+      title: "Type Declaration",
+      url: "#type-declaration",
+    },
+  ];
+
+  if (constructorGroups.length > 0) {
+    items.push({
+      depth: 2,
+      title: "Constructors",
+      url: "#constructors",
+    });
+
+    for (const group of constructorGroups) {
+      for (const member of group.members) {
+        items.push({
+          depth: 3,
+          title: member.displaySignature,
+          url: `#${buildEntityAnchor(member)}`,
+        });
+      }
+    }
+  }
+
+  if (methodGroups.length > 0) {
+    items.push({
+      depth: 2,
+      title: "Methods",
+      url: "#methods",
+    });
+
+    for (const group of methodGroups) {
+      for (const member of group.members) {
+        items.push({
+          depth: 3,
+          title: member.displaySignature,
+          url: `#${buildEntityAnchor(member)}`,
+        });
+      }
+    }
+  }
+
+  if (propertyGroups.length > 0) {
+    items.push({
+      depth: 2,
+      title: "Properties",
+      url: "#properties",
+    });
+
+    for (const group of propertyGroups) {
+      for (const member of group.members) {
+        items.push({
+          depth: 3,
+          title: member.displaySignature,
+          url: `#${buildEntityAnchor(member)}`,
+        });
+      }
+    }
+  }
+
+  items.push({
+    depth: 2,
+    title: "Metadata",
+    url: "#metadata",
+  });
+
+  return items;
 }
 
 export default async function SdkEntityPage(props: SdkEntityPageProps) {
   const params = await props.params;
   const targetUrl = buildUrl(params.slug);
-  const entity = await getEntityByUrl(targetUrl);
+  const selectedEntity = await getEntityByUrl(targetUrl);
 
-  if (!entity) {
+  if (!selectedEntity) {
     notFound();
   }
 
+  const typeEntity =
+    selectedEntity.type === "class" || selectedEntity.type === "enum"
+      ? selectedEntity
+      : await getTypeEntityByClass(selectedEntity.namespace, selectedEntity.class);
+
+  if (!typeEntity) {
+    notFound();
+  }
+
+  const canonicalTypeUrl = typeEntity.canonicalUrl || typeEntity.url;
+  if (selectedEntity.id !== typeEntity.id && targetUrl !== canonicalTypeUrl) {
+    redirect(`${canonicalTypeUrl}#${buildEntityAnchor(selectedEntity)}`);
+  }
+
+  const allTypeEntities = await getEntitiesByClass(
+    typeEntity.namespace,
+    typeEntity.class
+  );
+  const allEntities = await loadSdkEntities();
+  const typeLookup = buildTypeLookup(allEntities);
+
+  const constructors = allTypeEntities.filter(
+    (entity) => entity.type === "method" && entity.entityKind === "constructor"
+  );
+  const methods = allTypeEntities.filter(
+    (entity) => entity.type === "method" && entity.entityKind !== "constructor"
+  );
+  const properties = allTypeEntities.filter((entity) => entity.type === "property");
+
+  const constructorGroups = groupOverloads(constructors, typeEntity);
+  const methodGroups = groupOverloads(methods, typeEntity);
+  const propertyGroups = groupOverloads(properties, typeEntity);
+
+  const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
+  const summary = splitSummary(typeEntity);
+  const selectedAnchor = buildEntityAnchor(selectedEntity);
+
   return (
-    <DocsPage full>
-      <DocsTitle>{entity.name}</DocsTitle>
-      <DocsDescription>{entity.description || "No description."}</DocsDescription>
-      <DocsBody>
-        <h2>Entity</h2>
-        <ul>
-          <li>
-            <strong>Type:</strong> <code>{entity.type}</code>
-          </li>
-          <li>
-            <strong>Namespace:</strong> <code>{entity.namespace}</code>
-          </li>
-          <li>
-            <strong>Class:</strong> <code>{entity.class}</code>
-          </li>
-          <li>
-            <strong>ID:</strong> <code>{entity.id}</code>
-          </li>
-        </ul>
+    <DocsPage full tableOfContent={{ enabled: true }} toc={toc}>
+      <DocsTitle>{typeEntity.name}</DocsTitle>
+      <DocsDescription>
+        {summary.summary ||
+          `${typeEntity.entityKind} in namespace ${typeEntity.namespace}`}
+      </DocsDescription>
+      <DocsBody className="sdk-reference">
+        {selectedEntity.id !== typeEntity.id ? (
+          <Callout title="Info" type="info">
+            <p>
+              Opened from member route <code>{selectedEntity.name}</code>. Jump to
+              <a className="ms-1 sdk-inline-link" href={`#${selectedAnchor}`}>
+                selected member
+              </a>
+              .
+            </p>
+          </Callout>
+        ) : null}
 
-        <h2>Signature</h2>
-        <pre>
-          <code>{entity.displaySignature}</code>
-        </pre>
+        <section id="summary">
+          <h2>Summary</h2>
+          <p>{summary.summary}</p>
+          <AdvisoryCallout remarks={summary.remarks} />
+        </section>
 
-        <h2>Source Signature</h2>
-        <pre>
-          <code>{entity.signature}</code>
-        </pre>
+        <section id="type-declaration">
+          <h2>Type Declaration</h2>
+          <DynamicCodeBlock
+            code={typeEntity.displaySignature}
+            codeblock={{ title: "C#" }}
+            lang="csharp"
+          />
+        </section>
 
-        <h2>Parameters</h2>
-        {entity.parameters.length === 0 ? (
-          <p>None.</p>
-        ) : (
-          <ul>
-            {entity.parameters.map((parameter) => (
-              <li key={parameter.name}>
-                <code>{parameter.name}</code> (<code>{parameter.type}</code>)
-                {parameter.defaultValue ? (
-                  <>
-                    {" "}
-                    default: <code>{parameter.defaultValue}</code>
-                  </>
-                ) : null}
-                {parameter.description ? ` - ${parameter.description}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
+        <section id="constructors">
+          <h2>Constructors</h2>
+          <MemberGroups
+            groups={constructorGroups}
+            lookup={typeLookup}
+            sectionId="constructors-groups"
+          />
+        </section>
 
-        <h2>Return Type</h2>
-        <p>{entity.returnType ? <code>{entity.returnType}</code> : "N/A"}</p>
+        <section id="methods">
+          <h2>Methods</h2>
+          <MemberGroups
+            groups={methodGroups}
+            lookup={typeLookup}
+            sectionId="methods-groups"
+          />
+        </section>
 
-        <h2>Examples</h2>
-        {entity.examples.length === 0 ? (
-          <p>No documented examples in source JSON.</p>
-        ) : (
-          entity.examples.map((example) => (
-            <pre key={example.slice(0, 64)}>
-              <code>{example}</code>
-            </pre>
-          ))
-        )}
+        <section id="properties">
+          <h2>Properties</h2>
+          <MemberGroups
+            groups={propertyGroups}
+            lookup={typeLookup}
+            sectionId="properties-groups"
+          />
+        </section>
 
-        <h2>Metadata</h2>
-        <ul>
-          <li>
-            <strong>Assembly:</strong> <code>{entity.assembly}</code>
-          </li>
-          <li>
-            <strong>Doc ID:</strong> <code>{entity.docId}</code>
-          </li>
-        </ul>
+        <section id="metadata">
+          <h2>Metadata</h2>
+          <table className="sdk-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Namespace</td>
+                <td>
+                  <code>{typeEntity.namespace}</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Type</td>
+                <td>
+                  <code>{typeEntity.entityKind}</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Assembly</td>
+                <td>
+                  <code>{typeEntity.assembly}</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Doc ID</td>
+                <td>
+                  <code>{typeEntity.docId}</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
       </DocsBody>
     </DocsPage>
   );
@@ -113,16 +852,35 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const targetUrl = buildUrl(params.slug);
-  const entity = await getEntityByUrl(targetUrl);
+  const selectedEntity = await getEntityByUrl(targetUrl);
 
-  if (!entity) {
+  if (!selectedEntity) {
     return {
       title: "SDK entity not found",
     };
   }
 
+  const typeEntity =
+    selectedEntity.type === "class" || selectedEntity.type === "enum"
+      ? selectedEntity
+      : await getTypeEntityByClass(selectedEntity.namespace, selectedEntity.class);
+
+  if (!typeEntity) {
+    return {
+      title: "SDK entity not found",
+    };
+  }
+
+  const titleSuffix =
+    selectedEntity.id === typeEntity.id
+      ? `${typeEntity.name} (${typeEntity.entityKind})`
+      : `${selectedEntity.name} - ${typeEntity.name}`;
+
   return {
-    description: entity.description || `SDK ${entity.type} in ${entity.namespace}`,
-    title: `${entity.name} (${entity.type})`,
+    description:
+      typeEntity.summary ||
+      typeEntity.description ||
+      `${typeEntity.entityKind} in ${typeEntity.namespace}`,
+    title: titleSuffix,
   };
 }

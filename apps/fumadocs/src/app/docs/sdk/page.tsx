@@ -1,3 +1,4 @@
+import { Callout } from "fumadocs-ui/components/callout";
 import {
   DocsBody,
   DocsDescription,
@@ -21,25 +22,78 @@ export default async function SdkIndexPage() {
   ).length;
 
   return (
-    <DocsPage full>
+    <DocsPage
+      full
+      tableOfContent={{ enabled: true }}
+      toc={[
+        { depth: 2, title: "Overview", url: "#overview" },
+        { depth: 2, title: "Coverage", url: "#coverage" },
+        { depth: 2, title: "Navigation", url: "#navigation" },
+      ]}
+    >
       <DocsTitle>SDK Reference</DocsTitle>
       <DocsDescription>
-        SDK entities are loaded from the imported JSON source and replaced
-        entirely on every regeneration.
+        Generated C# API reference with grouped type/member navigation and
+        structured method documentation.
       </DocsDescription>
-      <DocsBody>
-        <ul>
-          <li>Classes/Structs/Interfaces: {classCount}</li>
-          <li>Enums: {enumCount}</li>
-          <li>Methods: {methodCount}</li>
-          <li>Properties: {propertyCount}</li>
-          <li>Total indexed entities: {entities.length}</li>
-        </ul>
-        <p className="mt-6">
-          Use the default docs sidebar to navigate namespaces, classes, and SDK
-          methods. Use the default Fumadocs search in the header to find
-          entities quickly.
-        </p>
+      <DocsBody className="sdk-reference">
+        <section id="overview">
+          <h2>Overview</h2>
+          <Callout title="Note" type="info">
+            <p>
+              API pages are generated from XML documentation and JSON reflection
+              dumps. Signatures and member contracts are preserved exactly from
+              source metadata.
+            </p>
+          </Callout>
+        </section>
+
+        <section id="coverage">
+          <h2>Coverage</h2>
+          <table className="sdk-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Classes / Structs / Interfaces</td>
+                <td>{classCount}</td>
+              </tr>
+              <tr>
+                <td>Enums</td>
+                <td>{enumCount}</td>
+              </tr>
+              <tr>
+                <td>Methods (incl. constructors)</td>
+                <td>{methodCount}</td>
+              </tr>
+              <tr>
+                <td>Properties</td>
+                <td>{propertyCount}</td>
+              </tr>
+              <tr>
+                <td>Total entities</td>
+                <td>{entities.length}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="navigation">
+          <h2>Navigation</h2>
+          <p>
+            Use the sidebar to browse namespace → type → member groups. Method
+            links point directly to anchored sections with overload group
+            collapse/expand controls.
+          </p>
+          <p>
+            Use the global search to jump to signatures by method name, type, or
+            natural language queries.
+          </p>
+        </section>
       </DocsBody>
     </DocsPage>
   );

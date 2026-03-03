@@ -1,3 +1,102 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
+
+.sdk-reference {
+  --sdk-border: color-mix(in oklab, var(--color-fd-border) 88%, white 12%);
+}
+
+.sdk-reference section {
+  border-top: 1px solid var(--sdk-border);
+  padding-top: 1.5rem;
+}
+
+.sdk-reference section + section {
+  margin-top: 2rem;
+}
+
+.sdk-reference h2 {
+  margin-bottom: 0.9rem;
+}
+
+.sdk-reference h3 {
+  margin-bottom: 0.6rem;
+}
+
+.sdk-member-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.sdk-member-overloads {
+  display: grid;
+  gap: 1rem;
+  padding-block: 0.5rem;
+}
+
+.sdk-member-card {
+  border: 1px solid var(--sdk-border);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: color-mix(in oklab, var(--color-fd-card) 96%, white 4%);
+}
+
+.sdk-member-title {
+  font-size: 1rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.sdk-member-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sdk-member-title a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.sdk-subsection + .sdk-subsection {
+  margin-top: 1rem;
+}
+
+.sdk-subsection h4 {
+  margin-bottom: 0.4rem;
+  font-size: 0.95rem;
+}
+
+.sdk-inline-link {
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.sdk-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.35rem;
+}
+
+.sdk-table th,
+.sdk-table td {
+  border: 1px solid var(--sdk-border);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.sdk-table thead th {
+  background: color-mix(in oklab, var(--color-fd-secondary) 94%, white 6%);
+  font-weight: 600;
+}
+
+.sdk-inline-type {
+  font-size: 0.87rem;
+  white-space: nowrap;
+}
+
+.sdk-type-link {
+  color: var(--color-fd-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}

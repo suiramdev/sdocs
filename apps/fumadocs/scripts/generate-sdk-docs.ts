@@ -3,10 +3,8 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type {
-  SdkEntity,
-  SdkParameter,
-} from "../src/lib/sdk/schemas";
+import { buildSdkEntityAnchor } from "@/lib/sdk/reference";
+import type { SdkEntity, SdkException, SdkParameter } from "@/lib/sdk/schemas";
 
 interface CliOptions {
   input: string;
@@ -21,6 +19,23 @@ interface RawDocumentation {
   Remarks?: string;
   Params?: Record<string, string>;
   Examples?: string[];
+  Exceptions?:
+    | Array<{
+        Cref?: string;
+        Type?: string;
+        Name?: string;
+        Description?: string;
+        Value?: string;
+      }>
+    | Record<string, string>;
+}
+
+interface NormalizedDocumentation {
+  summary: string;
+  remarks: string;
+  returnsDescription: string;
+  examples: string[];
+  exceptions: SdkException[];
 }
 
 interface RawParameter {
@@ -118,7 +133,7 @@ function parseArgs(argv: string[]): CliOptions {
 
   const input = args.get("input");
   if (typeof input !== "string") {
-    throw new Error(
+    throw new TypeError(
       "Missing --input. Example: bun run scripts/generate-sdk-docs.ts --input /path/to/sdk.json"
     );
   }
@@ -126,10 +141,10 @@ function parseArgs(argv: string[]): CliOptions {
   const emitMdxArg = args.get("emit-mdx");
 
   return {
-    input,
     clean: args.get("clean") !== "false",
     emitMdx: emitMdxArg === true || emitMdxArg === "true",
     includeNonPublic: args.get("include-non-public") === true,
+    input,
   };
 }
 
@@ -139,10 +154,10 @@ function quoteYaml(value: string): string {
 
 function safeSlug(value: string): string {
   const normalized = value
-    .replace(/[`'"<>()[\]{}]/gu, "-")
-    .replace(/[^A-Za-z0-9._-]+/gu, "-")
-    .replace(/-+/gu, "-")
-    .replace(/^[-.]+|[-.]+$/gu, "")
+    .replaceAll(/[`'"<>()[\]{}]/gu, "-")
+    .replaceAll(/[^A-Za-z0-9._-]+/gu, "-")
+    .replaceAll(/-+/gu, "-")
+    .replaceAll(/^[-.]+|[-.]+$/gu, "")
     .toLowerCase();
 
   return normalized.length > 0 ? normalized : "item";
@@ -179,22 +194,38 @@ function stripCData(value: string): string {
 
 function decodeHtmlEntities(value: string): string {
   return value
-    .replace(/&lt;/gu, "<")
-    .replace(/&gt;/gu, ">")
-    .replace(/&amp;/gu, "&")
-    .replace(/&quot;/gu, '"')
-    .replace(/&#39;/gu, "'")
-    .replace(/&nbsp;/gu, " ");
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&nbsp;", " ");
+}
+
+function cleanCrefValue(value: string): string {
+  const withoutPrefix = value.replace(/^[A-Z]:/u, "");
+
+  return withoutPrefix
+    .replaceAll(/\{([^{}]+)\}/gu, "<$1>")
+    .replaceAll(/`\d+/gu, "")
+    .trim();
 }
 
 function cleanXmlText(value: string): string {
   return value
-    .replace(/<see cref="([^"]+)"\s*\/>/gu, "`$1`")
-    .replace(/<paramref name="([^"]+)"\s*\/>/gu, "`$1`")
-    .replace(/<code>([\s\S]*?)<\/code>/gu, "$1")
-    .replace(/<[^>]+>/gu, "")
-    .replace(/\r\n/gu, "\n")
-    .replace(/\n{3,}/gu, "\n\n")
+    .replaceAll(
+      /<see cref="([^"]+)"\s*\/>/gu,
+      (_, cref: string) => `\`${cleanCrefValue(cref)}\``
+    )
+    .replaceAll(/<paramref name="([^"]+)"\s*\/>/gu, "`$1`")
+    .replaceAll(/<c>([\s\S]*?)<\/c>/gu, "`$1`")
+    .replaceAll(/<code>([\s\S]*?)<\/code>/gu, "$1")
+    .replaceAll(/<para>([\s\S]*?)<\/para>/gu, "$1")
+    .replaceAll(/<[^>]+>/gu, "")
+    .replaceAll("\r\n", "\n")
+    .replaceAll(/[ \t]+\n/gu, "\n")
+    .replaceAll(/\n[ \t]+/gu, "\n")
+    .replaceAll(/\n{3,}/gu, "\n\n")
     .trim();
 }
 
@@ -212,6 +243,50 @@ function sanitizeExamples(doc: RawDocumentation | undefined): string[] {
   return examples
     .map((example) => sanitizeText(example))
     .filter((example) => example.length > 0);
+}
+
+function sanitizeExceptions(doc: RawDocumentation | undefined): SdkException[] {
+  const rawExceptions = doc?.Exceptions;
+  if (!rawExceptions) {
+    return [];
+  }
+
+  if (Array.isArray(rawExceptions)) {
+    const exceptions: SdkException[] = [];
+
+    for (const entry of rawExceptions) {
+      const type = sanitizeText(entry.Cref ?? entry.Type ?? entry.Name);
+      if (type.length === 0) {
+        continue;
+      }
+
+      exceptions.push({
+        description: sanitizeText(entry.Description ?? entry.Value),
+        type: cleanCrefValue(type),
+      });
+    }
+
+    return exceptions;
+  }
+
+  return Object.entries(rawExceptions)
+    .map(([type, description]) => ({
+      description: sanitizeText(description),
+      type: cleanCrefValue(sanitizeText(type)),
+    }))
+    .filter((item) => item.type.length > 0);
+}
+
+function normalizeDocumentation(
+  documentation: RawDocumentation | undefined
+): NormalizedDocumentation {
+  return {
+    examples: sanitizeExamples(documentation),
+    exceptions: sanitizeExceptions(documentation),
+    remarks: sanitizeText(documentation?.Remarks),
+    returnsDescription: sanitizeText(documentation?.Return),
+    summary: sanitizeText(documentation?.Summary),
+  };
 }
 
 function signatureFromDocId(docId: string, fallback: string): string {
@@ -237,9 +312,15 @@ function visibilityModifier(member: {
 function collectTypeModifiers(type: RawType): string[] {
   const modifiers = [visibilityModifier(type)];
 
-  if (type.IsStatic) modifiers.push("static");
-  if (type.IsAbstract) modifiers.push("abstract");
-  if (type.IsSealed) modifiers.push("sealed");
+  if (type.IsStatic) {
+    modifiers.push("static");
+  }
+  if (type.IsAbstract) {
+    modifiers.push("abstract");
+  }
+  if (type.IsSealed) {
+    modifiers.push("sealed");
+  }
 
   return modifiers;
 }
@@ -276,10 +357,18 @@ function buildMethodDisplaySignature(type: RawType, method: RawMethod): string {
     .join(", ");
   const modifiers: string[] = [visibilityModifier(method)];
 
-  if (method.IsStatic) modifiers.push("static");
-  if (method.IsVirtual) modifiers.push("virtual");
-  if (method.IsOverride) modifiers.push("override");
-  if (method.IsSealed) modifiers.push("sealed");
+  if (method.IsStatic) {
+    modifiers.push("static");
+  }
+  if (method.IsVirtual) {
+    modifiers.push("virtual");
+  }
+  if (method.IsOverride) {
+    modifiers.push("override");
+  }
+  if (method.IsSealed) {
+    modifiers.push("sealed");
+  }
 
   if (method.Name === ".ctor") {
     return `${modifiers.join(" ")} ${methodName}(${params})`;
@@ -291,9 +380,15 @@ function buildMethodDisplaySignature(type: RawType, method: RawMethod): string {
 function buildPropertyDisplaySignature(property: RawProperty): string {
   const modifiers: string[] = [visibilityModifier(property)];
 
-  if (property.IsStatic) modifiers.push("static");
-  if (property.IsVirtual) modifiers.push("virtual");
-  if (property.IsSealed) modifiers.push("sealed");
+  if (property.IsStatic) {
+    modifiers.push("static");
+  }
+  if (property.IsVirtual) {
+    modifiers.push("virtual");
+  }
+  if (property.IsSealed) {
+    modifiers.push("sealed");
+  }
 
   return `${modifiers.join(" ")} ${withFallback(property.PropertyType, "object")} ${withFallback(property.FullName, withFallback(property.Name, "Property"))} { get; set; }`;
 }
@@ -308,9 +403,9 @@ function ensureDocId(
     : `${prefix}:${fallback}`;
 }
 
-function buildDescription(doc?: RawDocumentation): string {
-  const summary = sanitizeText(doc?.Summary);
-  const remarks = sanitizeText(doc?.Remarks);
+function buildDescription(doc: NormalizedDocumentation): string {
+  const { summary } = doc;
+  const { remarks } = doc;
 
   if (summary.length > 0 && remarks.length > 0) {
     return `${summary}\n\n${remarks}`;
@@ -342,7 +437,7 @@ function buildMeiliId(entityId: string, sequence: number): string {
 function toDocUrl(filePath: string): { pathValue: string; url: string } {
   const relativeToSdkRoot = path
     .relative(sdkDocsRoot, filePath)
-    .replace(/\\/gu, "/");
+    .replaceAll("\\", "/");
   const pathWithoutExtension = relativeToSdkRoot
     .replace(/\/index\.mdx$/u, "")
     .replace(/\.mdx$/u, "");
@@ -353,58 +448,156 @@ function toDocUrl(filePath: string): { pathValue: string; url: string } {
   };
 }
 
-function renderParameterSection(parameters: SdkParameter[]): string {
-  if (parameters.length === 0) {
-    return "None.";
-  }
-
-  return parameters
-    .map((param) => {
-      const description =
-        param.description && param.description.length > 0
-          ? ` - ${param.description}`
-          : "";
-      const defaultValue = param.defaultValue
-        ? ` (default: ${inlineCode(param.defaultValue)})`
-        : "";
-
-      return `- ${inlineCode(param.name)} (${inlineCode(param.type)})${defaultValue}${description}`;
-    })
-    .join("\n");
-}
-
-function renderExamplesSection(examples: string[]): string {
-  if (examples.length === 0) {
-    return "No documented examples in source JSON.";
-  }
-
-  return examples
-    .map((example) => `\n\`\`\`csharp\n${example}\n\`\`\``)
-    .join("\n");
-}
-
 function inlineCode(value: string): string {
   const maxTickRun = Math.max(
     1,
-    ...Array.from(value.matchAll(/`+/gu)).map((match) => match[0].length)
+    ...[...value.matchAll(/`+/gu)].map((match) => match[0].length)
   );
   const fence = "`".repeat(maxTickRun + 1);
   return `${fence}${value}${fence}`;
 }
 
+function escapeTableCell(value: string): string {
+  return value.replaceAll("|", "\\|").replaceAll(/\n+/gu, " ").trim();
+}
+
+function renderParameterSection(parameters: SdkParameter[]): string {
+  if (parameters.length === 0) {
+    return '<Callout type="info" title="Info">This member has no parameters.</Callout>';
+  }
+
+  const rows = parameters
+    .map((param) => {
+      const description =
+        param.description?.trim() || "No parameter description.";
+      const defaultPart = param.defaultValue
+        ? `${description} Default: ${param.defaultValue}.`
+        : description;
+
+      return `| ${inlineCode(param.name)} | ${inlineCode(param.type)} | ${escapeTableCell(defaultPart)} |`;
+    })
+    .join("\n");
+
+  return `| Name | Type | Description |
+| --- | --- | --- |
+${rows}`;
+}
+
+function renderReturnSection(entity: SdkEntity): string {
+  if (entity.entityKind === "constructor") {
+    return `| Type | Description |
+| --- | --- |
+| ${inlineCode(entity.class.split(".").at(-1) ?? entity.class)} | Creates a new instance of the containing type. |`;
+  }
+
+  const returnType = entity.returnType ?? "void";
+  const description =
+    entity.returnsDescription.length > 0
+      ? entity.returnsDescription
+      : "No explicit return description.";
+
+  return `| Type | Description |
+| --- | --- |
+| ${inlineCode(returnType)} | ${escapeTableCell(description)} |`;
+}
+
+function renderExceptionsSection(exceptions: SdkException[]): string {
+  if (exceptions.length === 0) {
+    return '<Callout type="info" title="Info">No documented exceptions.</Callout>';
+  }
+
+  const rows = exceptions
+    .map((item) => {
+      const condition =
+        item.description && item.description.length > 0
+          ? item.description
+          : "No condition details provided.";
+
+      return `| ${inlineCode(item.type)} | ${escapeTableCell(condition)} |`;
+    })
+    .join("\n");
+
+  return `| Exception | Condition |
+| --- | --- |
+${rows}`;
+}
+
+function renderExamplesSection(examples: string[]): string {
+  if (examples.length === 0) {
+    return '<Callout type="info" title="Info">No documented examples.</Callout>';
+  }
+
+  if (examples.length === 1) {
+    return `\`\`\`csharp\n${examples[0]}\n\`\`\``;
+  }
+
+  const labels = examples.map((_, index) => {
+    if (index === 0) {
+      return "Basic Example";
+    }
+
+    if (index === 1) {
+      return "Advanced Example";
+    }
+
+    return `Example ${index + 1}`;
+  });
+
+  const tabs = examples
+    .map(
+      (example, index) => `<Tab value=${quoteYaml(labels[index])}>
+
+\`\`\`csharp
+${example}
+\`\`\`
+
+</Tab>`
+    )
+    .join("\n\n");
+
+  const items = labels.map((label) => quoteYaml(label)).join(", ");
+
+  return `<Tabs items={[${items}]}>
+
+${tabs}
+
+</Tabs>`;
+}
+
+function renderRemarksSection(entity: SdkEntity): string {
+  if (entity.remarks.length === 0) {
+    return "";
+  }
+
+  const isWarning = /\b(warning|obsolete|deprecated|breaking)\b/iu.test(
+    entity.remarks
+  );
+  const title = isWarning ? "Warning" : "Note";
+  const type = isWarning ? "warning" : "info";
+
+  return `<Callout type=${quoteYaml(type)} title=${quoteYaml(title)}>
+${entity.remarks}
+</Callout>`;
+}
+
 function renderMdxPage(entity: SdkEntity): string {
+  const fallbackSummary =
+    entity.summary.length > 0
+      ? entity.summary
+      : entity.description.length > 0
+        ? entity.description
+        : "No summary documentation is available for this member.";
+
   return `---
 title: ${quoteYaml(entity.name)}
-description: ${quoteYaml(descriptionForFrontmatter(entity.description))}
+description: ${quoteYaml(descriptionForFrontmatter(entity.description || fallbackSummary))}
 ---
 
-## Entity
+## Summary
 
-- **Name:** ${inlineCode(entity.name)}
-- **Type:** ${inlineCode(entity.entityKind)}
-- **Namespace:** ${inlineCode(entity.namespace)}
-- **Class:** ${inlineCode(entity.class)}
-- **ID:** ${inlineCode(entity.id)}
+${fallbackSummary}
+
+${renderRemarksSection(entity)}
 
 ## Signature
 
@@ -412,32 +605,33 @@ description: ${quoteYaml(descriptionForFrontmatter(entity.description))}
 ${entity.displaySignature}
 \`\`\`
 
-## Source Signature
-
-\`\`\`text
-${entity.signature}
-\`\`\`
-
-## Description
-
-${entity.description.length > 0 ? entity.description : "No description in source JSON."}
-
 ## Parameters
 
 ${renderParameterSection(entity.parameters)}
 
-## Return Type
+## Returns
 
-${entity.returnType ? inlineCode(entity.returnType) : "N/A"}
+${renderReturnSection(entity)}
 
-## Examples
+## Exceptions
+
+${renderExceptionsSection(entity.exceptions)}
+
+## Example
 
 ${renderExamplesSection(entity.examples)}
 
 ## Metadata
 
-- **Assembly:** ${inlineCode(entity.assembly)}
-- **Doc ID:** ${inlineCode(entity.docId)}
+| Field | Value |
+| --- | --- |
+| Name | ${inlineCode(entity.name)} |
+| Kind | ${inlineCode(entity.entityKind)} |
+| Namespace | ${inlineCode(entity.namespace)} |
+| Type | ${inlineCode(entity.class)} |
+| Assembly | ${inlineCode(entity.assembly)} |
+| Source Signature | ${inlineCode(entity.signature)} |
+| Doc ID | ${inlineCode(entity.docId)} |
 `;
 }
 
@@ -469,7 +663,7 @@ async function main() {
   const versionRoot = sdkDocsRoot;
 
   if (options.clean && options.emitMdx) {
-    await rm(versionRoot, { recursive: true, force: true });
+    await rm(versionRoot, { force: true, recursive: true });
   }
 
   if (options.emitMdx) {
@@ -483,7 +677,7 @@ async function main() {
 
   const types = rawTypes
     .filter((type) => options.includeNonPublic || type.IsPublic !== false)
-    .sort((a, b) =>
+    .toSorted((a, b) =>
       withFallback(a.FullName, "").localeCompare(withFallback(b.FullName, ""))
     );
 
@@ -527,15 +721,18 @@ async function main() {
       "index.mdx"
     );
 
-    const typeDescription = buildDescription(rawType.Documentation);
+    const typeDocs = normalizeDocumentation(rawType.Documentation);
+    const typeDescription = buildDescription(typeDocs);
     const typeEntityId = buildEntityId(typeDocId);
     entitySequence += 1;
     const typeEntity: SdkEntity = {
-      id: typeEntityId,
+      anchor: "type-overview",
+      assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
+      canonicalUrl: "",
+      class: typeFullName,
+      description: typeDescription,
+      displaySignature: buildTypeDisplaySignature(rawType),
       docId: typeDocId,
-      meiliId: buildMeiliId(typeEntityId, entitySequence),
-      name: typeName,
-      type: typeKind,
       entityKind: rawType.IsEnum
         ? "enum"
         : rawType.IsInterface
@@ -543,31 +740,39 @@ async function main() {
           : rawType.IsValueType
             ? "struct"
             : "class",
+      examples: typeDocs.examples,
+      exceptions: typeDocs.exceptions,
+      id: typeEntityId,
+      meiliId: buildMeiliId(typeEntityId, entitySequence),
+      name: typeName,
       namespace: namespaceName,
-      class: typeFullName,
+      parameters: [],
+      path: "",
+      remarks: typeDocs.remarks,
+      returnType: null,
+      returnsDescription: typeDocs.returnsDescription,
       signature: signatureFromDocId(typeDocId, typeFullName),
       sourceSignature: typeDocId,
-      displaySignature: buildTypeDisplaySignature(rawType),
-      description: typeDescription,
-      examples: sanitizeExamples(rawType.Documentation),
-      parameters: [],
-      returnType: null,
-      assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
-      path: "",
+      summary: typeDocs.summary,
+      type: typeKind,
       url: "",
     };
 
     const typeDocLocation = toDocUrl(typePagePath);
     typeEntity.path = typeDocLocation.pathValue;
     typeEntity.url = typeDocLocation.url;
+    typeEntity.canonicalUrl = typeDocLocation.url;
 
     if (options.emitMdx) {
       await writeTextFile(typePagePath, renderMdxPage(typeEntity));
     }
     entities.push(typeEntity);
 
-    if (typeEntity.type === "enum") namespaceBucket.enums += 1;
-    else namespaceBucket.classes += 1;
+    if (typeEntity.type === "enum") {
+      namespaceBucket.enums += 1;
+    } else {
+      namespaceBucket.classes += 1;
+    }
 
     const constructors = (rawType.Constructors ?? []).filter(
       (method) => options.includeNonPublic || method.IsPublic !== false
@@ -590,45 +795,53 @@ async function main() {
         `${methodSlug}.mdx`
       );
 
+      const methodDocs = normalizeDocumentation(method.Documentation);
       const methodParameters = (method.Parameters ?? []).map((param) => ({
-        name: withFallback(param.Name, "arg"),
-        type: withFallback(param.Type, "object"),
+        defaultValue: param.Default,
         description: sanitizeText(
           method.Documentation?.Params?.[withFallback(param.Name, "arg")]
         ),
-        defaultValue: param.Default,
+        name: withFallback(param.Name, "arg"),
+        type: withFallback(param.Type, "object"),
       }));
 
-      const methodDescription = buildDescription(method.Documentation);
+      const methodDescription = buildDescription(methodDocs);
       const methodEntityId = buildEntityId(methodDocId);
       entitySequence += 1;
       const methodEntity: SdkEntity = {
-        id: methodEntityId,
+        anchor: "",
+        assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
+        canonicalUrl: typeEntity.url,
+        class: typeFullName,
+        description: methodDescription,
+        displaySignature: buildMethodDisplaySignature(rawType, method),
         docId: methodDocId,
+        entityKind: methodName === ".ctor" ? "constructor" : "method",
+        examples: methodDocs.examples,
+        exceptions: methodDocs.exceptions,
+        id: methodEntityId,
         meiliId: buildMeiliId(methodEntityId, entitySequence),
         name: methodName === ".ctor" ? `${typeName}.ctor` : methodName,
-        type: "method",
-        entityKind: methodName === ".ctor" ? "constructor" : "method",
         namespace: namespaceName,
-        class: typeFullName,
-        signature: signatureFromDocId(methodDocId, fallbackMethodDoc),
-        sourceSignature: methodDocId,
-        displaySignature: buildMethodDisplaySignature(rawType, method),
-        description: methodDescription,
-        examples: sanitizeExamples(method.Documentation),
         parameters: methodParameters,
+        path: "",
+        remarks: methodDocs.remarks,
         returnType:
           methodName === ".ctor"
             ? null
             : withFallback(method.ReturnType, "void"),
-        assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
-        path: "",
+        returnsDescription: methodDocs.returnsDescription,
+        signature: signatureFromDocId(methodDocId, fallbackMethodDoc),
+        sourceSignature: methodDocId,
+        summary: methodDocs.summary,
+        type: "method",
         url: "",
       };
 
       const methodDocLocation = toDocUrl(methodPath);
       methodEntity.path = methodDocLocation.pathValue;
       methodEntity.url = methodDocLocation.url;
+      methodEntity.anchor = buildSdkEntityAnchor(methodEntity);
 
       if (options.emitMdx) {
         await writeTextFile(methodPath, renderMdxPage(methodEntity));
@@ -643,6 +856,7 @@ async function main() {
 
     for (const property of properties) {
       const propertyName = withFallback(property.Name, "Property");
+      const propertyDocs = normalizeDocumentation(property.Documentation);
       const fallbackPropertyDoc = `${typeFullName}.${propertyName}`;
       const propertyDocId = ensureDocId(
         "P",
@@ -662,29 +876,36 @@ async function main() {
       const propertyEntityId = buildEntityId(propertyDocId);
       entitySequence += 1;
       const propertyEntity: SdkEntity = {
-        id: propertyEntityId,
+        anchor: "",
+        assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
+        canonicalUrl: typeEntity.url,
+        class: typeFullName,
+        description: buildDescription(propertyDocs),
+        displaySignature: buildPropertyDisplaySignature(property),
         docId: propertyDocId,
+        entityKind: "property",
+        examples: propertyDocs.examples,
+        exceptions: propertyDocs.exceptions,
+        id: propertyEntityId,
         meiliId: buildMeiliId(propertyEntityId, entitySequence),
         name: propertyName,
-        type: "property",
-        entityKind: "property",
         namespace: namespaceName,
-        class: typeFullName,
+        parameters: [],
+        path: "",
+        remarks: propertyDocs.remarks,
+        returnType: withFallback(property.PropertyType, "object"),
+        returnsDescription: propertyDocs.returnsDescription,
         signature: signatureFromDocId(propertyDocId, fallbackPropertyDoc),
         sourceSignature: propertyDocId,
-        displaySignature: buildPropertyDisplaySignature(property),
-        description: buildDescription(property.Documentation),
-        examples: sanitizeExamples(property.Documentation),
-        parameters: [],
-        returnType: withFallback(property.PropertyType, "object"),
-        assembly: withFallback(rawType.Assembly, "Unknown Assembly"),
-        path: "",
+        summary: propertyDocs.summary,
+        type: "property",
         url: "",
       };
 
       const propertyDocLocation = toDocUrl(propertyPath);
       propertyEntity.path = propertyDocLocation.pathValue;
       propertyEntity.url = propertyDocLocation.url;
+      propertyEntity.anchor = buildSdkEntityAnchor(propertyEntity);
 
       if (options.emitMdx) {
         await writeTextFile(propertyPath, renderMdxPage(propertyEntity));
@@ -694,7 +915,7 @@ async function main() {
     }
   }
 
-  const namespaceItems = [...namespaceStats.entries()].sort((a, b) =>
+  const namespaceItems = [...namespaceStats.entries()].toSorted((a, b) =>
     a[0].localeCompare(b[0])
   );
 
@@ -812,11 +1033,11 @@ SDK MDX files are generated for offline/reference output under content/sdk-gener
 
   process.stdout.write(
     `${JSON.stringify({
-      entities: entities.length,
-      namespaces: namespaceItems.length,
       emitMdx: options.emitMdx,
-      output: versionRoot,
+      entities: entities.length,
       indexedOutput: path.join(entitiesRoot, "latest.json"),
+      namespaces: namespaceItems.length,
+      output: versionRoot,
     })}\n`
   );
 }

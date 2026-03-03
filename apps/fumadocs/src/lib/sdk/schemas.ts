@@ -9,28 +9,40 @@ export const sdkParameterSchema = z.object({
   type: z.string(),
 });
 
+export const sdkExceptionSchema = z.object({
+  description: z.string().optional(),
+  type: z.string(),
+});
+
 export const sdkEntitySchema = z.object({
+  anchor: z.string().optional(),
   assembly: z.string(),
+  canonicalUrl: z.string().optional(),
   class: z.string(),
   description: z.string(),
   displaySignature: z.string(),
   docId: z.string(),
   entityKind: z.string(),
   examples: z.array(z.string()),
+  exceptions: z.array(sdkExceptionSchema).default([]),
   id: z.string(),
   meiliId: z.string(),
   name: z.string(),
   namespace: z.string(),
   parameters: z.array(sdkParameterSchema),
   path: z.string(),
+  remarks: z.string().default(""),
   returnType: z.string().nullable(),
+  returnsDescription: z.string().default(""),
   signature: z.string(),
   sourceSignature: z.string(),
+  summary: z.string().default(""),
   type: z.enum(sdkEntityTypes),
   url: z.string(),
 });
 
 export type SdkParameter = z.infer<typeof sdkParameterSchema>;
+export type SdkException = z.infer<typeof sdkExceptionSchema>;
 export type SdkEntity = z.infer<typeof sdkEntitySchema>;
 export type SdkEntityType = (typeof sdkEntityTypes)[number];
 
