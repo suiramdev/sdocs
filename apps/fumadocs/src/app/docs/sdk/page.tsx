@@ -85,9 +85,14 @@ export default async function SdkIndexPage() {
         <section id="navigation">
           <h2>Navigation</h2>
           <p>
-            Use the sidebar to browse namespace → type → member groups. Method
-            links point directly to anchored sections with overload group
-            collapse/expand controls.
+            The global SDK sidebar stays high-level: namespace → class page.
+            Member-level details are intentionally omitted from this main
+            navigation to keep scanning concise.
+          </p>
+          <p>
+            Inside each class page, related links are organized in context under
+            sections like Constructors, Methods, and Properties, with member
+            links jumping to exact anchors.
           </p>
           <p>
             Use the global search to jump to signatures by method name, type, or
