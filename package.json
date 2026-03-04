@@ -15,9 +15,9 @@
     "dev:web": "bun run --filter fumadocs dev",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "sdk:generate": "bun run --filter fumadocs sdk:generate",
-    "sdk:index": "bun run --filter fumadocs sdk:index",
-    "sdk:index:reset": "bun run --filter fumadocs sdk:index:reset"
+    "api:generate": "bun run --filter fumadocs api:generate",
+    "api:index": "bun run --filter fumadocs api:index",
+    "api:index:reset": "bun run --filter fumadocs api:index:reset"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

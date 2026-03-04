@@ -49,7 +49,7 @@ coverage
 tmp
 temp
 
-# Generated SDK docs/index artifacts
-apps/fumadocs/content/sdk-generated/**
-apps/fumadocs/data/sdk/entities/*.json
-!apps/fumadocs/data/sdk/entities/.gitkeep
+# Generated API docs/index artifacts
+apps/fumadocs/content/api-generated/**
+apps/fumadocs/data/api/entities/*.json
+!apps/fumadocs/data/api/entities/.gitkeep

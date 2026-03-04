@@ -2,21 +2,16 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { searchSboxDocsService } from "@/features/api/utils/sbox-search";
-import { apiEntityTypes } from "@/features/api/utils/schemas";
+import { searchApiService } from "@/features/api/utils/service";
 
 export const runtime = "nodejs";
 
 const querySchema = z.object({
   className: z.string().trim().min(1).optional(),
-  includeObsolete: z
-    .string()
-    .optional()
-    .transform((value) => value === "1" || value === "true"),
-  limit: z.coerce.number().int().min(1).max(25).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
   namespace: z.string().trim().min(1).optional(),
   q: z.string().trim().min(1),
-  type: z.enum(apiEntityTypes).optional(),
+  type: z.enum(["class", "method", "enum", "property"]).optional(),
   useHybrid: z
     .string()
     .optional()
@@ -25,20 +20,17 @@ const querySchema = z.object({
 
 const bodySchema = z.object({
   className: z.string().trim().min(1).optional(),
-  includeObsolete: z.boolean().optional(),
-  limit: z.number().int().min(1).max(25).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
   namespace: z.string().trim().min(1).optional(),
   query: z.string().trim().min(1),
-  type: z.enum(apiEntityTypes).optional(),
+  type: z.enum(["class", "method", "enum", "property"]).optional(),
   useHybrid: z.boolean().optional(),
 });
 
-export const GET = async (request: NextRequest) => {
+export async function GET(request: NextRequest) {
   try {
     const parsed = querySchema.parse({
       className: request.nextUrl.searchParams.get("className") ?? undefined,
-      includeObsolete:
-        request.nextUrl.searchParams.get("includeObsolete") ?? undefined,
       limit: request.nextUrl.searchParams.get("limit") ?? undefined,
       namespace: request.nextUrl.searchParams.get("namespace") ?? undefined,
       q: request.nextUrl.searchParams.get("q") ?? "",
@@ -46,9 +38,8 @@ export const GET = async (request: NextRequest) => {
       useHybrid: request.nextUrl.searchParams.get("useHybrid") ?? undefined,
     });
 
-    const response = await searchSboxDocsService({
+    const response = await searchApiService({
       className: parsed.className,
-      includeObsolete: parsed.includeObsolete,
       limit: parsed.limit,
       namespace: parsed.namespace,
       query: parsed.q,
@@ -61,7 +52,7 @@ export const GET = async (request: NextRequest) => {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
-          error: "Invalid s&box search query",
+          error: "Invalid search query",
           issues: error.flatten(),
         },
         {
@@ -72,21 +63,20 @@ export const GET = async (request: NextRequest) => {
 
     return NextResponse.json(
       {
-        error: "s&box search failed",
+        error: "API search failed",
       },
       {
         status: 500,
       }
     );
   }
-};
+}
 
-export const POST = async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
     const body = bodySchema.parse(await request.json());
-    const response = await searchSboxDocsService({
+    const response = await searchApiService({
       className: body.className,
-      includeObsolete: body.includeObsolete,
       limit: body.limit,
       namespace: body.namespace,
       query: body.query,
@@ -99,7 +89,7 @@ export const POST = async (request: NextRequest) => {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
-          error: "Invalid s&box search request",
+          error: "Invalid request body",
           issues: error.flatten(),
         },
         {
@@ -110,11 +100,11 @@ export const POST = async (request: NextRequest) => {
 
     return NextResponse.json(
       {
-        error: "s&box search failed",
+        error: "API search failed",
       },
       {
         status: 500,
       }
     );
   }
-};
+}

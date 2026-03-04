@@ -2,12 +2,17 @@ import { source } from "@/features/docs/utils/source";
 
 export const revalidate = false;
 
-export async function GET() {
-  const lines: string[] = [];
-  lines.push("# Documentation");
-  lines.push("");
-  for (const page of source.getPages()) {
-    lines.push(`- [${page.data.title}](${page.url}): ${page.data.description}`);
-  }
+export const GET = () => {
+  const lines: string[] = [
+    "# s&box Documentation",
+    "",
+    ...source
+      .getPages()
+      .map(
+        (page) =>
+          `- [${page.data.title}](${page.url}): ${page.data.description}`,
+      ),
+  ];
+
   return new Response(lines.join("\n"));
-}
+};

@@ -6,14 +6,14 @@ import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 export const docs = defineDocs({
   dir: "content/docs",
   docs: {
-    files: ["**/*.mdx", "!sdk/**/*.mdx"],
+    files: ["**/*.mdx", "!api/**/*.mdx"],
     postprocess: {
       includeProcessedMarkdown: true,
     },
     schema: pageSchema,
   },
   meta: {
-    files: ["**/meta.json", "!sdk/**/meta.json"],
+    files: ["**/meta.json", "!api/**/meta.json"],
     schema: metaSchema,
   },
 });

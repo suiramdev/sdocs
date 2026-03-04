@@ -1,6 +1,6 @@
-# Fumadocs SDK Platform
+# Fumadocs API Platform
 
-This app serves generated C# SDK docs with Meilisearch-backed natural language search and AI retrieval routes.
+This app serves generated C# API docs with Meilisearch-backed natural language search and AI retrieval routes.
 
 ## Local Setup
 
@@ -19,13 +19,13 @@ cp .env.example .env.local
 3. Generate docs + normalized index docs (latest only):
 
 ```bash
-bun run sdk:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.json
+bun run api:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.json
 ```
 
 4. Index documents into Meilisearch:
 
 ```bash
-bun run sdk:index --reset
+bun run api:index --reset
 ```
 
 5. Run the app:
@@ -34,27 +34,27 @@ bun run sdk:index --reset
 bun run dev
 ```
 
-If you hit `EMFILE: too many open files, watch` while developing with a fully generated SDK tree, increase your file descriptor limit before running dev:
+If you hit `EMFILE: too many open files, watch` while developing with a fully generated API tree, increase your file descriptor limit before running dev:
 
 ```bash
 ulimit -n 65536
 ```
 
-## SDK Service Layer
+## API Service Layer
 
 - `GET|POST /api/search`
-- `GET|POST /api/sdk/search`
+- `GET|POST /api/api/search`
 - `GET|POST /api/sbox/search`
-- `GET /api/sdk/describe`
-- `GET /api/sdk/get-signature`
-- `GET /api/sdk/tools/definitions`
-- `POST /api/sdk/tools/search-sdk`
-- `POST /api/sdk/tools/search-sbox-docs`
-- `POST /api/sdk/ask`
+- `GET /api/api/describe`
+- `GET /api/api/get-signature`
+- `GET /api/api/tools/definitions`
+- `POST /api/api/tools/search-api`
+- `POST /api/api/tools/search-sbox-docs`
+- `POST /api/api/ask`
 
 ## Generation Outputs
 
-- Docs (optional MDX output): `content/sdk-generated/...`
-- Entities: `data/sdk/entities/latest.json`
+- Docs (optional MDX output): `content/api-generated/...`
+- Entities: `data/api/entities/latest.json`
 
 All AI answers should be grounded in search results and return exact indexed signatures.

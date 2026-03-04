@@ -8,9 +8,9 @@
     "start": "next start",
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "fumadocs-mdx",
-    "sdk:generate": "bun run scripts/generate-sdk-docs.ts",
-    "sdk:index": "bun run scripts/index-sdk-meili.ts",
-    "sdk:index:reset": "bun run scripts/index-sdk-meili.ts --reset"
+    "api:generate": "bun run scripts/generate-api-docs.ts",
+    "api:index": "bun run scripts/index-api-meili.ts",
+    "api:index:reset": "bun run scripts/index-api-meili.ts --reset"
   },
   "dependencies": {
     "@takumi-rs/image-response": "^0.69.5",

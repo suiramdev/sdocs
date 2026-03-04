@@ -2,8 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import type { SdkSearchResult } from "@/features/sdk/utils/schemas";
-import { searchSdkService } from "@/features/sdk/utils/service";
+import type { ApiSearchResult } from "@/features/api/utils/schemas";
+import { searchApiService } from "@/features/api/utils/service";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ const defaultSearchQuerySchema = z.object({
   query: z.string().trim().min(1),
 });
 
-const sdkToolQuerySchema = z.object({
+const apiToolQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
   q: z.string().trim().min(1),
 });
@@ -30,7 +30,7 @@ interface FumadocsSearchResult {
   url: string;
 }
 
-const toFumadocsResult = (result: SdkSearchResult): FumadocsSearchResult => ({
+const toFumadocsResult = (result: ApiSearchResult): FumadocsSearchResult => ({
   breadcrumbs: [result.namespace, result.class, result.type],
   content: result.displaySignature,
   id: result.id,
@@ -66,7 +66,7 @@ const runFumadocsSearch = async (
     limit: request.nextUrl.searchParams.get("limit") ?? undefined,
     query: request.nextUrl.searchParams.get("query") ?? "",
   });
-  const result = await searchSdkService({
+  const result = await searchApiService({
     limit: parsed.limit,
     query: parsed.query,
   });
@@ -75,12 +75,12 @@ const runFumadocsSearch = async (
 };
 
 const runToolSearch = (request: NextRequest) => {
-  const parsed = sdkToolQuerySchema.parse({
+  const parsed = apiToolQuerySchema.parse({
     limit: request.nextUrl.searchParams.get("limit") ?? undefined,
     q: request.nextUrl.searchParams.get("q") ?? "",
   });
 
-  return searchSdkService({
+  return searchApiService({
     limit: parsed.limit,
     query: parsed.q,
   });
@@ -110,7 +110,7 @@ export const POST = async (request: NextRequest) => {
   try {
     const body = bodySchema.parse(await request.json());
     return NextResponse.json(
-      await searchSdkService({
+      await searchApiService({
         limit: body.limit,
         query: body.query,
       })
