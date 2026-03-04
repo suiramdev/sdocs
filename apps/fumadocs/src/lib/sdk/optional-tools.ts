@@ -9,8 +9,8 @@ export const sdkDescribeTool = {
     additionalProperties: false,
     properties: {
       id: {
-        type: "string",
         description: "Entity id from search results.",
+        type: "string",
       },
     },
     required: ["id"],
@@ -25,8 +25,8 @@ export const sdkSignatureTool = {
     additionalProperties: false,
     properties: {
       id: {
-        type: "string",
         description: "Entity id from search results.",
+        type: "string",
       },
     },
     required: ["id"],
@@ -35,14 +35,10 @@ export const sdkSignatureTool = {
   name: "sdk_get_signature",
 } as const;
 
-export async function executeDescribeTool(input: {
-  id: string;
-}) {
+export async function executeDescribeTool(input: { id: string }) {
   return describeSdkEntityService(input);
 }
 
-export async function executeSignatureTool(input: {
-  id: string;
-}) {
+export async function executeSignatureTool(input: { id: string }) {
   return getSignatureService(input);
 }

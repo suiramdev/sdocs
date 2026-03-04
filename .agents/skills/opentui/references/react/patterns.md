@@ -78,7 +78,11 @@ const ThemeContext = createContext<{
 function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
-  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 function useTheme() {
@@ -100,7 +104,9 @@ function ThemedBox() {
   const { theme } = useTheme();
   return (
     <box backgroundColor={theme === "dark" ? "#1a1a2e" : "#f0f0f0"}>
-      <text fg={theme === "dark" ? "#fff" : "#000"}>Current theme: {theme}</text>
+      <text fg={theme === "dark" ? "#fff" : "#000"}>
+        Current theme: {theme}
+      </text>
     </box>
   );
 }
@@ -130,7 +136,11 @@ function FocusableForm() {
   return (
     <box flexDirection="column" gap={1}>
       {fields.map((field, i) => (
-        <input key={field} placeholder={`Enter ${field}...`} focused={i === focusIndex} />
+        <input
+          key={field}
+          placeholder={`Enter ${field}...`}
+          focused={i === focusIndex}
+        />
       ))}
     </box>
   );
@@ -385,7 +395,7 @@ function ProgressBar() {
         onUpdate: (anim) => {
           setProgress(Math.round(anim.targets[0].value));
         },
-      },
+      }
     );
   }, []);
 
@@ -423,11 +433,18 @@ function Clock() {
 ### Render Props
 
 ```tsx
-function Focusable({ children }: { children: (focused: boolean) => React.ReactNode }) {
+function Focusable({
+  children,
+}: {
+  children: (focused: boolean) => React.ReactNode;
+}) {
   const [focused, setFocused] = useState(false);
 
   return (
-    <box onMouseDown={() => setFocused(true)} onMouseUp={() => setFocused(false)}>
+    <box
+      onMouseDown={() => setFocused(true)}
+      onMouseUp={() => setFocused(false)}
+    >
       {children(focused)}
     </box>
   );
@@ -436,7 +453,9 @@ function Focusable({ children }: { children: (focused: boolean) => React.ReactNo
 // Usage
 <Focusable>
   {(focused) => (
-    <text fg={focused ? "#00ff00" : "#ffffff"}>{focused ? "Focused!" : "Click me"}</text>
+    <text fg={focused ? "#00ff00" : "#ffffff"}>
+      {focused ? "Focused!" : "Click me"}
+    </text>
   )}
 </Focusable>;
 ```

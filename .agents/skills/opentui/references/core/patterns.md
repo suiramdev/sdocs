@@ -7,7 +7,11 @@
 Create renderables and compose with `.add()`:
 
 ```typescript
-import { createCliRenderer, BoxRenderable, TextRenderable } from "@opentui/core";
+import {
+  createCliRenderer,
+  BoxRenderable,
+  TextRenderable,
+} from "@opentui/core";
 
 const renderer = await createCliRenderer();
 
@@ -52,8 +56,8 @@ const ui = Box(
   Box(
     { flexDirection: "row", gap: 2 },
     Text({ content: "Name:" }),
-    Input({ id: "name", placeholder: "Enter name..." }),
-  ),
+    Input({ id: "name", placeholder: "Enter name..." })
+  )
 );
 
 renderer.root.add(ui);
@@ -67,7 +71,7 @@ Create factory functions for reusable UI pieces:
 // Imperative factory
 function createLabeledInput(
   renderer: RenderContext,
-  props: { id: string; label: string; placeholder: string },
+  props: { id: string; label: string; placeholder: string }
 ) {
   const container = new BoxRenderable(renderer, {
     id: `${props.id}-container`,
@@ -79,7 +83,7 @@ function createLabeledInput(
     new TextRenderable(renderer, {
       id: `${props.id}-label`,
       content: props.label,
-    }),
+    })
   );
 
   container.add(
@@ -87,14 +91,18 @@ function createLabeledInput(
       id: `${props.id}-input`,
       placeholder: props.placeholder,
       width: 20,
-    }),
+    })
   );
 
   return container;
 }
 
 // Declarative factory
-function LabeledInput(props: { id: string; label: string; placeholder: string }) {
+function LabeledInput(props: {
+  id: string;
+  label: string;
+  placeholder: string;
+}) {
   return delegate(
     { focus: `${props.id}-input` },
     Box(
@@ -104,8 +112,8 @@ function LabeledInput(props: { id: string; label: string; placeholder: string })
         id: `${props.id}-input`,
         placeholder: props.placeholder,
         width: 20,
-      }),
-    ),
+      })
+    )
   );
 }
 ```
@@ -125,8 +133,8 @@ const form = delegate(
   Box(
     { border: true, padding: 1 },
     Text({ content: "Email:" }),
-    Input({ id: "email-input", placeholder: "you@example.com" }),
-  ),
+    Input({ id: "email-input", placeholder: "you@example.com" })
+  )
 );
 
 // This focuses the input inside, not the box
@@ -283,7 +291,8 @@ class FocusManager {
 
   focusPrevious() {
     this.focusables[this.currentIndex]?.blur();
-    this.currentIndex = (this.currentIndex - 1 + this.focusables.length) % this.focusables.length;
+    this.currentIndex =
+      (this.currentIndex - 1 + this.focusables.length) % this.focusables.length;
     this.focusables[this.currentIndex]?.focus();
   }
 }
@@ -316,7 +325,7 @@ const intervals: Timer[] = [];
 intervals.push(
   setInterval(() => {
     updateClock();
-  }, 1000),
+  }, 1000)
 );
 
 // Cleanup on exit

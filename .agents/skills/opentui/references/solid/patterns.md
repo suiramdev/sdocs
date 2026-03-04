@@ -74,7 +74,11 @@ function AutoSave() {
   });
 
   return (
-    <textarea value={content()} onInput={setContent} placeholder="Auto-saves after 1 second..." />
+    <textarea
+      value={content()}
+      onInput={setContent}
+      placeholder="Auto-saves after 1 second..."
+    />
   );
 }
 ```
@@ -100,7 +104,10 @@ function App() {
   });
 
   const addItem = (name: string) => {
-    setState("items", (items) => [...items, { id: Date.now(), name, done: false }]);
+    setState("items", (items) => [
+      ...items,
+      { id: Date.now(), name, done: false },
+    ]);
   };
 
   const toggleItem = (id: number) => {
@@ -108,7 +115,7 @@ function App() {
       "items",
       (item) => item.id === id,
       "done",
-      (done) => !done,
+      (done) => !done
     );
   };
 
@@ -117,10 +124,15 @@ function App() {
   };
 
   return (
-    <box backgroundColor={state.settings.theme === "dark" ? "#1a1a2e" : "#f0f0f0"}>
+    <box
+      backgroundColor={state.settings.theme === "dark" ? "#1a1a2e" : "#f0f0f0"}
+    >
       <For each={state.items}>
         {(item) => (
-          <text fg={item.done ? "#888" : "#fff"} onMouseDown={() => toggleItem(item.id)}>
+          <text
+            fg={item.done ? "#888" : "#fff"}
+            onMouseDown={() => toggleItem(item.id)}
+          >
             {item.done ? "[x]" : "[ ]"} {item.name}
           </text>
         )}
@@ -164,7 +176,11 @@ const StoreProvider: ParentComponent = (props) => {
     addItem: (item: string) => setState("items", (i) => [...i, item]),
   };
 
-  return <StoreContext.Provider value={[state, actions]}>{props.children}</StoreContext.Provider>;
+  return (
+    <StoreContext.Provider value={[state, actions]}>
+      {props.children}
+    </StoreContext.Provider>
+  );
 };
 
 function useStore() {
@@ -200,7 +216,10 @@ function ToggleableContent() {
         <text>Toggle</text>
       </box>
 
-      <Show when={visible()} fallback={<text fg="#888">Content is hidden</text>}>
+      <Show
+        when={visible()}
+        fallback={<text fg="#888">Content is hidden</text>}
+      >
         <text fg="#0f0">Content is visible!</text>
       </Show>
     </box>
@@ -220,7 +239,9 @@ function TodoList() {
   ]);
 
   const toggle = (id: number) => {
-    setTodos((todos) => todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    setTodos((todos) =>
+      todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+    );
   };
 
   return (
@@ -316,7 +337,12 @@ function FocusableForm() {
   return (
     <box flexDirection="column" gap={1}>
       <Index each={fields}>
-        {(field, i) => <input placeholder={`Enter ${field()}...`} focused={i === focusIndex()} />}
+        {(field, i) => (
+          <input
+            placeholder={`Enter ${field()}...`}
+            focused={i === focusIndex()}
+          />
+        )}
       </Index>
     </box>
   );
@@ -390,7 +416,9 @@ function DataDisplay() {
   return (
     <Suspense fallback={<text>Loading...</text>}>
       <Show when={data()}>
-        {(items) => <For each={items()}>{(item) => <text>{item.name}</text>}</For>}
+        {(items) => (
+          <For each={items()}>{(item) => <text>{item.name}</text>}</For>
+        )}
       </Show>
     </Suspense>
   );
@@ -406,9 +434,14 @@ function SafeDataDisplay() {
   const [data] = createResource(fetchData);
 
   return (
-    <ErrorBoundary fallback={(err) => <text fg="red">Error: {err.message}</text>}>
+    <ErrorBoundary
+      fallback={(err) => <text fg="red">Error: {err.message}</text>}
+    >
       <Show when={!data.loading} fallback={<text>Loading...</text>}>
-        <Show when={!data.error} fallback={<text fg="red">Failed to load</text>}>
+        <Show
+          when={!data.error}
+          fallback={<text fg="red">Failed to load</text>}
+        >
           <For each={data()}>{(item) => <text>{item.name}</text>}</For>
         </Show>
       </Show>
@@ -491,7 +524,7 @@ function AnimatedProgress() {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].value));
         },
-      },
+      }
     );
   });
 

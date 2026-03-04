@@ -280,7 +280,11 @@ const style = useMemo(() => ({ padding: 2 }), [])
 Use React.memo for expensive components:
 
 ```tsx
-const ExpensiveList = React.memo(function ExpensiveList({ items }: { items: Item[] }) {
+const ExpensiveList = React.memo(function ExpensiveList({
+  items,
+}: {
+  items: Item[];
+}) {
   return (
     <box flexDirection="column">
       {items.map((item) => (

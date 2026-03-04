@@ -254,7 +254,7 @@ import { createRoot } from "@opentui/react";
 
 export async function renderForTest(
   element: React.ReactElement,
-  options = { width: 80, height: 24 },
+  options = { width: 80, height: 24 }
 ) {
   const testSetup = await createTestRenderer(options);
   createRoot(testSetup.renderer).render(element);

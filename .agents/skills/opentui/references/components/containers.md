@@ -298,7 +298,11 @@ function List({ items, renderItem }) {
   return (
     <scrollbox height={15} focused>
       {items.map((item, i) => (
-        <box key={i} padding={1} backgroundColor={i % 2 === 0 ? "#222" : "#333"}>
+        <box
+          key={i}
+          padding={1}
+          backgroundColor={i % 2 === 0 ? "#222" : "#333"}
+        >
           {renderItem(item, i)}
         </box>
       ))}

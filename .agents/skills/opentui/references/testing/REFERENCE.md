@@ -94,7 +94,7 @@ test("component matches snapshot", async () => {
   box.add(
     new TextRenderable(testSetup.renderer, {
       content: "Content",
-    }),
+    })
   );
 
   testSetup.renderer.root.add(box);
@@ -132,7 +132,10 @@ function Greeting({ name }: { name: string }) {
 }
 
 test("Greeting renders name", async () => {
-  const testSetup = await testRender(<Greeting name="World" />, { width: 80, height: 24 });
+  const testSetup = await testRender(<Greeting name="World" />, {
+    width: 80,
+    height: 24,
+  });
 
   await testSetup.renderOnce();
   const frame = testSetup.captureCharFrame();
@@ -160,7 +163,7 @@ test("component matches snapshot", async () => {
     <box style={{ width: 20, height: 5, border: true }}>
       <text>Content</text>
     </box>,
-    { width: 25, height: 8 },
+    { width: 25, height: 8 }
   );
 
   await testSetup.renderOnce();
@@ -274,7 +277,10 @@ function Greeting(props: { name: string }) {
 }
 
 test("Greeting renders name", async () => {
-  const testSetup = await testRender(() => <Greeting name="World" />, { width: 80, height: 24 });
+  const testSetup = await testRender(() => <Greeting name="World" />, {
+    width: 80,
+    height: 24,
+  });
 
   await testSetup.renderOnce();
   const frame = testSetup.captureCharFrame();
@@ -304,7 +310,7 @@ test("component matches snapshot", async () => {
         <text>Content</text>
       </box>
     ),
-    { width: 25, height: 8 },
+    { width: 25, height: 8 }
   );
 
   await testSetup.renderOnce();
@@ -456,17 +462,23 @@ afterEach(() => {
 });
 
 test("shows loading state", async () => {
-  testSetup = await testRender(<DataLoader loading={true} />, { width: 40, height: 10 });
+  testSetup = await testRender(<DataLoader loading={true} />, {
+    width: 40,
+    height: 10,
+  });
 
   await testSetup.renderOnce();
   expect(testSetup.captureCharFrame()).toContain("Loading...");
 });
 
 test("shows data when loaded", async () => {
-  testSetup = await testRender(<DataLoader loading={false} data={["Item 1", "Item 2"]} />, {
-    width: 40,
-    height: 10,
-  });
+  testSetup = await testRender(
+    <DataLoader loading={false} data={["Item 1", "Item 2"]} />,
+    {
+      width: 40,
+      height: 10,
+    }
+  );
 
   await testSetup.renderOnce();
   const frame = testSetup.captureCharFrame();
@@ -481,7 +493,10 @@ test("shows data when loaded", async () => {
 test("renders all items", async () => {
   const items = ["Apple", "Banana", "Cherry"];
 
-  testSetup = await testRender(<ItemList items={items} />, { width: 40, height: 10 });
+  testSetup = await testRender(<ItemList items={items} />, {
+    width: 40,
+    height: 10,
+  });
 
   await testSetup.renderOnce();
   const frame = testSetup.captureCharFrame();
@@ -498,7 +513,7 @@ test("renders all items", async () => {
 test("matches layout snapshot", async () => {
   testSetup = await testRender(
     <AppLayout />,
-    { width: 120, height: 40 }, // Larger viewport
+    { width: 120, height: 40 } // Larger viewport
   );
 
   await testSetup.renderOnce();
@@ -514,7 +529,10 @@ test("matches layout snapshot", async () => {
 import { testRender } from "@opentui/react/test-utils";
 
 test("debug output", async () => {
-  const testSetup = await testRender(<MyComponent />, { width: 40, height: 10 });
+  const testSetup = await testRender(<MyComponent />, {
+    width: 40,
+    height: 10,
+  });
 
   await testSetup.renderOnce();
   const frame = testSetup.captureCharFrame();

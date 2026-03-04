@@ -47,7 +47,12 @@ OpenTUI uses Tree-sitter for syntax highlighting. Common languages:
 ### Styling
 
 ```tsx
-<code code={sourceCode} language="typescript" backgroundColor="#1a1a2e" showLineNumbers />
+<code
+  code={sourceCode}
+  language="typescript"
+  backgroundColor="#1a1a2e"
+  showLineNumbers
+/>
 ```
 
 ### onHighlight Callback

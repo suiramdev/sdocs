@@ -178,7 +178,12 @@ Render components dynamically:
 import { Dynamic } from "@opentui/solid";
 
 function DynamicInput(props: { multiline: boolean }) {
-  return <Dynamic component={props.multiline ? "textarea" : "input"} placeholder="Enter text..." />;
+  return (
+    <Dynamic
+      component={props.multiline ? "textarea" : "input"}
+      placeholder="Enter text..."
+    />
+  );
 }
 ```
 

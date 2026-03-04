@@ -39,7 +39,7 @@ function AnimatedBox() {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].width));
         },
-      },
+      }
     );
   }, []);
 
@@ -70,7 +70,7 @@ function AnimatedBox() {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].width));
         },
-      },
+      }
     );
   });
 
@@ -100,7 +100,7 @@ timeline.add(
     onUpdate: (anim) => {
       box.setLeft(Math.round(anim.targets[0].x));
     },
-  },
+  }
 );
 
 engine.addTimeline(timeline);
@@ -152,7 +152,7 @@ timeline.add(
       // Called when this animation completes
     },
   },
-  0, // Start time in timeline (optional)
+  0 // Start time in timeline (optional)
 );
 ```
 
@@ -243,7 +243,7 @@ function ProgressBar({ progress }: { progress: number }) {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].value));
         },
-      },
+      }
     );
   }, [progress]);
 
@@ -276,7 +276,7 @@ function FadeIn({ children }) {
         onUpdate: (anim) => {
           setOpacity(anim.targets[0].opacity);
         },
-      },
+      }
     );
   }, []);
 
@@ -350,7 +350,7 @@ function SlideIn({ children, from = "left" }) {
         onUpdate: (anim) => {
           setOffset(Math.round(anim.targets[0].offset));
         },
-      },
+      }
     );
   }, []);
 

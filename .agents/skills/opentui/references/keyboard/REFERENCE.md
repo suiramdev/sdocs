@@ -209,7 +209,7 @@ useKeyboard(
       // Key released
     }
   },
-  { release: true }, // Enable release events
+  { release: true } // Enable release events
 );
 
 // Solid
@@ -219,7 +219,7 @@ useKeyboard(
       // Key released
     }
   },
-  { release: true },
+  { release: true }
 );
 ```
 
@@ -313,7 +313,11 @@ function Editor() {
   return (
     <box flexDirection="column">
       <text>Mode: {mode}</text>
-      <textarea value={content} onChange={setContent} focused={mode === "insert"} />
+      <textarea
+        value={content}
+        onChange={setContent}
+        focused={mode === "insert"}
+      />
     </box>
   );
 }
@@ -337,7 +341,7 @@ function Game() {
         return newKeys;
       });
     },
-    { release: true },
+    { release: true }
   );
 
   // Game logic uses pressed set

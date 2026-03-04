@@ -27,7 +27,7 @@ interface MeiliHit {
 }
 
 const escapeFilterValue = (value: string): string =>
-  value.replaceAll(/\\/gu, "\\\\").replaceAll(/"/gu, '\\"');
+  value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 
 const toSearchResult = (hit: {
   class: string;
@@ -147,7 +147,11 @@ const scoreContains = (value: string, query: string, points: number): number =>
 const scoreTerms = (value: string, terms: string[], points: number): number =>
   terms.reduce((acc, term) => acc + (value.includes(term) ? points : 0), 0);
 
-const scoreEntity = (entity: SdkEntity, query: string, terms: string[]): number => {
+const scoreEntity = (
+  entity: SdkEntity,
+  query: string,
+  terms: string[]
+): number => {
   const className = entity.class.toLowerCase();
   const description = entity.description.toLowerCase();
   const name = entity.name.toLowerCase();

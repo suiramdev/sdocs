@@ -81,7 +81,11 @@ zIndex;
 ### Core (Imperative)
 
 ```typescript
-import { createCliRenderer, TextRenderable, BoxRenderable } from "@opentui/core";
+import {
+  createCliRenderer,
+  TextRenderable,
+  BoxRenderable,
+} from "@opentui/core";
 
 const renderer = await createCliRenderer();
 

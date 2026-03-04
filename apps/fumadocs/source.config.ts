@@ -7,10 +7,10 @@ export const docs = defineDocs({
   dir: "content/docs",
   docs: {
     files: ["**/*.mdx", "!sdk/**/*.mdx"],
-    schema: pageSchema,
     postprocess: {
       includeProcessedMarkdown: true,
     },
+    schema: pageSchema,
   },
   meta: {
     files: ["**/meta.json", "!sdk/**/meta.json"],

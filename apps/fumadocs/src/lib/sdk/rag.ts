@@ -60,13 +60,13 @@ async function generateWithOpenAI(
     body: JSON.stringify({
       messages: [
         {
-          role: "system",
           content:
             "You are an SDK assistant. Answer only using retrieved SDK entities. Never invent methods, namespaces, or signatures. Quote signatures exactly as provided. If evidence is insufficient, explicitly ask for a refined query.",
+          role: "system",
         },
         {
-          role: "user",
           content: `Question:\n${question}\n\nRetrieved SDK entities:\n${context}`,
+          role: "user",
         },
       ],
       model: process.env.SDK_RAG_MODEL ?? "gpt-4.1-mini",

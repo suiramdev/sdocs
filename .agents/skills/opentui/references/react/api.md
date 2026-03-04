@@ -58,7 +58,9 @@ function ThemedApp() {
 
   return (
     <box backgroundColor={theme === "dark" ? "#1a1a2e" : "#ffffff"}>
-      <text fg={theme === "dark" ? "#fff" : "#000"}>Current theme: {theme}</text>
+      <text fg={theme === "dark" ? "#fff" : "#000"}>
+        Current theme: {theme}
+      </text>
     </box>
   );
 }
@@ -102,7 +104,7 @@ function GameControls() {
         return newKeys;
       });
     },
-    { release: true }, // Include release events
+    { release: true } // Include release events
   );
 
   return <text>Pressed: {Array.from(pressed).join(", ")}</text>;
@@ -189,7 +191,7 @@ function AnimatedBox() {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].width));
         },
-      },
+      }
     );
   }, [timeline]);
 
@@ -378,7 +380,12 @@ function AnimatedBox() {
 ### Code Component
 
 ```tsx
-<code code={sourceCode} language="typescript" showLineNumbers highlightLines={[1, 5, 10]} />
+<code
+  code={sourceCode}
+  language="typescript"
+  showLineNumbers
+  highlightLines={[1, 5, 10]}
+/>
 ```
 
 ### Line Number Component

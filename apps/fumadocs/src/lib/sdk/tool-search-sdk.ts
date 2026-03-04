@@ -9,15 +9,15 @@ export const searchSdkTool = {
   input_schema: {
     additionalProperties: false,
     properties: {
-      query: {
-        description: "Natural language query to find SDK entities.",
-        type: "string",
-      },
       limit: {
         description: "Maximum number of ranked entities to return.",
         maximum: 20,
         minimum: 1,
         type: "integer",
+      },
+      query: {
+        description: "Natural language query to find SDK entities.",
+        type: "string",
       },
     },
     required: ["query"],

@@ -358,7 +358,11 @@ function Form() {
   return (
     <box flexDirection="column" gap={1}>
       {fields.map((field, i) => (
-        <input key={field} placeholder={`Enter ${field}`} focused={i === focusIndex} />
+        <input
+          key={field}
+          placeholder={`Enter ${field}`}
+          focused={i === focusIndex}
+        />
       ))}
     </box>
   );
@@ -381,7 +385,9 @@ input.isFocused(); // Check focus state
 function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [focusField, setFocusField] = useState<"username" | "password">("username");
+  const [focusField, setFocusField] = useState<"username" | "password">(
+    "username"
+  );
 
   useKeyboard((key) => {
     if (key.name === "tab") {
@@ -425,7 +431,9 @@ function SearchableList({ items, onItemSelected }) {
   const [focusSearch, setFocusSearch] = useState(true);
   const [preview, setPreview] = useState(null);
 
-  const filtered = items.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
+  const filtered = items.filter((item) =>
+    item.toLowerCase().includes(query.toLowerCase())
+  );
 
   useKeyboard((key) => {
     if (key.name === "tab") {
@@ -435,7 +443,12 @@ function SearchableList({ items, onItemSelected }) {
 
   return (
     <box flexDirection="column">
-      <input value={query} onChange={setQuery} placeholder="Search..." focused={focusSearch} />
+      <input
+        value={query}
+        onChange={setQuery}
+        placeholder="Search..."
+        focused={focusSearch}
+      />
       <select
         options={filtered.map((item) => ({ name: item }))}
         focused={!focusSearch}

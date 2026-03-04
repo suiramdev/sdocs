@@ -254,7 +254,7 @@ import { testRender } from "@opentui/solid";
 
 export async function renderForTest(
   Component: () => JSX.Element,
-  options = { width: 80, height: 24 },
+  options = { width: 80, height: 24 }
 ) {
   return await testRender(Component, options);
 }

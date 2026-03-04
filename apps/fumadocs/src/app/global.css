@@ -15,6 +15,41 @@
     var(--color-fd-muted-foreground) 86%,
     var(--color-fd-foreground) 14%
   );
+  --sdk-token-default: color-mix(
+    in oklab,
+    var(--color-fd-foreground) 92%,
+    var(--color-fd-muted-foreground) 8%
+  );
+  --sdk-token-keyword: color-mix(
+    in oklab,
+    #4f46e5 72%,
+    var(--color-fd-primary) 28%
+  );
+  --sdk-token-modifier: color-mix(
+    in oklab,
+    #7c3aed 68%,
+    var(--color-fd-primary) 32%
+  );
+  --sdk-token-type: color-mix(
+    in oklab,
+    #0f766e 66%,
+    var(--color-fd-primary) 34%
+  );
+  --sdk-token-generic: color-mix(
+    in oklab,
+    #9333ea 62%,
+    var(--color-fd-primary) 38%
+  );
+  --sdk-token-parameter: color-mix(
+    in oklab,
+    #d97706 70%,
+    var(--color-fd-primary) 30%
+  );
+  --sdk-token-member: color-mix(
+    in oklab,
+    var(--color-fd-foreground) 94%,
+    var(--color-fd-primary) 6%
+  );
 }
 
 .sdk-reference section {
@@ -62,6 +97,13 @@
   margin: 0;
 }
 
+.sdk-member-title-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .sdk-member-title a {
   display: block;
   color: inherit;
@@ -70,6 +112,18 @@
 
 .sdk-member-title a:hover {
   opacity: 0.95;
+}
+
+.sdk-obsolete-badge {
+  border: 1px solid color-mix(in oklab, #dc2626 45%, var(--sdk-border) 55%);
+  border-radius: 999px;
+  color: color-mix(in oklab, #dc2626 75%, var(--color-fd-foreground) 25%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 0.25rem 0.48rem;
+  text-transform: uppercase;
 }
 
 .sdk-signature {
@@ -103,6 +157,35 @@
 .sdk-page-signature .sdk-signature {
   font-size: clamp(1.05rem, 0.95rem + 0.55vw, 1.34rem);
   line-height: 1.45;
+}
+
+.sdk-token {
+  color: var(--sdk-token-default);
+}
+
+.sdk-token-keyword {
+  color: var(--sdk-token-keyword);
+}
+
+.sdk-token-modifier {
+  color: var(--sdk-token-modifier);
+}
+
+.sdk-token-type {
+  color: var(--sdk-token-type);
+}
+
+.sdk-token-generic {
+  color: var(--sdk-token-generic);
+}
+
+.sdk-token-parameter {
+  color: var(--sdk-token-parameter);
+}
+
+.sdk-token-member {
+  color: var(--sdk-token-member);
+  font-weight: 600;
 }
 
 .sdk-member-summary {

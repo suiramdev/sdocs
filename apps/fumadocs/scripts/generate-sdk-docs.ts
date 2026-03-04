@@ -44,6 +44,11 @@ interface RawParameter {
   Default?: string;
 }
 
+interface RawAttribute {
+  FullName?: string;
+  ConstructorArguments?: string[];
+}
+
 interface RawMethod {
   Name?: string;
   FullName?: string;
@@ -58,6 +63,7 @@ interface RawMethod {
   IsVirtual?: boolean;
   IsSealed?: boolean;
   IsOverride?: boolean;
+  Attributes?: RawAttribute[];
 }
 
 interface RawProperty {
@@ -71,6 +77,7 @@ interface RawProperty {
   IsStatic?: boolean;
   IsVirtual?: boolean;
   IsSealed?: boolean;
+  Attributes?: RawAttribute[];
 }
 
 interface RawType {
@@ -93,6 +100,7 @@ interface RawType {
   IsAbstract?: boolean;
   IsStatic?: boolean;
   IsSealed?: boolean;
+  Attributes?: RawAttribute[];
 }
 
 interface RawSdkDump {
@@ -430,6 +438,42 @@ function buildMeiliId(entityId: string, sequence: number): string {
   return `sdk_${sequence}_${shortHash(entityId)}`;
 }
 
+function getObsoleteInfo(attributes: RawAttribute[] | undefined): {
+  isObsolete: boolean;
+  obsoleteMessage: string;
+} {
+  const obsoleteAttribute = (attributes ?? []).find((attribute) => {
+    const fullName = attribute.FullName ?? "";
+    return (
+      fullName === "ObsoleteAttribute" ||
+      fullName === "System.ObsoleteAttribute" ||
+      fullName.endsWith(".ObsoleteAttribute")
+    );
+  });
+
+  if (!obsoleteAttribute) {
+    return {
+      isObsolete: false,
+      obsoleteMessage: "",
+    };
+  }
+
+  const obsoleteMessage =
+    obsoleteAttribute.ConstructorArguments?.find((value) => {
+      const trimmed = sanitizeText(value).trim();
+      return (
+        trimmed.length > 0 &&
+        trimmed.toLowerCase() !== "true" &&
+        trimmed.toLowerCase() !== "false"
+      );
+    }) ?? "";
+
+  return {
+    isObsolete: true,
+    obsoleteMessage: sanitizeText(obsoleteMessage),
+  };
+}
+
 function toDocUrl(filePath: string): { pathValue: string; url: string } {
   const relativeToSdkRoot = path
     .relative(sdkDocsRoot, filePath)
@@ -746,6 +790,7 @@ async function main() {
     );
 
     const typeDocs = normalizeDocumentation(rawType.Documentation);
+    const typeObsolete = getObsoleteInfo(rawType.Attributes);
     const typeDescription = buildDescription(typeDocs);
     const typeEntityId = buildEntityId(typeDocId);
     entitySequence += 1;
@@ -767,9 +812,11 @@ async function main() {
       examples: typeDocs.examples,
       exceptions: typeDocs.exceptions,
       id: typeEntityId,
+      isObsolete: typeObsolete.isObsolete,
       meiliId: buildMeiliId(typeEntityId, entitySequence),
       name: typeName,
       namespace: namespaceName,
+      obsoleteMessage: typeObsolete.obsoleteMessage,
       parameters: [],
       path: "",
       remarks: typeDocs.remarks,
@@ -820,6 +867,7 @@ async function main() {
       );
 
       const methodDocs = normalizeDocumentation(method.Documentation);
+      const methodObsolete = getObsoleteInfo(method.Attributes);
       const methodParameters = (method.Parameters ?? []).map((param) => ({
         defaultValue: param.Default,
         description: sanitizeText(
@@ -844,9 +892,11 @@ async function main() {
         examples: methodDocs.examples,
         exceptions: methodDocs.exceptions,
         id: methodEntityId,
+        isObsolete: methodObsolete.isObsolete,
         meiliId: buildMeiliId(methodEntityId, entitySequence),
         name: methodName === ".ctor" ? `${typeName}.ctor` : methodName,
         namespace: namespaceName,
+        obsoleteMessage: methodObsolete.obsoleteMessage,
         parameters: methodParameters,
         path: "",
         remarks: methodDocs.remarks,
@@ -881,6 +931,7 @@ async function main() {
     for (const property of properties) {
       const propertyName = withFallback(property.Name, "Property");
       const propertyDocs = normalizeDocumentation(property.Documentation);
+      const propertyObsolete = getObsoleteInfo(property.Attributes);
       const fallbackPropertyDoc = `${typeFullName}.${propertyName}`;
       const propertyDocId = ensureDocId(
         "P",
@@ -911,9 +962,11 @@ async function main() {
         examples: propertyDocs.examples,
         exceptions: propertyDocs.exceptions,
         id: propertyEntityId,
+        isObsolete: propertyObsolete.isObsolete,
         meiliId: buildMeiliId(propertyEntityId, entitySequence),
         name: propertyName,
         namespace: namespaceName,
+        obsoleteMessage: propertyObsolete.obsoleteMessage,
         parameters: [],
         path: "",
         remarks: propertyDocs.remarks,

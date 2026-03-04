@@ -104,7 +104,9 @@ function ThemedApp() {
 
   return (
     <box backgroundColor={theme() === "dark" ? "#1a1a2e" : "#ffffff"}>
-      <text fg={theme() === "dark" ? "#fff" : "#000"}>Current theme: {theme()}</text>
+      <text fg={theme() === "dark" ? "#fff" : "#000"}>
+        Current theme: {theme()}
+      </text>
     </box>
   );
 }
@@ -148,7 +150,7 @@ function GameControls() {
         return newKeys;
       });
     },
-    { release: true },
+    { release: true }
   );
 
   return <text>Pressed: {Array.from(pressed()).join(", ")}</text>;
@@ -268,11 +270,13 @@ function AnimatedBox() {
         onUpdate: (anim) => {
           setWidth(Math.round(anim.targets[0].width));
         },
-      },
+      }
     );
   });
 
-  return <box style={{ width: width(), height: 3, backgroundColor: "#6a5acd" }} />;
+  return (
+    <box style={{ width: width(), height: 3, backgroundColor: "#6a5acd" }} />
+  );
 }
 ```
 
@@ -429,7 +433,12 @@ function AnimatedBox() {
 ### Line Number Component (Note: underscore)
 
 ```tsx
-<line_number code={sourceCode} language="typescript" startLine={1} highlightedLines={[5]} />
+<line_number
+  code={sourceCode}
+  language="typescript"
+  startLine={1}
+  highlightedLines={[5]}
+/>
 ```
 
 ### Diff Component
@@ -520,5 +529,9 @@ import { Portal } from "@opentui/solid";
 ```tsx
 import { Dynamic } from "@opentui/solid";
 
-<Dynamic component={isMultiline() ? "textarea" : "input"} placeholder="Enter text..." focused />;
+<Dynamic
+  component={isMultiline() ? "textarea" : "input"}
+  placeholder="Enter text..."
+  focused
+/>;
 ```
