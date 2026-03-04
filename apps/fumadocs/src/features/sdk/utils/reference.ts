@@ -1,4 +1,4 @@
-import type { SdkEntity } from "@/lib/sdk/schemas";
+import type { SdkEntity } from "@/features/sdk/utils/schemas";
 
 function hashText(value: string): string {
   let hash = 0;

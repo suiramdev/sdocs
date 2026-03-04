@@ -3,8 +3,12 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildSdkEntityAnchor } from "@/lib/sdk/reference";
-import type { SdkEntity, SdkException, SdkParameter } from "@/lib/sdk/schemas";
+import { buildSdkEntityAnchor } from "@/features/sdk/utils/reference";
+import type {
+  SdkEntity,
+  SdkException,
+  SdkParameter,
+} from "@/features/sdk/utils/schemas";
 
 interface CliOptions {
   input: string;

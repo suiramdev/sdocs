@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { cn } from "@/lib/cn";
+import { usePageReadQuery } from "@/features/docs/hooks/use-page-read-query";
+import { cn } from "@/shared/utils/cn";
 
 const cache = new Map<string, string>();
 
@@ -84,12 +85,9 @@ export function ViewOptions({
    */
   githubUrl: string;
 }) {
-  const items = useMemo(() => {
-    const pageUrl =
-      typeof window !== "undefined" ? window.location.href : "loading";
-    const q = `Read ${pageUrl}, I want to ask questions about it.`;
+  const pageReadQuery = usePageReadQuery();
 
-    return [
+  const items = useMemo(() => [
       {
         href: githubUrl,
         icon: (
@@ -107,7 +105,7 @@ export function ViewOptions({
       },
       {
         href: `https://scira.ai/?${new URLSearchParams({
-          q,
+          q: pageReadQuery,
         })}`,
         icon: (
           <svg
@@ -172,7 +170,7 @@ export function ViewOptions({
       {
         href: `https://chatgpt.com/?${new URLSearchParams({
           hints: "search",
-          q,
+          q: pageReadQuery,
         })}`,
         icon: (
           <svg
@@ -189,7 +187,7 @@ export function ViewOptions({
       },
       {
         href: `https://claude.ai/new?${new URLSearchParams({
-          q,
+          q: pageReadQuery,
         })}`,
         icon: (
           <svg
@@ -206,7 +204,7 @@ export function ViewOptions({
       },
       {
         href: `https://cursor.com/link/prompt?${new URLSearchParams({
-          text: q,
+          text: pageReadQuery,
         })}`,
         icon: (
           <svg
@@ -221,8 +219,7 @@ export function ViewOptions({
         ),
         title: "Open in Cursor",
       },
-    ];
-  }, [githubUrl, markdownUrl]);
+    ], [githubUrl, markdownUrl, pageReadQuery]);
 
   return (
     <Popover>

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getSignatureService } from "@/lib/sdk/service";
+import { getSignatureService } from "@/features/sdk/utils/service";
 
 export const runtime = "nodejs";
 

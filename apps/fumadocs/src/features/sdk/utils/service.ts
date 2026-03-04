@@ -1,11 +1,11 @@
 import { performance } from "node:perf_hooks";
 
-import { getEntityById } from "@/lib/sdk/data";
-import { logSdkError, logSdkInfo } from "@/lib/sdk/logging";
-import { sdkSearchRequestSchema } from "@/lib/sdk/schemas";
-import type { SdkEntityType } from "@/lib/sdk/schemas";
-import { searchSdk } from "@/lib/sdk/search";
-import type { SdkSearchResponse } from "@/lib/sdk/search";
+import { getEntityById } from "@/features/sdk/utils/data";
+import { logSdkError, logSdkInfo } from "@/features/sdk/utils/logging";
+import { sdkSearchRequestSchema } from "@/features/sdk/utils/schemas";
+import type { SdkEntityType } from "@/features/sdk/utils/schemas";
+import { searchSdk } from "@/features/sdk/utils/search";
+import type { SdkSearchResponse } from "@/features/sdk/utils/search";
 
 interface SearchSdkInput {
   className?: string;

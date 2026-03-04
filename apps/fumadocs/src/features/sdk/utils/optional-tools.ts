@@ -1,7 +1,7 @@
 import {
   describeSdkEntityService,
   getSignatureService,
-} from "@/lib/sdk/service";
+} from "@/features/sdk/utils/service";
 
 export const sdkDescribeTool = {
   description: "Fetch full metadata for a specific indexed SDK entity id.",

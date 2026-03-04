@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const appRootDir = path.resolve(moduleDir, "../../..");
+const appRootDir = path.resolve(moduleDir, "../../../..");
 
 export const sdkConfig = {
   app: {

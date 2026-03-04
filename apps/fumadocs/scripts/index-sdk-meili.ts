@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { SdkEntity } from "../src/lib/sdk/schemas";
+import type { SdkEntity } from "../src/features/sdk/utils/schemas";
 
 interface CliOptions {
   reset: boolean;

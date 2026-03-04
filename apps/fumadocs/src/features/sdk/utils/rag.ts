@@ -1,4 +1,4 @@
-import { executeSearchSdkTool } from "@/lib/sdk/tool-search-sdk";
+import { executeSearchSdkTool } from "@/features/sdk/utils/tool-search-sdk";
 
 interface AnswerSdkQuestionInput {
   question: string;

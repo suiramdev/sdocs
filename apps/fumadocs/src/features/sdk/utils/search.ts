@@ -1,10 +1,10 @@
-import { sdkConfig } from "@/lib/sdk/config";
-import { loadSdkEntities } from "@/lib/sdk/data";
+import { sdkConfig } from "@/features/sdk/utils/config";
+import { loadSdkEntities } from "@/features/sdk/utils/data";
 import type {
   SdkEntity,
   SdkSearchRequest,
   SdkSearchResult,
-} from "@/lib/sdk/schemas";
+} from "@/features/sdk/utils/schemas";
 
 export interface SdkSearchResponse {
   query: string;

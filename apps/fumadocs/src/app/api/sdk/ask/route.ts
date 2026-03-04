@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { answerSdkQuestion } from "@/lib/sdk/rag";
+import { answerSdkQuestion } from "@/features/sdk/utils/rag";
 
 export const runtime = "nodejs";
 

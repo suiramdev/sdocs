@@ -1,8 +1,8 @@
 import { access, readFile } from "node:fs/promises";
 
-import { sdkConfig } from "@/lib/sdk/config";
-import { sdkEntitySchema } from "@/lib/sdk/schemas";
-import type { SdkEntity } from "@/lib/sdk/schemas";
+import { sdkConfig } from "@/features/sdk/utils/config";
+import { sdkEntitySchema } from "@/features/sdk/utils/schemas";
+import type { SdkEntity } from "@/features/sdk/utils/schemas";
 
 let entityCache: SdkEntity[] | null = null;
 let entityByIdCache: Map<string, SdkEntity> | null = null;

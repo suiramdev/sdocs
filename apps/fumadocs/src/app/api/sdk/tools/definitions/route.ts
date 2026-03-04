@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { sdkDescribeTool, sdkSignatureTool } from "@/lib/sdk/optional-tools";
-import { searchSdkTool } from "@/lib/sdk/tool-search-sdk";
+import {
+  sdkDescribeTool,
+  sdkSignatureTool,
+} from "@/features/sdk/utils/optional-tools";
+import { searchSdkTool } from "@/features/sdk/utils/tool-search-sdk";
 
 export const runtime = "nodejs";
 

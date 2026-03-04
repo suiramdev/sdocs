@@ -1,7 +1,7 @@
 import type { Folder, Root } from "fumadocs-core/page-tree";
 
-import { loadSdkEntities } from "@/lib/sdk/data";
-import type { SdkEntity } from "@/lib/sdk/schemas";
+import { loadSdkEntities } from "@/features/sdk/utils/data";
+import type { SdkEntity } from "@/features/sdk/utils/schemas";
 
 type MethodEntity = SdkEntity & { type: "method" };
 type PropertyEntity = SdkEntity & { type: "property" };

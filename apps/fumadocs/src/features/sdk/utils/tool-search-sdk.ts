@@ -1,7 +1,7 @@
-import { sdkConfig } from "@/lib/sdk/config";
-import { searchSdkToolInputSchema } from "@/lib/sdk/schemas";
-import type { SdkSearchResult } from "@/lib/sdk/schemas";
-import { searchSdkService } from "@/lib/sdk/service";
+import { sdkConfig } from "@/features/sdk/utils/config";
+import { searchSdkToolInputSchema } from "@/features/sdk/utils/schemas";
+import type { SdkSearchResult } from "@/features/sdk/utils/schemas";
+import { searchSdkService } from "@/features/sdk/utils/service";
 
 export const searchSdkTool = {
   description:
