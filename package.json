@@ -17,7 +17,9 @@
     "fix": "ultracite fix",
     "api:generate": "bun run --filter fumadocs api:generate",
     "api:index": "bun run --filter fumadocs api:index",
-    "api:index:reset": "bun run --filter fumadocs api:index:reset"
+    "api:index:reset": "bun run --filter fumadocs api:index:reset",
+    "meilisearch": "bun run --filter fumadocs meilisearch",
+    "meilisearch:stop": "bun run --filter fumadocs meilisearch:stop"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

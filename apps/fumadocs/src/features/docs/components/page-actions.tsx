@@ -87,7 +87,8 @@ export function ViewOptions({
 }) {
   const pageReadQuery = usePageReadQuery();
 
-  const items = useMemo(() => [
+  const items = useMemo(
+    () => [
       {
         href: githubUrl,
         icon: (
@@ -219,7 +220,9 @@ export function ViewOptions({
         ),
         title: "Open in Cursor",
       },
-    ], [githubUrl, markdownUrl, pageReadQuery]);
+    ],
+    [githubUrl, markdownUrl, pageReadQuery]
+  );
 
   return (
     <Popover>

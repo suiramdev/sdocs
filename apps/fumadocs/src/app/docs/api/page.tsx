@@ -11,14 +11,14 @@ import { loadApiEntities } from "@/features/api/utils/data";
 export default async function ApiIndexPage() {
   const entities = await loadApiEntities();
   const classCount = entities.filter(
-    (entity) => entity.type === "class",
+    (entity) => entity.type === "class"
   ).length;
   const enumCount = entities.filter((entity) => entity.type === "enum").length;
   const methodCount = entities.filter(
-    (entity) => entity.type === "method",
+    (entity) => entity.type === "method"
   ).length;
   const propertyCount = entities.filter(
-    (entity) => entity.type === "property",
+    (entity) => entity.type === "property"
   ).length;
 
   return (

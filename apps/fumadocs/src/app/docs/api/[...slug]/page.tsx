@@ -20,6 +20,7 @@ import {
   getTypeEntityByClass,
   loadApiEntities,
 } from "@/features/api/utils/data";
+import { SignatureText } from "@/features/api/components/signature-text";
 import {
   buildApiEntityAnchor,
   safeAnchorSegment,
@@ -46,20 +47,6 @@ interface TypeLinkLookup {
   bySimpleName: Map<string, ApiEntity | null>;
 }
 
-type SignatureTokenKind =
-  | "default"
-  | "generic"
-  | "keyword"
-  | "member"
-  | "modifier"
-  | "parameter"
-  | "type";
-
-interface SignatureToken {
-  kind: SignatureTokenKind;
-  value: string;
-}
-
 const SYSTEM_TYPE_ALIASES: Record<string, string> = {
   "System.Boolean": "bool",
   "System.Byte": "byte",
@@ -83,71 +70,6 @@ const WARNING_HINT = /\b(warning|obsolete|deprecated|breaking)\b/iu;
 const PERFORMANCE_HINT =
   /\b(performance|allocation|allocates|expensive|slow|cache)\b/iu;
 const TYPE_TOKEN = /[A-Za-z_][A-Za-z0-9_.`]*/gu;
-const SIGNATURE_TOKEN = /[A-Za-z_][A-Za-z0-9_]*|\s+|./gu;
-const IDENTIFIER_TOKEN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
-const SIGNATURE_MODIFIERS = new Set([
-  "abstract",
-  "async",
-  "const",
-  "extern",
-  "internal",
-  "new",
-  "override",
-  "partial",
-  "private",
-  "protected",
-  "public",
-  "readonly",
-  "sealed",
-  "static",
-  "unsafe",
-  "virtual",
-  "volatile",
-]);
-const SIGNATURE_KEYWORDS = new Set([
-  "class",
-  "enum",
-  "event",
-  "for",
-  "foreach",
-  "get",
-  "if",
-  "in",
-  "interface",
-  "namespace",
-  "operator",
-  "out",
-  "params",
-  "record",
-  "ref",
-  "return",
-  "set",
-  "struct",
-  "using",
-  "var",
-  "where",
-]);
-const SIGNATURE_BUILTIN_TYPES = new Set([
-  "bool",
-  "byte",
-  "char",
-  "decimal",
-  "double",
-  "dynamic",
-  "float",
-  "int",
-  "long",
-  "nint",
-  "nuint",
-  "object",
-  "sbyte",
-  "short",
-  "string",
-  "uint",
-  "ulong",
-  "ushort",
-  "void",
-]);
 
 function buildUrl(slug: string[]): string {
   return `/docs/api/${slug.join("/")}`;
@@ -155,151 +77,6 @@ function buildUrl(slug: string[]): string {
 
 function buildEntityAnchor(entity: ApiEntity): string {
   return buildApiEntityAnchor(entity);
-}
-
-function isIdentifierToken(value: string): boolean {
-  return IDENTIFIER_TOKEN.test(value);
-}
-
-function findPreviousNonWhitespaceIndex(
-  tokens: string[],
-  from: number,
-): number {
-  for (let index = from; index >= 0; index -= 1) {
-    if (!/^\s+$/u.test(tokens[index])) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function findNextNonWhitespaceIndex(tokens: string[], from: number): number {
-  for (let index = from; index < tokens.length; index += 1) {
-    if (!/^\s+$/u.test(tokens[index])) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function findMemberNameTokenIndex(tokens: string[]): number {
-  const openParenIndex = tokens.indexOf("(");
-  const stopIndex =
-    openParenIndex !== -1 ? openParenIndex - 1 : tokens.indexOf("{") - 1;
-
-  if (stopIndex < 0) {
-    return -1;
-  }
-
-  for (let index = stopIndex; index >= 0; index -= 1) {
-    if (isIdentifierToken(tokens[index])) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function collectParameterNameIndexes(tokens: string[]): Set<number> {
-  const indexes = new Set<number>();
-  let parenDepth = 0;
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token === "(") {
-      parenDepth += 1;
-      continue;
-    }
-
-    if (token === ")") {
-      parenDepth = Math.max(0, parenDepth - 1);
-      continue;
-    }
-
-    if (parenDepth <= 0 || !isIdentifierToken(token)) {
-      continue;
-    }
-
-    const nextIndex = findNextNonWhitespaceIndex(tokens, index + 1);
-    if (nextIndex < 0) {
-      continue;
-    }
-
-    const nextToken = tokens[nextIndex];
-    if (nextToken !== "," && nextToken !== ")" && nextToken !== "=") {
-      continue;
-    }
-
-    const previousIndex = findPreviousNonWhitespaceIndex(tokens, index - 1);
-    if (previousIndex >= 0 && tokens[previousIndex] === ".") {
-      continue;
-    }
-
-    indexes.add(index);
-  }
-
-  return indexes;
-}
-
-function tokenizeSignature(signature: string): SignatureToken[] {
-  const tokens = signature.match(SIGNATURE_TOKEN) ?? [signature];
-  const memberNameIndex = findMemberNameTokenIndex(tokens);
-  const parameterNameIndexes = collectParameterNameIndexes(tokens);
-  const genericIndexes = new Set<number>();
-  let genericDepth = 0;
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token === "<") {
-      genericDepth += 1;
-      continue;
-    }
-    if (token === ">") {
-      genericDepth = Math.max(0, genericDepth - 1);
-      continue;
-    }
-    if (genericDepth > 0 && isIdentifierToken(token)) {
-      genericIndexes.add(index);
-    }
-  }
-
-  return tokens.map((token, index) => {
-    if (/^\s+$/u.test(token) || !isIdentifierToken(token)) {
-      return { kind: "default", value: token };
-    }
-
-    if (index === memberNameIndex) {
-      return { kind: "member", value: token };
-    }
-
-    if (parameterNameIndexes.has(index)) {
-      return { kind: "parameter", value: token };
-    }
-
-    if (SIGNATURE_MODIFIERS.has(token)) {
-      return { kind: "modifier", value: token };
-    }
-
-    if (SIGNATURE_KEYWORDS.has(token)) {
-      return { kind: "keyword", value: token };
-    }
-
-    if (SIGNATURE_BUILTIN_TYPES.has(token)) {
-      return { kind: "type", value: token };
-    }
-
-    if (genericIndexes.has(index)) {
-      return { kind: "generic", value: token };
-    }
-
-    if (/^[A-Z]/u.test(token)) {
-      return { kind: "type", value: token };
-    }
-
-    return { kind: "default", value: token };
-  });
 }
 
 function splitSummary(entity: ApiEntity): SummaryParts {
@@ -335,6 +112,15 @@ function splitSummary(entity: ApiEntity): SummaryParts {
   };
 }
 
+function resolveObsoleteMessage(obsoleteMessage: string, fallback: string): string {
+  const trimmed = obsoleteMessage.trim();
+  if (trimmed.length > 0) {
+    return trimmed;
+  }
+
+  return fallback;
+}
+
 function compareEntities(left: ApiEntity, right: ApiEntity): number {
   const nameCompare = left.name.localeCompare(right.name);
   if (nameCompare !== 0) {
@@ -346,7 +132,7 @@ function compareEntities(left: ApiEntity, right: ApiEntity): number {
 
 function groupOverloads(
   members: ApiEntity[],
-  typeEntity: ApiEntity,
+  typeEntity: ApiEntity
 ): {
   anchor: string;
   key: string;
@@ -409,7 +195,7 @@ function buildTypeLookup(entities: ApiEntity[]): TypeLinkLookup {
 
 function resolveTypeEntity(
   token: string,
-  lookup: TypeLinkLookup,
+  lookup: TypeLinkLookup
 ): ApiEntity | null {
   const withoutArity = token.replace(/`\d+$/u, "");
 
@@ -469,7 +255,7 @@ function TypeExpression({
           title={target.class}
         >
           {displayValue}
-        </Link>,
+        </Link>
       );
     } else {
       chunks.push(
@@ -478,7 +264,7 @@ function TypeExpression({
           title={token.includes(".") ? token : undefined}
         >
           {displayValue}
-        </span>,
+        </span>
       );
     }
 
@@ -499,7 +285,7 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
 
   const isWarning = WARNING_HINT.test(remarks);
   const isPerformance = PERFORMANCE_HINT.test(remarks);
-  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
+  const title = isWarning ? "Warning" : (isPerformance ? "Performance" : "Note");
 
   return (
     <Callout title={title} type={isWarning ? "warning" : "info"}>
@@ -712,8 +498,10 @@ function MemberHeader({
   isObsolete: boolean;
   obsoleteMessage: string;
 }) {
-  const badgeTitle =
-    obsoleteMessage.length > 0 ? obsoleteMessage : "This member is obsolete.";
+  const badgeTitle = resolveObsoleteMessage(
+    obsoleteMessage,
+    "This API member is obsolete."
+  );
 
   return (
     <h3 className="api-member-title" id={anchor}>
@@ -735,23 +523,6 @@ function MemberHeader({
   );
 }
 
-function SignatureText({ value }: { value: string }) {
-  const signatureTokens = tokenizeSignature(value);
-
-  return (
-    <span className="api-signature" role="text">
-      {signatureTokens.map((token, index) => (
-        <span
-          className={`api-token api-token-${token.kind}`}
-          key={`${token.value}-${index}`}
-        >
-          {token.value}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function MemberReference({
   entity,
   lookup,
@@ -761,6 +532,10 @@ function MemberReference({
 }) {
   const anchor = buildEntityAnchor(entity);
   const { remarks, summary } = splitSummary(entity);
+  const obsoleteNotice =
+    entity.isObsolete === true
+      ? resolveObsoleteMessage(entity.obsoleteMessage, "This API member is obsolete.")
+      : "";
   const hasReturnsSection =
     (entity.returnType ?? "").length > 0 ||
     entity.returnsDescription.length > 0;
@@ -776,6 +551,9 @@ function MemberReference({
         />
         {summary.length > 0 ? (
           <p className="api-member-summary">{summary}</p>
+        ) : null}
+        {entity.isObsolete ? (
+          <p className="api-obsolete-message">Obsolete: {obsoleteNotice}</p>
         ) : null}
       </header>
 
@@ -899,7 +677,7 @@ function buildToc(
   propertyGroups: {
     anchor: string;
     members: ApiEntity[];
-  }[],
+  }[]
 ): TOCItemType[] {
   const items: TOCItemType[] = [];
 
@@ -980,7 +758,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
       ? selectedEntity
       : await getTypeEntityByClass(
           selectedEntity.namespace,
-          selectedEntity.class,
+          selectedEntity.class
         );
 
   if (!typeEntity) {
@@ -994,19 +772,19 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
 
   const allTypeEntities = await getEntitiesByClass(
     typeEntity.namespace,
-    typeEntity.class,
+    typeEntity.class
   );
   const allEntities = await loadApiEntities();
   const typeLookup = buildTypeLookup(allEntities);
 
   const constructors = allTypeEntities.filter(
-    (entity) => entity.type === "method" && entity.entityKind === "constructor",
+    (entity) => entity.type === "method" && entity.entityKind === "constructor"
   );
   const methods = allTypeEntities.filter(
-    (entity) => entity.type === "method" && entity.entityKind !== "constructor",
+    (entity) => entity.type === "method" && entity.entityKind !== "constructor"
   );
   const properties = allTypeEntities.filter(
-    (entity) => entity.type === "property",
+    (entity) => entity.type === "property"
   );
 
   const constructorGroups = groupOverloads(constructors, typeEntity);
@@ -1014,14 +792,25 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
   const propertyGroups = groupOverloads(properties, typeEntity);
 
   const summary = splitSummary(typeEntity);
+  const typeObsoleteNotice =
+    typeEntity.isObsolete === true
+      ? resolveObsoleteMessage(typeEntity.obsoleteMessage, "This API type is obsolete.")
+      : "";
   const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const selectedAnchor = buildEntityAnchor(selectedEntity);
 
   return (
     <DocsPage full tableOfContent={{ enabled: true }} toc={toc}>
       <DocsTitle>
-        <span className="api-page-signature api-reference">
-          <SignatureText value={typeEntity.displaySignature} />
+        <span className="api-page-title-row">
+          <span className="api-page-signature api-reference">
+            <SignatureText value={typeEntity.displaySignature} />
+          </span>
+          {typeEntity.isObsolete ? (
+            <span className="api-obsolete-badge" title={typeObsoleteNotice}>
+              Obsolete
+            </span>
+          ) : null}
         </span>
       </DocsTitle>
       {summary.summary.length > 0 ? (
@@ -1038,6 +827,11 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
               </a>
               .
             </p>
+          </Callout>
+        ) : null}
+        {typeEntity.isObsolete ? (
+          <Callout title="Obsolete" type="warning">
+            <p>{typeObsoleteNotice}</p>
           </Callout>
         ) : null}
 
@@ -1121,7 +915,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
 }
 
 export async function generateMetadata(
-  props: ApiEntityPageProps,
+  props: ApiEntityPageProps
 ): Promise<Metadata> {
   const params = await props.params;
   const targetUrl = buildUrl(params.slug);
@@ -1138,7 +932,7 @@ export async function generateMetadata(
       ? selectedEntity
       : await getTypeEntityByClass(
           selectedEntity.namespace,
-          selectedEntity.class,
+          selectedEntity.class
         );
 
   if (!typeEntity) {

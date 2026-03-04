@@ -7,6 +7,12 @@ This app serves generated C# API docs with Meilisearch-backed natural language s
 1. Start Meilisearch:
 
 ```bash
+bun run meilisearch
+```
+
+Or with Docker directly:
+
+```bash
 docker compose -f infra/meilisearch/docker-compose.yml up -d
 ```
 

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         },
         {
           status: 404,
-        },
+        }
       );
     }
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         },
         {
           status: 400,
-        },
+        }
       );
     }
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       },
       {
         status: 500,
-      },
+      }
     );
   }
 }

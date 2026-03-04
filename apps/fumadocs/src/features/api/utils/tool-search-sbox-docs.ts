@@ -94,7 +94,7 @@ const buildSearchUrl = (input: SearchSboxDocsToolInput): URL => {
 };
 
 export const executeSearchSboxDocsTool = async (
-  input: unknown,
+  input: unknown
 ): Promise<SearchSboxDocsToolOutput> => {
   const parsed = searchSboxDocsToolInputSchema.parse(input);
 
@@ -110,7 +110,7 @@ export const executeSearchSboxDocsTool = async (
 
     if (!response.ok) {
       throw new Error(
-        `search_sbox_docs call failed with status ${response.status}`,
+        `search_sbox_docs call failed with status ${response.status}`
       );
     }
 

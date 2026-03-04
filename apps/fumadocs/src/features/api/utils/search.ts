@@ -19,8 +19,10 @@ interface MeiliHit {
   description: string;
   displaySignature: string;
   id: string;
+  isObsolete?: boolean;
   name: string;
   namespace: string;
+  obsoleteMessage?: string;
   signature: string;
   type: ApiSearchResult["type"];
   url: string;
@@ -34,8 +36,10 @@ const toSearchResult = (hit: {
   description: string;
   displaySignature: string;
   id: string;
+  isObsolete?: boolean;
   name: string;
   namespace: string;
+  obsoleteMessage?: string;
   score?: number;
   signature: string;
   type: ApiSearchResult["type"];
@@ -45,8 +49,10 @@ const toSearchResult = (hit: {
   description: hit.description,
   displaySignature: hit.displaySignature,
   id: hit.id,
+  isObsolete: hit.isObsolete,
   name: hit.name,
   namespace: hit.namespace,
+  obsoleteMessage: hit.obsoleteMessage,
   score: hit.score,
   signature: hit.signature,
   type: hit.type,
@@ -101,6 +107,8 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
       "displaySignature",
       "description",
       "url",
+      "isObsolete",
+      "obsoleteMessage",
     ],
     filter: buildFilter(request),
     hybrid: hybridConfig,
@@ -122,8 +130,10 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
         description: hit.description,
         displaySignature: hit.displaySignature,
         id: hit.id,
+        isObsolete: hit.isObsolete,
         name: hit.name,
         namespace: hit.namespace,
+        obsoleteMessage: hit.obsoleteMessage,
         score: hit._rankingScore,
         signature: hit.signature,
         type: hit.type,
@@ -219,8 +229,10 @@ const searchLocally = async (request: ApiSearchRequest) => {
         description: item.entity.description,
         displaySignature: item.entity.displaySignature,
         id: item.entity.id,
+        isObsolete: item.entity.isObsolete,
         name: item.entity.name,
         namespace: item.entity.namespace,
+        obsoleteMessage: item.entity.obsoleteMessage,
         score: item.score,
         signature: item.entity.signature,
         type: item.entity.type,

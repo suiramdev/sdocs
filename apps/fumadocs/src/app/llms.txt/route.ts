@@ -10,7 +10,7 @@ export const GET = () => {
       .getPages()
       .map(
         (page) =>
-          `- [${page.data.title}](${page.url}): ${page.data.description}`,
+          `- [${page.data.title}](${page.url}): ${page.data.description}`
       ),
   ];
 

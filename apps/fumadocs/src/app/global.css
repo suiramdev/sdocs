@@ -115,15 +115,27 @@
 }
 
 .api-obsolete-badge {
-  border: 1px solid color-mix(in oklab, #dc2626 45%, var(--api-border) 55%);
+  border: 1px solid
+    color-mix(
+      in oklab,
+      #dc2626 45%,
+      var(
+          --api-border,
+          color-mix(in oklab, var(--color-fd-border) 88%, white 12%)
+        )
+        55%
+    );
   border-radius: 999px;
   color: color-mix(in oklab, #dc2626 75%, var(--color-fd-foreground) 25%);
+  display: inline-flex;
+  align-items: center;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   line-height: 1;
   padding: 0.25rem 0.48rem;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .api-signature {
@@ -157,6 +169,13 @@
 .api-page-signature .api-signature {
   font-size: clamp(1.05rem, 0.95rem + 0.55vw, 1.34rem);
   line-height: 1.45;
+}
+
+.api-page-title-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .api-token {
@@ -194,6 +213,15 @@
   font-size: 0.94rem;
   line-height: 1.65;
   font-weight: 400;
+  max-width: 85ch;
+}
+
+.api-obsolete-message {
+  margin: 0;
+  color: color-mix(in oklab, #dc2626 72%, var(--color-fd-foreground) 28%);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  font-weight: 500;
   max-width: 85ch;
 }
 
@@ -253,6 +281,115 @@
 .api-inline-type {
   font-size: 0.87rem;
   white-space: nowrap;
+}
+
+/* Search suggestion enhancements: API-reference-style signatures and description */
+.search-result-signature.api-signature {
+  --search-api-muted: var(
+    --api-muted,
+    color-mix(
+      in oklab,
+      var(--color-fd-muted-foreground) 86%,
+      var(--color-fd-foreground) 14%
+    )
+  );
+  --search-api-token-default: var(
+    --api-token-default,
+    color-mix(
+      in oklab,
+      var(--color-fd-foreground) 92%,
+      var(--color-fd-muted-foreground) 8%
+    )
+  );
+  --search-api-token-keyword: var(
+    --api-token-keyword,
+    color-mix(in oklab, #4f46e5 72%, var(--color-fd-primary) 28%)
+  );
+  --search-api-token-modifier: var(
+    --api-token-modifier,
+    color-mix(in oklab, #7c3aed 68%, var(--color-fd-primary) 32%)
+  );
+  --search-api-token-type: var(
+    --api-token-type,
+    color-mix(in oklab, #0f766e 66%, var(--color-fd-primary) 34%)
+  );
+  --search-api-token-generic: var(
+    --api-token-generic,
+    color-mix(in oklab, #9333ea 62%, var(--color-fd-primary) 38%)
+  );
+  --search-api-token-parameter: var(
+    --api-token-parameter,
+    color-mix(in oklab, #d97706 70%, var(--color-fd-primary) 30%)
+  );
+  --search-api-token-member: var(
+    --api-token-member,
+    color-mix(
+      in oklab,
+      var(--color-fd-foreground) 94%,
+      var(--color-fd-primary) 6%
+    )
+  );
+  display: inline;
+  font-family:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: -0.003em;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--search-api-token-default) !important;
+}
+
+.search-result-signature .api-token {
+  color: var(--search-api-token-default) !important;
+}
+
+.search-result-signature .api-token-modifier {
+  color: var(--search-api-token-modifier) !important;
+}
+
+.search-result-signature .api-token-keyword {
+  color: var(--search-api-token-keyword) !important;
+}
+
+.search-result-signature .api-token-type {
+  color: var(--search-api-token-type) !important;
+}
+
+.search-result-signature .api-token-generic {
+  color: var(--search-api-token-generic) !important;
+}
+
+.search-result-signature .api-token-parameter {
+  color: var(--search-api-token-parameter) !important;
+}
+
+.search-result-signature .api-token-member {
+  color: var(--search-api-token-member) !important;
+  font-weight: 600;
+}
+
+.search-result-desc {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(
+    --api-muted,
+    color-mix(
+      in oklab,
+      var(--color-fd-muted-foreground) 86%,
+      var(--color-fd-foreground) 14%
+    )
+  ) !important;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.search-result-obsolete-row {
+  display: block;
+  padding-top: 0.35rem;
 }
 
 .api-type-link {

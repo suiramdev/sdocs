@@ -21,6 +21,7 @@ type TypeBuckets = Map<string, TypeBucket>;
 type NamespaceBuckets = Map<string, TypeBuckets>;
 
 const API_ROOT_URL = "/docs/api";
+const GET_STARTED_URL = "/docs/get-started";
 const API_FOLDER_NAME = "API Reference";
 
 let cachedApiFolder: Folder | null = null;
@@ -32,7 +33,7 @@ const isPropertyEntity = (entity: ApiEntity): entity is PropertyEntity =>
   entity.type === "property";
 
 const isMemberEntity = (
-  entity: ApiEntity,
+  entity: ApiEntity
 ): entity is MethodEntity | PropertyEntity =>
   isMethodEntity(entity) || isPropertyEntity(entity);
 
@@ -45,7 +46,7 @@ const compareText = (left: string, right: string): number =>
 const getOrCreate = <TKey, TValue>(
   map: Map<TKey, TValue>,
   key: TKey,
-  factory: () => TValue,
+  factory: () => TValue
 ): TValue => {
   const existing = map.get(key);
   if (existing) {
@@ -60,7 +61,7 @@ const getOrCreate = <TKey, TValue>(
 const getOrCreateTypeBucket = (
   namespaces: NamespaceBuckets,
   namespaceName: string,
-  className: string,
+  className: string
 ): TypeBucket => {
   const typeBuckets = getOrCreate(namespaces, namespaceName, () => new Map());
 
@@ -98,7 +99,7 @@ const buildNamespaceBuckets = (entities: ApiEntity[]): NamespaceBuckets => {
     const bucket = getOrCreateTypeBucket(
       namespaces,
       entity.namespace,
-      entity.class,
+      entity.class
     );
     appendEntityToBucket(bucket, entity);
   }
@@ -111,7 +112,7 @@ const toTypeLabel = (className: string, bucket: TypeBucket): string =>
 
 const toTypePage = (
   className: string,
-  bucket: TypeBucket,
+  bucket: TypeBucket
 ): TypePageNode | null => {
   const typeUrl = bucket.typeEntity?.url ?? bucket.fallbackUrl;
 
@@ -183,14 +184,29 @@ const isApiFolder = (node: Root["children"][number]): boolean =>
   node.type === "folder" &&
   (node.index?.url === API_ROOT_URL || node.name === API_FOLDER_NAME);
 
+const isGetStartedPage = (node: Root["children"][number]): boolean => {
+  if (node.type === "page") {
+    return node.url === GET_STARTED_URL;
+  }
+
+  if (node.type === "folder") {
+    return node.index?.url === GET_STARTED_URL;
+  }
+
+  return false;
+};
+
 export const mergeApiMethodsTree = async (baseTree: Root): Promise<Root> => {
   const apiFolder = await getApiReferenceFolder();
 
+  const nonApiNodes = baseTree.children.filter((node) => !isApiFolder(node));
+  const reorderedNonApiNodes = [
+    ...nonApiNodes.filter(isGetStartedPage),
+    ...nonApiNodes.filter((node) => !isGetStartedPage(node)),
+  ];
+
   return {
     ...baseTree,
-    children: [
-      ...baseTree.children.filter((node) => !isApiFolder(node)),
-      apiFolder,
-    ],
+    children: [...reorderedNonApiNodes, apiFolder],
   };
 };

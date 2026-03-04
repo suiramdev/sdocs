@@ -8,11 +8,14 @@
     "start": "next start",
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "fumadocs-mdx",
+    "meilisearch": "docker compose -f infra/meilisearch/docker-compose.yml up -d",
+    "meilisearch:stop": "docker compose -f infra/meilisearch/docker-compose.yml down",
     "api:generate": "bun run scripts/generate-api-docs.ts",
     "api:index": "bun run scripts/index-api-meili.ts",
     "api:index:reset": "bun run scripts/index-api-meili.ts --reset"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@takumi-rs/image-response": "^0.69.5",
     "fumadocs-core": "16.6.8",
     "fumadocs-mdx": "14.2.9",

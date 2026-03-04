@@ -113,6 +113,8 @@ async function main() {
         "displaySignature",
         "description",
         "url",
+        "isObsolete",
+        "obsoleteMessage",
       ],
       distinctAttribute: "meiliId",
       filterableAttributes: ["type", "namespace", "class", "entityKind"],
