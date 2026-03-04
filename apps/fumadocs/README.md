@@ -44,10 +44,12 @@ ulimit -n 65536
 
 - `GET|POST /api/search`
 - `GET|POST /api/sdk/search`
+- `GET|POST /api/sbox/search`
 - `GET /api/sdk/describe`
 - `GET /api/sdk/get-signature`
 - `GET /api/sdk/tools/definitions`
 - `POST /api/sdk/tools/search-sdk`
+- `POST /api/sdk/tools/search-sbox-docs`
 - `POST /api/sdk/ask`
 
 ## Generation Outputs

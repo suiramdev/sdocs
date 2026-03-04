@@ -17,6 +17,9 @@ export default function DocsHomePage() {
       <DocsBody>
         <ul>
           <li>
+            <Link href="/docs/sbox-ai-skill">s&box AI skill</Link>
+          </li>
+          <li>
             <Link href="/docs/test">General docs</Link>
           </li>
           <li>

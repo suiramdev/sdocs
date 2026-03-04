@@ -1,0 +1,128 @@
+---
+title: s&box AI Skill
+description: Add an AI agent skill that searches s&box SDK documentation before generating gameplay or modding code.
+---
+
+This skill makes AI coding agents use this documentation site as a grounded
+reference for s&box modding APIs. It exposes a search API that returns
+structured method/class snippets, signatures, descriptions, and examples when
+available.
+
+## Purpose
+
+Use this skill when an AI agent is asked to:
+
+- Generate gameplay code
+- Modify entities, components, or systems
+- Suggest API calls for s&box mods
+
+The skill enforces a documentation-first workflow so the agent does not invent
+unsupported methods or signatures.
+
+## Installation
+
+1. Ensure this repository is available to your agent runtime.
+2. Register the skill file:
+   `.agents/skills/search-sdk/SKILL.md`
+3. Add the tool definition from:
+   `apps/fumadocs/data/sdk/tools/search_sbox_docs.json`
+4. Start the docs app so the search routes are reachable:
+
+```bash
+bun run dev
+```
+
+If your agent supports direct HTTP tools, bind `search_sbox_docs` to:
+
+- `POST /api/sdk/tools/search-sbox-docs` (tool endpoint), or
+- `GET|POST /api/sbox/search` (raw search endpoint)
+
+## Search API
+
+### Endpoint
+
+- `GET /api/sbox/search?q=<query>&limit=10&type=method`
+- `POST /api/sbox/search`
+
+### Request Parameters
+
+- `query` or `q` (required): search terms (class, method, component, gameplay system)
+- `limit` (optional): max results, `1-25`
+- `type` (optional): `class | method | enum | property`
+- `namespace` (optional): exact namespace filter
+- `className` (optional): exact class filter
+- `useHybrid` (optional): `true` to force hybrid ranking when available
+
+### Response Shape
+
+```json
+{
+  "query": "damage entity",
+  "source": "meilisearch",
+  "total": 18,
+  "returned": 5,
+  "results": [
+    {
+      "id": "M:Sandbox.SomeClass.TakeDamage(...)",
+      "type": "method",
+      "namespace": "Sandbox",
+      "className": "Sandbox.SomeClass",
+      "name": "TakeDamage",
+      "methodName": "TakeDamage",
+      "displaySignature": "public void TakeDamage(DamageInfo info)",
+      "description": "Apply damage to the current entity.",
+      "parameters": [{ "name": "info", "type": "DamageInfo" }],
+      "returnType": null,
+      "exampleUsage": "entity.TakeDamage( info );",
+      "examples": ["entity.TakeDamage( info );"],
+      "snippet": "Name: TakeDamage...",
+      "url": "/docs/sdk/..."
+    }
+  ]
+}
+```
+
+## Programmatic Examples
+
+### Search Gameplay APIs
+
+```bash
+curl "http://localhost:4000/api/sbox/search?q=damage%20system&limit=5"
+```
+
+### Search Entity Methods
+
+```bash
+curl "http://localhost:4000/api/sbox/search?q=TakeDamage&type=method&limit=8"
+```
+
+### Search Modding Systems
+
+```bash
+curl "http://localhost:4000/api/sbox/search?q=inventory%20component&limit=8"
+```
+
+### POST Query Example
+
+```bash
+curl -X POST "http://localhost:4000/api/sbox/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "camera controller",
+    "type": "class",
+    "limit": 6
+  }'
+```
+
+## Agent Usage Pattern
+
+1. Search docs with `search_sbox_docs` before writing code.
+2. Pick methods/classes from returned `displaySignature` and `description`.
+3. Reuse `exampleUsage` when available for safe API patterns.
+4. Include source URLs in generated explanations or code comments.
+
+For implementation details, see:
+
+- Skill file: `.agents/skills/search-sdk/SKILL.md`
+- Tool route: `apps/fumadocs/src/app/api/sdk/tools/search-sbox-docs/route.ts`
+- Search route: `apps/fumadocs/src/app/api/sbox/search/route.ts`
