@@ -14,13 +14,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
+import { SignatureText } from "@/features/api/components/signature-text";
 import {
   getEntitiesByClass,
   getEntityByUrl,
   getTypeEntityByClass,
   loadApiEntities,
 } from "@/features/api/utils/data";
-import { SignatureText } from "@/features/api/components/signature-text";
 import {
   buildApiEntityAnchor,
   safeAnchorSegment,
@@ -30,6 +31,7 @@ import type {
   ApiException,
   ApiParameter,
 } from "@/features/api/utils/schemas";
+import type { SignatureToken } from "@/features/api/utils/signature-tokens";
 
 interface ApiEntityPageProps {
   params: Promise<{
@@ -112,7 +114,10 @@ function splitSummary(entity: ApiEntity): SummaryParts {
   };
 }
 
-function resolveObsoleteMessage(obsoleteMessage: string, fallback: string): string {
+function resolveObsoleteMessage(
+  obsoleteMessage: string,
+  fallback: string
+): string {
   const trimmed = obsoleteMessage.trim();
   if (trimmed.length > 0) {
     return trimmed;
@@ -224,6 +229,22 @@ function simplifyTypeToken(token: string): string {
   return withoutArity;
 }
 
+function resolveSignatureTokenHref(
+  token: SignatureToken,
+  lookup: TypeLinkLookup
+): string | null {
+  if (
+    token.kind !== "generic" &&
+    token.kind !== "member" &&
+    token.kind !== "type"
+  ) {
+    return null;
+  }
+
+  const target = resolveTypeEntity(token.value, lookup);
+  return target?.url ?? null;
+}
+
 function TypeExpression({
   lookup,
   value,
@@ -285,7 +306,7 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
 
   const isWarning = WARNING_HINT.test(remarks);
   const isPerformance = PERFORMANCE_HINT.test(remarks);
-  const title = isWarning ? "Warning" : (isPerformance ? "Performance" : "Note");
+  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
 
   return (
     <Callout title={title} type={isWarning ? "warning" : "info"}>
@@ -294,122 +315,59 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
   );
 }
 
-function ParametersTable({
-  lookup,
-  parameters,
-}: {
-  lookup: TypeLinkLookup;
-  parameters: ApiParameter[];
-}) {
+function ParameterNotes({ parameters }: { parameters: ApiParameter[] }) {
   if (parameters.length === 0) {
     return null;
   }
 
-  return (
-    <table className="api-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        {parameters.map((parameter) => {
-          const details = parameter.description?.trim();
-          const detailsParts: string[] = [];
-          if (details && details.length > 0) {
-            detailsParts.push(details);
-          }
-          if (parameter.defaultValue) {
-            detailsParts.push(`Default: ${parameter.defaultValue}`);
-          }
+  const entries = parameters
+    .map((parameter) => {
+      const details = parameter.description?.trim();
+      const detailsParts: string[] = [];
 
-          return (
-            <tr key={`${parameter.name}-${parameter.type}`}>
-              <td>
-                <code>{parameter.name}</code>
-              </td>
-              <td>
-                <TypeExpression lookup={lookup} value={parameter.type} />
-              </td>
-              <td>{detailsParts.join(" ")}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
+      if (details && details.length > 0) {
+        detailsParts.push(details);
+      }
 
-function ReturnsTable({
-  entity,
-  lookup,
-}: {
-  entity: ApiEntity;
-  lookup: TypeLinkLookup;
-}) {
-  const hasReturnType = (entity.returnType ?? "").length > 0;
-  const hasDescription = entity.returnsDescription.length > 0;
+      if (parameter.defaultValue) {
+        detailsParts.push(`Default: ${parameter.defaultValue}`);
+      }
 
-  if (!hasReturnType && !hasDescription) {
+      if (detailsParts.length === 0) {
+        return null;
+      }
+
+      return {
+        details: detailsParts.join(" "),
+        key: `${parameter.name}-${parameter.type}`,
+        name: parameter.name,
+      };
+    })
+    .filter((entry) => entry !== null);
+
+  if (entries.length === 0) {
     return null;
   }
 
-  if (hasReturnType && hasDescription) {
-    return (
-      <table className="api-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <TypeExpression lookup={lookup} value={entity.returnType ?? ""} />
-            </td>
-            <td>{entity.returnsDescription}</td>
-          </tr>
-        </tbody>
-      </table>
-    );
-  }
-
-  if (hasReturnType) {
-    return (
-      <table className="api-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <TypeExpression lookup={lookup} value={entity.returnType ?? ""} />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    );
-  }
-
   return (
-    <table className="api-table">
-      <thead>
-        <tr>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>{entity.returnsDescription}</td>
-        </tr>
-      </tbody>
-    </table>
+    <ul className="api-detail-list">
+      {entries.map((entry) => (
+        <li key={entry.key}>
+          <code>{entry.name}</code>
+          <span>{`: ${entry.details}`}</span>
+        </li>
+      ))}
+    </ul>
   );
+}
+
+function ReturnsNotes({ description }: { description: string }) {
+  const details = description.trim();
+  if (details.length === 0) {
+    return null;
+  }
+
+  return <p className="api-detail-text">{details}</p>;
 }
 
 function ExceptionsTable({
@@ -489,11 +447,13 @@ function ExamplesBlock({ examples }: { examples: string[] }) {
 
 function MemberHeader({
   anchor,
+  lookup,
   title,
   isObsolete,
   obsoleteMessage,
 }: {
   anchor: string;
+  lookup: TypeLinkLookup;
   title: string;
   isObsolete: boolean;
   obsoleteMessage: string;
@@ -506,18 +466,20 @@ function MemberHeader({
   return (
     <h3 className="api-member-title" id={anchor}>
       <span className="api-member-title-row">
-        <a
-          aria-label={`Link to section ${title}`}
-          className="api-member-title-link"
-          href={`#${anchor}`}
-        >
-          <SignatureText value={title} />
-        </a>
-        {isObsolete ? (
-          <span className="api-obsolete-badge" title={badgeTitle}>
-            Obsolete
-          </span>
-        ) : null}
+        <span className="api-member-title-signature">
+          <SignatureText
+            getTokenHref={(token) => resolveSignatureTokenHref(token, lookup)}
+            value={title}
+          />
+        </span>
+        <span className="api-member-title-actions">
+          {isObsolete ? (
+            <span className="api-obsolete-badge" title={badgeTitle}>
+              Obsolete
+            </span>
+          ) : null}
+          <SignatureAnchorButton anchor={anchor} signature={title} />
+        </span>
       </span>
     </h3>
   );
@@ -534,11 +496,17 @@ function MemberReference({
   const { remarks, summary } = splitSummary(entity);
   const obsoleteNotice =
     entity.isObsolete === true
-      ? resolveObsoleteMessage(entity.obsoleteMessage, "This API member is obsolete.")
+      ? resolveObsoleteMessage(
+          entity.obsoleteMessage,
+          "This API member is obsolete."
+        )
       : "";
-  const hasReturnsSection =
-    (entity.returnType ?? "").length > 0 ||
-    entity.returnsDescription.length > 0;
+  const hasParameterSection = entity.parameters.some(
+    (parameter) =>
+      (parameter.description?.trim().length ?? 0) > 0 ||
+      (parameter.defaultValue?.trim().length ?? 0) > 0
+  );
+  const hasReturnsSection = entity.returnsDescription.trim().length > 0;
 
   return (
     <article className="api-member-card">
@@ -546,6 +514,7 @@ function MemberReference({
         <MemberHeader
           anchor={anchor}
           isObsolete={entity.isObsolete}
+          lookup={lookup}
           obsoleteMessage={entity.obsoleteMessage}
           title={entity.displaySignature}
         />
@@ -563,13 +532,13 @@ function MemberReference({
         </section>
       ) : null}
 
-      {entity.parameters.length > 0 ? (
+      {hasParameterSection ? (
         <section
           aria-labelledby={`${anchor}-parameters`}
           className="api-subsection"
         >
           <h4 id={`${anchor}-parameters`}>Parameters</h4>
-          <ParametersTable lookup={lookup} parameters={entity.parameters} />
+          <ParameterNotes parameters={entity.parameters} />
         </section>
       ) : null}
 
@@ -579,7 +548,7 @@ function MemberReference({
           className="api-subsection"
         >
           <h4 id={`${anchor}-returns`}>Returns</h4>
-          <ReturnsTable entity={entity} lookup={lookup} />
+          <ReturnsNotes description={entity.returnsDescription} />
         </section>
       ) : null}
 
@@ -794,7 +763,10 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
   const summary = splitSummary(typeEntity);
   const typeObsoleteNotice =
     typeEntity.isObsolete === true
-      ? resolveObsoleteMessage(typeEntity.obsoleteMessage, "This API type is obsolete.")
+      ? resolveObsoleteMessage(
+          typeEntity.obsoleteMessage,
+          "This API type is obsolete."
+        )
       : "";
   const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const selectedAnchor = buildEntityAnchor(selectedEntity);
@@ -804,7 +776,12 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
       <DocsTitle>
         <span className="api-page-title-row">
           <span className="api-page-signature api-reference">
-            <SignatureText value={typeEntity.displaySignature} />
+            <SignatureText
+              getTokenHref={(token) =>
+                resolveSignatureTokenHref(token, typeLookup)
+              }
+              value={typeEntity.displaySignature}
+            />
           </span>
           {typeEntity.isObsolete ? (
             <span className="api-obsolete-badge" title={typeObsoleteNotice}>
