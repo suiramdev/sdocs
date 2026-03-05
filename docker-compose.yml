@@ -26,6 +26,8 @@ services:
       PORT: 4000
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4000}
       API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
+      API_JSON_DOWNLOAD_TIMEOUT_MS: ${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
+      API_JSON_DOWNLOAD_ATTEMPTS: ${API_JSON_DOWNLOAD_ATTEMPTS:-3}
       MEILI_HOST: http://meilisearch:7700
       MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
       MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
