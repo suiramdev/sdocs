@@ -22,28 +22,39 @@ docker compose -f infra/meilisearch/docker-compose.yml up -d
 cp .env.example .env.local
 ```
 
-3. Generate docs + normalized index docs (latest only):
+3. (Optional) Generate docs + normalized index docs manually:
 
 ```bash
 bun run api:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.json
 ```
 
-4. Index documents into Meilisearch:
+4. Start the app:
+
+```bash
+bun run start
+```
+
+At startup, the app automatically:
+
+- Downloads the API dump from `API_JSON_URL`
+- Regenerates API entities + API reference docs
+
+5. Index documents into Meilisearch (if you use Meilisearch search):
 
 ```bash
 bun run api:index --reset
-```
-
-5. Run the app:
-
-```bash
-bun run dev
 ```
 
 If you hit `EMFILE: too many open files, watch` while developing with a fully generated API tree, increase your file descriptor limit before running dev:
 
 ```bash
 ulimit -n 65536
+```
+
+For development with hot reload:
+
+```bash
+bun run dev
 ```
 
 ## API Service Layer
@@ -64,3 +75,30 @@ ulimit -n 65536
 - Entities: `data/api/entities/latest.json`
 
 All AI answers should be grounded in search results and return exact indexed signatures.
+
+## Docker Deployment
+
+From the repository root:
+
+```bash
+docker compose up -d --build
+```
+
+This starts:
+
+- `fumadocs` on `http://localhost:4000`
+- `meilisearch` on `http://localhost:7700`
+
+If those ports are already used, override them:
+
+```bash
+FUMADOCS_PORT=4400 MEILI_PORT=7710 docker compose up -d --build
+```
+
+To (re)index API entities in Meilisearch:
+
+```bash
+docker compose --profile indexer up fumadocs-indexer
+```
+
+The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic.

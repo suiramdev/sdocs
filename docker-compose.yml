@@ -1,0 +1,58 @@
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    restart: unless-stopped
+    ports:
+      - "${MEILI_PORT:-7700}:7700"
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+
+  fumadocs:
+    build:
+      context: .
+      dockerfile: apps/fumadocs/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - meilisearch
+    ports:
+      - "${FUMADOCS_PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 4000
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4000}
+      API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
+      MEILI_HOST: http://meilisearch:7700
+      MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
+      MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
+      MEILI_ENABLE_HYBRID: ${MEILI_ENABLE_HYBRID:-false}
+      MEILI_SEMANTIC_RATIO: ${MEILI_SEMANTIC_RATIO:-0.35}
+      API_LOGGING: ${API_LOGGING:-false}
+      API_RAG_MODEL: ${API_RAG_MODEL:-gpt-4.1-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  fumadocs-indexer:
+    build:
+      context: .
+      dockerfile: apps/fumadocs/Dockerfile
+    restart: "no"
+    depends_on:
+      - meilisearch
+    profiles:
+      - indexer
+    command: ["bun", "run", "scripts/index-api-meili.ts", "--reset"]
+    environment:
+      NODE_ENV: production
+      MEILI_HOST: http://meilisearch:7700
+      MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
+      MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
+      MEILI_ENABLE_HYBRID: ${MEILI_ENABLE_HYBRID:-false}
+      MEILI_SEMANTIC_RATIO: ${MEILI_SEMANTIC_RATIO:-0.35}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+volumes:
+  meili_data:

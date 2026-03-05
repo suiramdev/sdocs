@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+.cursor
+.claude
+.agents
+.codex
+node_modules
+**/node_modules
+**/.next
+**/coverage
+**/dist
+**/*.log
+**/tsconfig.tsbuildinfo
+.env
+apps/fumadocs/.env.local
