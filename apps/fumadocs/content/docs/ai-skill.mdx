@@ -1,73 +1,45 @@
 ---
 title: AI Skill
-description: Learn how to install and use the s&box API Reference AI skill from agents, IDEs, and tooling.
+description: Install the s&box docs AI skill in your agent and use it from your development tool in minutes.
 ---
 
-## One-line install
+Use the AI Skill when your coding agent supports `skills` packages.
 
-If your environment uses the `skills` CLI, add the s&box docs skill with:
+## Choose your setup path
 
-```bash
-npx skills add suiramdev/sdocs
+<Tabs items={["Skills-enabled agent", "MCP-only tool"]}>
+  <Tab>
+    1. Install the skill:
+
+    ```bash
+    npx skills add suiramdev/sdocs
+    ```
+
+    2. Restart or reload your agent/tool.
+    3. Ask your question normally in your IDE or agent.
+
+  </Tab>
+  <Tab>
+    If your preferred IDE or assistant only supports MCP server connections, use the [MCP setup guide](./mcp).
+  </Tab>
+</Tabs>
+
+## What this installs
+
+It adds a reusable `sdocs` skill that gives your agent grounded access to the s&box documentation.
+For S&Box C# projects, the skill is applied automatically in compatible tools, so users do not need to mention it explicitly.
+
+## Quick example
+
+Prompt:
+
+```text
+How do I spawn an entity in S&Box C#, and what is the exact method signature?
 ```
 
-This registers a reusable skill that knows how to talk to `https://sdocs.suiram.dev/` and exposes tools for searching and inspecting the API.
+The skill helps your agent:
 
-## What the skill provides
-
-The `suiramdev/sdocs` skill exposes the following capabilities to your agent:
-
-- `search_docs` – semantic search over the documentation
-- `describe_entity` – summarize an API type, class, or member
-- `get_signature` – retrieve signatures and parameters for a specific entity
-- `answer_question` – answer free-form questions grounded in the docs
-
-Your IDE or agent will typically surface these as tools, actions, or a named skill (for example, `sdocs`).
-
-## Using the skill in your agent
-
-After running the install command:
-
-1. **Ask your model** to use the s&box docs skill, for example: “Use the s&box docs skill to find how to spawn an entity.”
-2. The model will call the appropriate tool (`search_docs`, `describe_entity`, `get_signature`, or `answer_question`) under the hood.
-
-You do not need to call the HTTP API directly; the skill handles all transport and error handling for you.
-
-## Advanced: call the HTTP tools yourself (optional)
-
-If you prefer to wire things manually instead of using the skill, you can call the same HTTP endpoints directly from your agent:
-
-- List tools: `GET https://sdocs.suiram.dev/api/v1/tools`
-- Call a tool: `POST https://sdocs.suiram.dev/api/v1/tools/{toolName}` with a JSON body
-
-For a minimal TypeScript helper:
-
-```ts
-const API_BASE_URL = "https://sdocs.suiram.dev";
-
-type SkillCall = {
-  toolName:
-    | "search_docs"
-    | "describe_entity"
-    | "get_signature"
-    | "answer_question";
-  input: unknown;
-};
-
-export async function callSdocsTool({ toolName, input }: SkillCall) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/tools/${toolName}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
-
-  const payload = await response.json();
-  if (!response.ok || payload.ok !== true) {
-    throw new Error(payload?.error?.message ?? "s&box docs tool call failed");
-  }
-
-  return payload.data.result;
-}
-```
-
-Most users can ignore this section and rely on `npx skills add suiramdev/sdocs` instead.
+- Search docs quickly
+- Explain API entities in plain language
+- Return exact signatures when needed
+- Answer questions with grounded documentation context

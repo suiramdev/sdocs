@@ -1,121 +1,66 @@
 ---
 title: MCP
-description: Learn how to connect MCP-compatible IDEs and agents to the s&box API Reference tools using an MCP server configuration.
+description: Connect your preferred MCP-compatible development tool to the s&box docs server.
 ---
 
-## Quick start for IDEs (recommended)
+Use MCP when your IDE or agent supports MCP servers.
 
-Add or merge the following into your MCP configuration file (for example in Cursor, Windsurf, Zed, or any other MCP-aware IDE or agent).
+## 1) Configure your preferred tool
 
-If you are using Cursor, you can click the button to install the server automatically, or paste the config manually from the block below:
+<Tabs items={["Cursor", "Other MCP tools"]}>
+  <Tab>
+    Install with one click:
 
-<McpCursorInstallButton />
+    <McpCursorInstallButton />
 
-```jsonc
-{
-  "mcpServers": {
-    "sdocs": {
-      "type": "sse",
-      "url": "https://sdocs.suiram.dev/api/v1/mcp",
-    },
-  },
-}
-```
+    Or paste this server config in Cursor MCP settings:
 
-After saving the config, restart your IDE or agent so it can discover the new `sdocs` MCP server and its tools.
-
-## What tools your agent gets
-
-Once connected, your MCP client can call these tools:
-
-- `search_docs` – search the s&box documentation by keyword
-- `describe_entity` – get a high-level description of an API entity
-- `get_signature` – fetch method and property signatures for an API entity
-- `answer_question` – answer natural-language questions grounded in the docs
-
-Your IDE or agent will usually surface these as tools or actions; no extra wiring is needed beyond the MCP config above.
-
-## Direct JSON-RPC usage (optional)
-
-If you are building your own MCP client, you can talk to the same endpoint directly over JSON-RPC.
-
-### 1) Initialize
-
-```bash
-curl -X POST "https://sdocs.suiram.dev/api/v1/mcp" \
-  -H "content-type: application/json" \
-  -H "accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2025-03-26",
-      "capabilities": {},
-      "clientInfo": {
-        "name": "my-client",
-        "version": "1.0.0"
+    ```jsonc
+    {
+      "mcpServers": {
+        "sdocs": {
+          "type": "sse",
+          "url": "https://sdocs.suiram.dev/api/v1/mcp"
+        }
       }
     }
-  }'
-```
+    ```
 
-Then send:
+  </Tab>
+  <Tab>
+    In your tool's MCP settings (Windsurf, Cline, Zed, Claude Desktop, and similar), add:
 
-```bash
-curl -X POST "https://sdocs.suiram.dev/api/v1/mcp" \
-  -H "content-type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "notifications/initialized",
-    "params": {}
-  }'
-```
-
-### 2) List tools
-
-```bash
-curl -X POST "https://sdocs.suiram.dev/api/v1/mcp" \
-  -H "content-type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "tools/list",
-    "params": {}
-  }'
-```
-
-### 3) Call a tool
-
-Example `search_docs` call:
-
-```bash
-curl -X POST "https://sdocs.suiram.dev/api/v1/mcp" \
-  -H "content-type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "search_docs",
-      "arguments": {
-        "query": "player movement",
-        "limit": 5
+    ```jsonc
+    {
+      "mcpServers": {
+        "sdocs": {
+          "type": "sse",
+          "url": "https://sdocs.suiram.dev/api/v1/mcp"
+        }
       }
     }
-  }'
+    ```
+
+  </Tab>
+</Tabs>
+
+## 2) Restart your tool
+
+After saving the config, restart your IDE/agent so it can discover the `sdocs` MCP server.
+
+## 3) Verify with a quick prompt
+
+```text
+How do I implement Player movement in S&Box C#, and what is the exact API signature?
 ```
 
-The tool result includes:
+## What this gives your agent
 
-- `content` – human-readable text blocks
-- `structuredContent` – machine-friendly data you can pass back to the model
+Once connected, your tool can:
 
-### 4) Optional variables for better RAG answer quality
+- `search_docs` - search the s&box documentation by keyword
+- `describe_entity` - get a high-level description of an API entity
+- `get_signature` - fetch method and property signatures for an API entity
+- `answer_question` - answer natural-language questions grounded in the docs
 
-```bash
-OPENAI_API_KEY="..."
-API_RAG_MODEL="gpt-4.1-mini"
-```
-
-If no `OPENAI_API_KEY` is set, answers still work using grounded fallback output.
+Your IDE usually exposes these as built-in tools/actions after MCP connection.
