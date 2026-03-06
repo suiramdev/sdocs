@@ -39,6 +39,11 @@ At startup, the app automatically:
 - Downloads the API dump from `API_JSON_URL`
 - Regenerates API entities + API reference docs
 
+If `API_JSON_URL` still points at the same version and the generated outputs are
+already present, bootstrap skips regeneration. The Meilisearch indexer also
+skips re-indexing and re-embedding when the generated entities and embedder
+configuration are unchanged.
+
 5. Index documents into Meilisearch (if you use Meilisearch search):
 
 ```bash
@@ -108,4 +113,4 @@ To manually rerun API indexing after deployment:
 docker compose up --build fumadocs-indexer
 ```
 
-The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. During Docker deployment, the separate `fumadocs-indexer` job also bootstraps the same API dump and resets the Meilisearch index so search stays aligned with the deployed API snapshot.
+The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. During Docker deployment, the separate `fumadocs-indexer` job bootstraps the same API dump and only rebuilds the Meilisearch index when the API version or embedder settings changed. Generated docs/entities are stored in shared Docker volumes so both services reuse the same cached snapshot.

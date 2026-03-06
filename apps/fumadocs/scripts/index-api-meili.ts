@@ -1,12 +1,19 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   buildProviderUrl,
   getMeiliEmbedderProviderConfig,
 } from "@/features/api/utils/ai-provider";
 import type { ApiEntity } from "@/features/api/utils/schemas";
+
+import {
+  buildIndexCacheKey,
+  entitiesFile,
+  getIndexScriptHash,
+  hashContent,
+  readApiReferenceState,
+  writeApiReferenceState,
+} from "./api-reference-state";
 
 interface CliOptions {
   reset: boolean;
@@ -24,6 +31,10 @@ interface IndexRuntimeConfig {
 interface ExperimentalFeaturesResponse {
   vectorStore?: boolean;
   vectorStoreSetting?: boolean;
+}
+
+interface IndexStatsResponse {
+  numberOfDocuments?: number;
 }
 
 type VectorStoreFeatureKey = "vectorStore" | "vectorStoreSetting";
@@ -45,15 +56,6 @@ interface MeiliTaskClient {
 interface MeiliIndexWithEmbedders {
   updateEmbedders?: (embedders: unknown) => Promise<unknown>;
 }
-
-const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const entitiesFile = path.join(
-  projectRoot,
-  "data",
-  "api",
-  "entities",
-  "latest.json"
-);
 
 const indexSettings = {
   displayedAttributes: [
@@ -214,6 +216,27 @@ const getExperimentalFeatures = async (
   return parseJsonResponse<ExperimentalFeaturesResponse>(response);
 };
 
+const getIndexStats = async (
+  runtimeConfig: IndexRuntimeConfig
+): Promise<IndexStatsResponse | null> => {
+  const response = await fetch(
+    buildMeiliUrl(
+      runtimeConfig,
+      `/indexes/${encodeURIComponent(runtimeConfig.indexName)}/stats`
+    ),
+    {
+      headers: buildMeiliHeaders(runtimeConfig),
+      method: "GET",
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  return parseJsonResponse<IndexStatsResponse>(response);
+};
+
 const getVectorStoreFeatureKey = (
   features: ExperimentalFeaturesResponse
 ): VectorStoreFeatureKey => {
@@ -305,15 +328,37 @@ const buildMeiliEmbedders = (): Record<string, unknown> | null => {
   };
 };
 
+const buildIndexFingerprint = async (
+  runtimeConfig: IndexRuntimeConfig
+): Promise<string> => {
+  const providerConfig = getMeiliEmbedderProviderConfig();
+  const indexScriptHash = await getIndexScriptHash();
+
+  return hashContent(
+    JSON.stringify({
+      embeddersEnabled:
+        runtimeConfig.enableHybrid &&
+        providerConfig.apiKey !== null &&
+        providerConfig.baseUrl !== null,
+      indexScriptHash,
+      indexSettings,
+      model: process.env.MEILI_EMBEDDER_MODEL ?? "text-embedding-3-small",
+      provider: providerConfig.provider,
+      providerBaseUrl: providerConfig.baseUrl,
+      runtimeHybridEnabled: runtimeConfig.enableHybrid,
+    })
+  );
+};
+
 const resetIndexIfRequested = async (
   runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   index: {
     deleteAllDocuments: () => Promise<unknown>;
   },
-  options: CliOptions
+  reset: boolean
 ): Promise<void> => {
-  if (!options.reset) {
+  if (!reset) {
     return;
   }
 
@@ -411,7 +456,8 @@ const createClientAndIndex = async (
 
 const writeSummary = (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[]
+  documents: ApiEntity[],
+  skipped: boolean
 ): void => {
   process.stdout.write(
     `${JSON.stringify({
@@ -419,19 +465,104 @@ const writeSummary = (
       host: runtimeConfig.host,
       hybrid: runtimeConfig.enableHybrid,
       index: runtimeConfig.indexName,
+      skipped,
       source: entitiesFile,
     })}\n`
   );
 };
 
-const run = async (): Promise<void> => {
-  const options = parseArgs(process.argv.slice(2));
-  const runtimeConfig = getIndexRuntimeConfig();
-  const documents = await getDocuments();
+const getExpectedIndexCacheKey = async (
+  runtimeConfig: IndexRuntimeConfig,
+  documentsHash: string
+): Promise<string> => {
+  const indexFingerprint = await buildIndexFingerprint(runtimeConfig);
+
+  return buildIndexCacheKey({
+    documentsHash,
+    enableHybrid: runtimeConfig.enableHybrid,
+    indexFingerprint,
+    indexName: runtimeConfig.indexName,
+  });
+};
+
+const isIndexStateCurrent = (input: {
+  documentsHash: string;
+  documentsLength: number;
+  expectedCacheKey: string;
+  indexStats: IndexStatsResponse | null;
+  runtimeConfig: IndexRuntimeConfig;
+  state: Awaited<ReturnType<typeof readApiReferenceState>>;
+}): boolean => {
+  const currentGeneration = input.state?.generation;
+  const currentIndexing = input.state?.indexing;
+
+  return (
+    currentIndexing?.cacheKey === input.expectedCacheKey &&
+    currentIndexing.documentsCount === input.documentsLength &&
+    currentIndexing.indexName === input.runtimeConfig.indexName &&
+    input.indexStats?.numberOfDocuments === input.documentsLength &&
+    (!currentGeneration?.entitiesHash ||
+      currentGeneration.entitiesHash === input.documentsHash)
+  );
+};
+
+const shouldSkipIndexing = async (
+  runtimeConfig: IndexRuntimeConfig,
+  documents: ApiEntity[],
+  documentsHash: string
+): Promise<boolean> => {
+  const state = await readApiReferenceState();
+  const indexStats = await getIndexStats(runtimeConfig);
+  const expectedCacheKey = await getExpectedIndexCacheKey(
+    runtimeConfig,
+    documentsHash
+  );
+
+  return isIndexStateCurrent({
+    documentsHash,
+    documentsLength: documents.length,
+    expectedCacheKey,
+    indexStats,
+    runtimeConfig,
+    state,
+  });
+};
+
+const updateIndexingState = async (
+  runtimeConfig: IndexRuntimeConfig,
+  documents: ApiEntity[],
+  documentsHash: string
+): Promise<void> => {
+  const currentState = await readApiReferenceState();
+
+  await writeApiReferenceState({
+    generation: currentState?.generation,
+    indexing: {
+      cacheKey: await getExpectedIndexCacheKey(runtimeConfig, documentsHash),
+      documentsCount: documents.length,
+      enableHybrid: runtimeConfig.enableHybrid,
+      indexName: runtimeConfig.indexName,
+      indexedAt: new Date().toISOString(),
+    },
+    schemaVersion: 1,
+    source: currentState?.source,
+  });
+};
+
+const reindexDocuments = async (
+  runtimeConfig: IndexRuntimeConfig,
+  options: CliOptions,
+  documents: ApiEntity[],
+  documentsHash: string
+): Promise<void> => {
   const { client, index } = await createClientAndIndex(runtimeConfig);
   const embedderIndex = index as unknown as MeiliIndexWithEmbedders;
+  const indexStats = await getIndexStats(runtimeConfig);
+  const shouldReset =
+    (options.reset && indexStats !== null) ||
+    (indexStats?.numberOfDocuments ?? 0) > 0;
 
-  await resetIndexIfRequested(runtimeConfig, client.tasks, index, options);
+  await resetIndexIfRequested(runtimeConfig, client.tasks, index, shouldReset);
   await applyIndexSettings(
     runtimeConfig,
     client.tasks,
@@ -446,7 +577,28 @@ const run = async (): Promise<void> => {
     runtimeConfig.enableHybrid
   );
   await indexDocuments(runtimeConfig, client.tasks, index, documents);
-  writeSummary(runtimeConfig, documents);
+  await updateIndexingState(runtimeConfig, documents, documentsHash);
+  writeSummary(runtimeConfig, documents, false);
+};
+
+const run = async (): Promise<void> => {
+  const options = parseArgs(process.argv.slice(2));
+  const runtimeConfig = getIndexRuntimeConfig();
+  const documents = await getDocuments();
+  const documentsHash = hashContent(JSON.stringify(documents));
+
+  if (
+    !options.reset &&
+    (await shouldSkipIndexing(runtimeConfig, documents, documentsHash))
+  ) {
+    process.stdout.write(
+      `Meilisearch index ${runtimeConfig.indexName} is already current for ${documents.length} documents. Skipping reindex.\n`
+    );
+    writeSummary(runtimeConfig, documents, true);
+    return;
+  }
+
+  await reindexDocuments(runtimeConfig, options, documents, documentsHash);
 };
 
 const main = async (): Promise<void> => {

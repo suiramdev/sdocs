@@ -1,8 +1,19 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+
+import {
+  buildGenerationCacheKey,
+  buildSourceVersion,
+  entitiesFile,
+  generationOutputsExist,
+  getGenerateScriptHash,
+  hashContent,
+  readApiReferenceState,
+  writeApiReferenceState,
+} from "./api-reference-state";
 
 const DEFAULT_API_JSON_URL =
   "https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json";
@@ -151,6 +162,59 @@ const runGeneration = async (
   process.stdout.write("API reference bootstrap completed.\n");
 };
 
+const shouldSkipGeneration = async (apiJsonUrl: string): Promise<boolean> => {
+  const state = await readApiReferenceState();
+  const generatorHash = await getGenerateScriptHash();
+  const sourceVersion = buildSourceVersion(apiJsonUrl);
+  const expectedCacheKey = buildGenerationCacheKey({
+    emitMdx: true,
+    generatorHash,
+    includeNonPublic: false,
+    sourceVersion,
+  });
+
+  if (state?.generation?.cacheKey !== expectedCacheKey) {
+    return false;
+  }
+
+  if (state.source?.version !== sourceVersion) {
+    return false;
+  }
+
+  return generationOutputsExist(true);
+};
+
+const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
+  const currentState = await readApiReferenceState();
+  const generatorHash = await getGenerateScriptHash();
+  const sourceVersion = buildSourceVersion(apiJsonUrl);
+  const entitiesContent = await readFile(entitiesFile, "utf8");
+  const entities = JSON.parse(entitiesContent) as unknown[];
+
+  await writeApiReferenceState({
+    generation: {
+      cacheKey: buildGenerationCacheKey({
+        emitMdx: true,
+        generatorHash,
+        includeNonPublic: false,
+        sourceVersion,
+      }),
+      emitMdx: true,
+      entitiesHash: hashContent(entitiesContent),
+      entityCount: entities.length,
+      generatedAt: new Date().toISOString(),
+      generatorHash,
+      includeNonPublic: false,
+    },
+    indexing: currentState?.indexing,
+    schemaVersion: 1,
+    source: {
+      url: apiJsonUrl,
+      version: sourceVersion,
+    },
+  });
+};
+
 const withTemporaryInputFile = async (
   run: (downloadedJsonPath: string) => Promise<void>
 ): Promise<void> => {
@@ -166,8 +230,17 @@ const withTemporaryInputFile = async (
 
 const main = async (): Promise<void> => {
   const apiJsonUrl = getApiJsonUrl();
+
+  if (await shouldSkipGeneration(apiJsonUrl)) {
+    process.stdout.write(
+      `API reference is already generated for ${buildSourceVersion(apiJsonUrl)}. Skipping regeneration.\n`
+    );
+    return;
+  }
+
   await withTemporaryInputFile(async (downloadedJsonPath) => {
     await runGeneration(apiJsonUrl, downloadedJsonPath);
+    await updateGenerationState(apiJsonUrl);
   });
 };
 
