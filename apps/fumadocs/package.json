@@ -11,6 +11,7 @@
     "meilisearch": "docker compose -f infra/meilisearch/docker-compose.yml up -d",
     "meilisearch:stop": "docker compose -f infra/meilisearch/docker-compose.yml down",
     "api:bootstrap": "bun run scripts/bootstrap-api-reference.ts",
+    "api:bootstrap:index": "bun run api:bootstrap && bun run api:index:reset",
     "api:generate": "bun run scripts/generate-api-docs.ts",
     "api:index": "bun run scripts/index-api-meili.ts",
     "api:index:reset": "bun run scripts/index-api-meili.ts --reset"

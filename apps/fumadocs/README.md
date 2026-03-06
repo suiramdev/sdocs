@@ -93,6 +93,8 @@ This starts:
 
 - `fumadocs` on `http://localhost:4000`
 - `meilisearch` on `http://localhost:7700`
+- `fumadocs-indexer`, which bootstraps `API_JSON_URL` and rebuilds the
+  Meilisearch index before `fumadocs` starts
 
 If those ports are already used, override them:
 
@@ -100,10 +102,10 @@ If those ports are already used, override them:
 FUMADOCS_PORT=4400 MEILI_PORT=7710 docker compose up -d --build
 ```
 
-To (re)index API entities in Meilisearch:
+To manually rerun API indexing after deployment:
 
 ```bash
-docker compose --profile indexer up fumadocs-indexer
+docker compose up --build fumadocs-indexer
 ```
 
-The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic.
+The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. During Docker deployment, the separate `fumadocs-indexer` job also bootstraps the same API dump and resets the Meilisearch index so search stays aligned with the deployed API snapshot.

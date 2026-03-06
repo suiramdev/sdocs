@@ -17,7 +17,10 @@ services:
       dockerfile: apps/fumadocs/Dockerfile
     restart: unless-stopped
     depends_on:
-      - meilisearch
+      fumadocs-indexer:
+        condition: service_completed_successfully
+      meilisearch:
+        condition: service_started
     ports:
       - "${FUMADOCS_PORT:-4000}:4000"
     environment:
@@ -49,12 +52,14 @@ services:
       dockerfile: apps/fumadocs/Dockerfile
     restart: "no"
     depends_on:
-      - meilisearch
-    profiles:
-      - indexer
-    command: ["bun", "run", "scripts/index-api-meili.ts", "--reset"]
+      meilisearch:
+        condition: service_started
+    command: ["bun", "run", "api:bootstrap:index"]
     environment:
       NODE_ENV: production
+      API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
+      API_JSON_DOWNLOAD_TIMEOUT_MS: ${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
+      API_JSON_DOWNLOAD_ATTEMPTS: ${API_JSON_DOWNLOAD_ATTEMPTS:-3}
       MEILI_HOST: http://meilisearch:7700
       MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
       MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
