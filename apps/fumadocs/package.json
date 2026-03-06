@@ -16,8 +16,11 @@
     "api:index:reset": "bun run scripts/index-api-meili.ts --reset"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai-compatible": "^2.0.35",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@takumi-rs/image-response": "^0.69.5",
+    "ai": "^6.0.116",
     "fumadocs-core": "16.6.8",
     "fumadocs-mdx": "14.2.9",
     "fumadocs-ui": "16.6.8",

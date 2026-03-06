@@ -45,6 +45,11 @@ At startup, the app automatically:
 bun run api:index --reset
 ```
 
+To use Chutes instead of OpenAI for grounded answers and hybrid embeddings,
+set `API_RAG_PROVIDER=chutes`, `MEILI_EMBEDDER_PROVIDER=chutes`,
+`CHUTES_API_KEY`, `CHUTES_API_BASE_URL`, and a valid `API_RAG_MODEL`, then
+re-run the indexer so Meilisearch rebuilds embeddings with the new provider.
+
 If you hit `EMFILE: too many open files, watch` while developing with a fully generated API tree, increase your file descriptor limit before running dev:
 
 ```bash

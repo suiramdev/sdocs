@@ -1,3 +1,6 @@
+import { generateText } from "ai";
+
+import { getRagLanguageModel } from "@/features/api/utils/ai-provider";
 import { executeSearchApiTool } from "@/features/api/utils/tool-search-api";
 
 interface AnswerApiQuestionInput {
@@ -25,7 +28,7 @@ export interface RagAnswer {
   };
 }
 
-function isAmbiguous(scores: (number | undefined)[]): boolean {
+const isAmbiguous = (scores: (number | undefined)[]): boolean => {
   if (scores.length < 2) {
     return false;
   }
@@ -36,68 +39,44 @@ function isAmbiguous(scores: (number | undefined)[]): boolean {
   }
 
   return Math.abs(first - second) < 0.03;
-}
+};
 
-function formatGroundingContext(citations: RagCitation[]): string {
-  return citations
+const formatGroundingContext = (citations: RagCitation[]): string =>
+  citations
     .map(
       (citation, index) =>
         `${index + 1}. ${citation.name}\nSignature: ${citation.signature}\nURL: ${citation.url}`
     )
     .join("\n\n");
-}
 
-async function generateWithOpenAI(
+const generateWithProvider = async (
   question: string,
   context: string
-): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+): Promise<string | null> => {
+  const model = getRagLanguageModel();
+  if (!model) {
     return null;
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    body: JSON.stringify({
-      messages: [
-        {
-          content:
-            "You are an API assistant. Answer only using retrieved API entities. Never invent methods, namespaces, or signatures. Quote signatures exactly as provided. If evidence is insufficient, explicitly ask for a refined query.",
-          role: "system",
-        },
-        {
-          content: `Question:\n${question}\n\nRetrieved API entities:\n${context}`,
-          role: "user",
-        },
-      ],
-      model: process.env.API_RAG_MODEL ?? "gpt-4.1-mini",
+  try {
+    const { text } = await generateText({
+      model,
+      prompt: `Question:\n${question}\n\nRetrieved API entities:\n${context}`,
+      system:
+        "You are an API assistant. Answer only using retrieved API entities. Never invent methods, namespaces, or signatures. Quote signatures exactly as provided. If evidence is insufficient, explicitly ask for a refined query.",
       temperature: 0,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-  });
+    });
 
-  if (!response.ok) {
+    return text.trim() || null;
+  } catch {
     return null;
   }
+};
 
-  const data = (await response.json()) as {
-    choices?: {
-      message?: {
-        content?: string;
-      };
-    }[];
-  };
-
-  return data.choices?.[0]?.message?.content?.trim() ?? null;
-}
-
-function generateFallbackAnswer(
+const generateFallbackAnswer = (
   question: string,
   citations: RagCitation[]
-): string {
+): string => {
   const intro = `Grounded results for: ${question}`;
   const lines = citations.map(
     (citation, index) =>
@@ -105,11 +84,11 @@ function generateFallbackAnswer(
   );
 
   return [intro, ...lines].join("\n");
-}
+};
 
-export async function answerApiQuestion(
+export const answerApiQuestion = async (
   input: AnswerApiQuestionInput
-): Promise<RagAnswer> {
+): Promise<RagAnswer> => {
   const retrieval = await executeSearchApiTool({
     limit: input.limit ?? 6,
     query: input.question,
@@ -160,7 +139,7 @@ export async function answerApiQuestion(
   }
 
   const context = formatGroundingContext(citations);
-  const aiAnswer = await generateWithOpenAI(input.question, context);
+  const aiAnswer = await generateWithProvider(input.question, context);
 
   return {
     answer: aiAnswer ?? generateFallbackAnswer(input.question, citations),
@@ -173,4 +152,4 @@ export async function answerApiQuestion(
       total: retrieval.total,
     },
   };
-}
+};
