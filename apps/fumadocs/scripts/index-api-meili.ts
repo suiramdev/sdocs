@@ -237,7 +237,7 @@ const buildMeiliEmbedders = (): Record<string, unknown> | null => {
   }
 
   const documentTemplate =
-    "Entity {{name}} ({{type}}) in {{namespace}} class {{class}}. Signature: {{displaySignature}}. Description: {{description}}.";
+    "Entity {{doc.name}} ({{doc.type}}) in {{doc.namespace}}. Signature: {{doc.displaySignature}}. Description: {{doc.description}}.";
   const model = process.env.MEILI_EMBEDDER_MODEL ?? "text-embedding-3-small";
 
   if (providerConfig.provider === "chutes") {
