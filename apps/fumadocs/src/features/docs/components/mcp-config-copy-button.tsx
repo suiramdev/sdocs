@@ -9,7 +9,6 @@ import { cn } from "@/shared/utils/cn";
 const MCP_CONFIG = `{
   "mcpServers": {
     "sdocs": {
-      "type": "sse",
       "url": "https://sdocs.suiram.dev/api/v1/mcp"
     }
   }
@@ -24,7 +23,7 @@ interface McpConfigCopyButtonProps {
 
 export function McpConfigCopyButton({ label }: McpConfigCopyButtonProps) {
   const [checked, onClick] = useCopyButton(async () =>
-    navigator.clipboard.writeText(MCP_CONFIG)
+    navigator.clipboard.writeText(MCP_CONFIG),
   );
 
   return (
@@ -35,7 +34,7 @@ export function McpConfigCopyButton({ label }: McpConfigCopyButtonProps) {
           className: "gap-2 [&_svg]:size-3.5 [&_svg]:text-fd-muted-foreground",
           color: "secondary",
           size: "sm",
-        })
+        }),
       )}
       onClick={onClick}
     >
