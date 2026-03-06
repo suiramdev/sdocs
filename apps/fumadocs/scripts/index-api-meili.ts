@@ -19,6 +19,10 @@ interface IndexRuntimeConfig {
   indexName: string;
 }
 
+interface ExperimentalFeaturesResponse {
+  vectorStoreSetting?: boolean;
+}
+
 interface TaskRef {
   taskUid?: number;
 }
@@ -97,6 +101,23 @@ const getIndexRuntimeConfig = (): IndexRuntimeConfig => ({
   indexName: process.env.MEILI_API_INDEX_NAME ?? "api_entities",
 });
 
+const buildMeiliUrl = (
+  runtimeConfig: IndexRuntimeConfig,
+  pathname: string
+): string => new URL(pathname, runtimeConfig.host).toString();
+
+const buildMeiliHeaders = (runtimeConfig: IndexRuntimeConfig): HeadersInit => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (runtimeConfig.apiKey.trim().length > 0) {
+    headers.Authorization = `Bearer ${runtimeConfig.apiKey}`;
+  }
+
+  return headers;
+};
+
 const readJson = async <T>(filePath: string): Promise<T | null> => {
   try {
     const content = await readFile(filePath, "utf8");
@@ -135,6 +156,54 @@ const waitForTask = async (
     const message = taskResult.error?.message ?? "Meilisearch task failed";
     throw new Error(message);
   }
+};
+
+const parseJsonResponse = async <T>(response: Response): Promise<T> => {
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Meilisearch request failed (${response.status} ${response.statusText}): ${bodyText || "empty response body"}`
+    );
+  }
+
+  return JSON.parse(bodyText) as T;
+};
+
+const isVectorStoreEnabled = async (
+  runtimeConfig: IndexRuntimeConfig
+): Promise<boolean> => {
+  const response = await fetch(
+    buildMeiliUrl(runtimeConfig, "/experimental-features/"),
+    {
+      headers: buildMeiliHeaders(runtimeConfig),
+      method: "GET",
+    }
+  );
+  const features =
+    await parseJsonResponse<ExperimentalFeaturesResponse>(response);
+
+  return features.vectorStoreSetting === true;
+};
+
+const enableVectorStoreExperimentalFeature = async (
+  runtimeConfig: IndexRuntimeConfig
+): Promise<void> => {
+  if (await isVectorStoreEnabled(runtimeConfig)) {
+    return;
+  }
+
+  const response = await fetch(
+    buildMeiliUrl(runtimeConfig, "/experimental-features/"),
+    {
+      body: JSON.stringify({
+        vectorStoreSetting: true,
+      }),
+      headers: buildMeiliHeaders(runtimeConfig),
+      method: "PATCH",
+    }
+  );
+
+  await parseJsonResponse<ExperimentalFeaturesResponse>(response);
 };
 
 const getDocuments = async (): Promise<ApiEntity[]> => {
@@ -224,6 +293,7 @@ const applyIndexSettings = async (
 const applyEmbeddersIfEnabled = async (
   taskClient: MeiliTaskClient,
   index: MeiliIndexWithEmbedders,
+  runtimeConfig: IndexRuntimeConfig,
   enabled: boolean
 ): Promise<void> => {
   if (!enabled) {
@@ -234,6 +304,8 @@ const applyEmbeddersIfEnabled = async (
   if (!embedders || typeof index.updateEmbedders !== "function") {
     return;
   }
+
+  await enableVectorStoreExperimentalFeature(runtimeConfig);
 
   await waitForTask(
     taskClient,
@@ -318,6 +390,7 @@ const run = async (): Promise<void> => {
   await applyEmbeddersIfEnabled(
     client.tasks,
     embedderIndex,
+    runtimeConfig,
     runtimeConfig.enableHybrid
   );
   await indexDocuments(client.tasks, index, documents);
