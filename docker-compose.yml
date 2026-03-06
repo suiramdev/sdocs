@@ -8,6 +8,16 @@ services:
       MEILI_ENV: production
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
       MEILI_NO_ANALYTICS: "true"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:7700/health | grep -q '\"status\":\"available\"'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     volumes:
       - meili_data:/meili_data
 
@@ -20,7 +30,7 @@ services:
       fumadocs-indexer:
         condition: service_completed_successfully
       meilisearch:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${FUMADOCS_PORT:-4000}:4000"
     environment:
@@ -53,7 +63,7 @@ services:
     restart: "no"
     depends_on:
       meilisearch:
-        condition: service_started
+        condition: service_healthy
     command: ["bun", "run", "api:bootstrap:index"]
     environment:
       NODE_ENV: production
