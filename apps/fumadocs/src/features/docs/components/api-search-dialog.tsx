@@ -20,13 +20,17 @@ import type { SearchItemType } from "fumadocs-ui/components/dialog/search";
 import type { DefaultSearchDialogProps } from "fumadocs-ui/components/dialog/search-default";
 import { useI18n } from "fumadocs-ui/contexts/i18n";
 import { ChevronRight, Hash } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+
+import { trackUmamiEvent } from "@/features/analytics/utils/umami";
 
 type NonActionSearchItem = Exclude<SearchItemType, { type: "action" }>;
 type SearchGroupKey = "class" | "enum" | "method" | "property" | "other";
 
 const emptyTags: NonNullable<DefaultSearchDialogProps["tags"]> = [];
 const emptyLinks: NonNullable<DefaultSearchDialogProps["links"]> = [];
+const minimumTrackedSearchLength = 2;
+const maxTrackedQueryLength = 120;
 
 const searchGroupOrder = [
   "class",
@@ -92,6 +96,98 @@ const populateGroupedEntries = (
 
 const getGroupHeadingLabel = (groupKey: SearchGroupKey): string | undefined =>
   groupKey === "other" ? undefined : searchGroupLabels[groupKey];
+
+const normalizeSearchTerm = (value: string): string =>
+  value.trim().replaceAll(/\s+/g, " ");
+
+const getTrackedSearchItemCount = (
+  items: SearchItemType[] | null | undefined
+): number => {
+  if (!items) {
+    return 0;
+  }
+
+  let trackedItemCount = 0;
+  for (const item of items) {
+    if (item.type !== "action") {
+      trackedItemCount += 1;
+    }
+  }
+
+  return trackedItemCount;
+};
+
+const getSearchItemUrl = (item: NonActionSearchItem): string | undefined =>
+  "url" in item && typeof item.url === "string" ? item.url : undefined;
+
+const getSearchItemLabel = (item: NonActionSearchItem): string =>
+  typeof item.content === "string"
+    ? item.content.slice(0, maxTrackedQueryLength)
+    : item.id;
+
+const trackDocsSearch = (
+  activeTag: string | undefined,
+  normalizedSearch: string,
+  trackedSearchItemCount: number
+) => {
+  trackUmamiEvent("docs_search", {
+    pathname: window.location.pathname,
+    query: normalizedSearch.slice(0, maxTrackedQueryLength),
+    results: trackedSearchItemCount,
+    tag: activeTag ?? "all",
+  });
+};
+
+const useTrackDocsSearch = ({
+  activeTag,
+  isLoading,
+  search,
+  trackedSearchItemCount,
+}: {
+  activeTag: string | undefined;
+  isLoading: boolean;
+  search: string;
+  trackedSearchItemCount: number;
+}) => {
+  const lastTrackedSearchKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const normalizedSearch = normalizeSearchTerm(search);
+    const trackedSearchKey = `${activeTag ?? "all"}:${normalizedSearch}`;
+    const canTrackSearch =
+      normalizedSearch.length >= minimumTrackedSearchLength && !isLoading;
+    if (!canTrackSearch) {
+      lastTrackedSearchKeyRef.current = null;
+      return;
+    }
+
+    if (lastTrackedSearchKeyRef.current === trackedSearchKey) {
+      return;
+    }
+
+    lastTrackedSearchKeyRef.current = trackedSearchKey;
+    trackDocsSearch(activeTag, normalizedSearch, trackedSearchItemCount);
+  }, [activeTag, isLoading, search, trackedSearchItemCount]);
+};
+
+const trackDocsSearchResultClick = (
+  activeTag: string | undefined,
+  item: SearchItemType,
+  search: string
+) => {
+  if (item.type === "action") {
+    return;
+  }
+
+  trackUmamiEvent("docs_search_result_click", {
+    pathname: window.location.pathname,
+    query: normalizeSearchTerm(search).slice(0, maxTrackedQueryLength),
+    resultLabel: getSearchItemLabel(item),
+    resultType: item.type,
+    resultUrl: getSearchItemUrl(item) ?? item.id,
+    tag: activeTag ?? "all",
+  });
+};
 
 const appendGroupedSearchItems = (
   groupHeadings: Map<string, string>,
@@ -229,6 +325,33 @@ const SearchItemContent = ({ item }: { item: SearchItemType }) => {
   );
 };
 
+const TrackedSearchDialogListItem = ({
+  activeTag,
+  groupLabel,
+  item,
+  onClick,
+  search,
+}: {
+  activeTag: string | undefined;
+  groupLabel?: string;
+  item: SearchItemType;
+  onClick: () => void;
+  search: string;
+}) => (
+  <Fragment>
+    <SearchGroupLabel label={groupLabel} />
+    <SearchDialogListItem
+      item={item}
+      onClick={() => {
+        trackDocsSearchResultClick(activeTag, item, search);
+        onClick();
+      }}
+    >
+      <SearchItemContent item={item} />
+    </SearchDialogListItem>
+  </Fragment>
+);
+
 const ApiSearchDialog = ({
   defaultTag,
   tags = emptyTags,
@@ -283,6 +406,14 @@ const ApiSearchDialog = ({
     () => sortSearchItems(items),
     [items]
   );
+  useTrackDocsSearch({
+    activeTag,
+    isLoading: query.isLoading,
+    search,
+    trackedSearchItemCount: getTrackedSearchItemCount(
+      query.data === "empty" ? [] : query.data
+    ),
+  });
 
   return (
     <SearchDialog
@@ -300,12 +431,13 @@ const ApiSearchDialog = ({
         </SearchDialogHeader>
         <SearchDialogList
           Item={({ item, onClick }) => (
-            <Fragment>
-              <SearchGroupLabel label={groupHeadings.get(item.id)} />
-              <SearchDialogListItem item={item} onClick={onClick}>
-                <SearchItemContent item={item} />
-              </SearchDialogListItem>
-            </Fragment>
+            <TrackedSearchDialogListItem
+              activeTag={activeTag}
+              groupLabel={groupHeadings.get(item.id)}
+              item={item}
+              onClick={onClick}
+              search={search}
+            />
           )}
           items={groupedItems}
         />

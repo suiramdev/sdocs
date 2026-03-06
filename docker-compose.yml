@@ -12,7 +12,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -q -O - http://127.0.0.1:7700/health | grep -q '\"status\":\"available\"'",
+          'wget -q -O - http://127.0.0.1:7700/health | grep -q ''"status":"available"''',
         ]
       interval: 5s
       timeout: 3s
@@ -41,6 +41,11 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 4000
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4000}
+      NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+      NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
+      NEXT_PUBLIC_UMAMI_HOST_URL: ${NEXT_PUBLIC_UMAMI_HOST_URL:-}
+      NEXT_PUBLIC_UMAMI_DOMAINS: ${NEXT_PUBLIC_UMAMI_DOMAINS:-}
+      NEXT_PUBLIC_UMAMI_TAG: ${NEXT_PUBLIC_UMAMI_TAG:-docs}
       API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
       API_JSON_DOWNLOAD_TIMEOUT_MS: ${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
       API_JSON_DOWNLOAD_ATTEMPTS: ${API_JSON_DOWNLOAD_ATTEMPTS:-3}

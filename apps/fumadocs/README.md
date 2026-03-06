@@ -22,6 +22,12 @@ docker compose -f infra/meilisearch/docker-compose.yml up -d
 cp .env.example .env.local
 ```
 
+To enable Umami analytics, set `NEXT_PUBLIC_UMAMI_WEBSITE_ID` and
+`NEXT_PUBLIC_UMAMI_SCRIPT_URL` in `apps/fumadocs/.env.local`. The app will
+auto-track page visits and route changes through Umami, and it also sends
+custom `docs_search` and `docs_search_result_click` events so you can inspect
+popular searches and which results people open.
+
 3. (Optional) Generate docs + normalized index docs manually:
 
 ```bash
