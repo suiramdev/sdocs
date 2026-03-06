@@ -27,12 +27,20 @@ services:
       dockerfile: apps/fumadocs/Dockerfile
     restart: unless-stopped
     depends_on:
-      fumadocs-indexer:
-        condition: service_completed_successfully
       meilisearch:
         condition: service_healthy
     ports:
       - "${FUMADOCS_PORT:-4000}:4000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:4000/ > /dev/null",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     volumes:
       - fumadocs_api_generated:/app/content/api-generated
       - fumadocs_api_entities:/app/data/api/entities
@@ -70,9 +78,11 @@ services:
       dockerfile: apps/fumadocs/Dockerfile
     restart: "no"
     depends_on:
+      fumadocs:
+        condition: service_healthy
       meilisearch:
         condition: service_healthy
-    command: ["bun", "run", "api:bootstrap:index"]
+    command: ["bun", "run", "api:index"]
     volumes:
       - fumadocs_api_generated:/app/content/api-generated
       - fumadocs_api_entities:/app/data/api/entities
