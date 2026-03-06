@@ -17,6 +17,8 @@ interface IndexRuntimeConfig {
   enableHybrid: boolean;
   host: string;
   indexName: string;
+  taskPollIntervalMs: number;
+  taskTimeoutMs: number;
 }
 
 interface ExperimentalFeaturesResponse {
@@ -31,7 +33,13 @@ interface TaskRef {
 }
 
 interface MeiliTaskClient {
-  waitForTask: (uid: number) => Promise<unknown>;
+  waitForTask: (
+    uid: number,
+    options?: {
+      interval?: number;
+      timeout?: number;
+    }
+  ) => Promise<unknown>;
 }
 
 interface MeiliIndexWithEmbedders {
@@ -93,6 +101,14 @@ const indexSettings = {
   },
 } as const;
 
+const DEFAULT_TASK_POLL_INTERVAL_MS = 250;
+const DEFAULT_TASK_TIMEOUT_MS = 30 * 60 * 1000;
+
+const getNonNegativeInteger = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
+
 const parseArgs = (argv: string[]): CliOptions => ({
   reset: argv.includes("--reset"),
 });
@@ -102,6 +118,14 @@ const getIndexRuntimeConfig = (): IndexRuntimeConfig => ({
   enableHybrid: process.env.MEILI_ENABLE_HYBRID === "true",
   host: process.env.MEILI_HOST ?? "http://127.0.0.1:7700",
   indexName: process.env.MEILI_API_INDEX_NAME ?? "api_entities",
+  taskPollIntervalMs: getNonNegativeInteger(
+    process.env.MEILI_TASK_POLL_INTERVAL_MS,
+    DEFAULT_TASK_POLL_INTERVAL_MS
+  ),
+  taskTimeoutMs: getNonNegativeInteger(
+    process.env.MEILI_TASK_TIMEOUT_MS,
+    DEFAULT_TASK_TIMEOUT_MS
+  ),
 });
 
 const buildMeiliUrl = (
@@ -141,6 +165,7 @@ const chunkDocuments = <T>(items: T[], chunkSize: number): T[][] => {
 };
 
 const waitForTask = async (
+  runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   task?: TaskRef
 ): Promise<void> => {
@@ -148,7 +173,10 @@ const waitForTask = async (
     return;
   }
 
-  const taskResult = (await taskClient.waitForTask(task.taskUid)) as {
+  const taskResult = (await taskClient.waitForTask(task.taskUid, {
+    interval: runtimeConfig.taskPollIntervalMs,
+    timeout: runtimeConfig.taskTimeoutMs,
+  })) as {
     error?: {
       message?: string;
     };
@@ -278,6 +306,7 @@ const buildMeiliEmbedders = (): Record<string, unknown> | null => {
 };
 
 const resetIndexIfRequested = async (
+  runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   index: {
     deleteAllDocuments: () => Promise<unknown>;
@@ -288,25 +317,31 @@ const resetIndexIfRequested = async (
     return;
   }
 
-  await waitForTask(taskClient, (await index.deleteAllDocuments()) as TaskRef);
+  await waitForTask(
+    runtimeConfig,
+    taskClient,
+    (await index.deleteAllDocuments()) as TaskRef
+  );
 };
 
 const applyIndexSettings = async (
+  runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   index: {
     updateSettings: (settings: unknown) => Promise<unknown>;
   }
 ): Promise<void> => {
   await waitForTask(
+    runtimeConfig,
     taskClient,
     (await index.updateSettings(indexSettings)) as TaskRef
   );
 };
 
 const applyEmbeddersIfEnabled = async (
+  runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   index: MeiliIndexWithEmbedders,
-  runtimeConfig: IndexRuntimeConfig,
   enabled: boolean
 ): Promise<void> => {
   if (!enabled) {
@@ -321,12 +356,14 @@ const applyEmbeddersIfEnabled = async (
   await enableVectorStoreExperimentalFeature(runtimeConfig);
 
   await waitForTask(
+    runtimeConfig,
     taskClient,
     (await index.updateEmbedders(embedders)) as TaskRef
   );
 };
 
 const indexDocuments = async (
+  runtimeConfig: IndexRuntimeConfig,
   taskClient: MeiliTaskClient,
   index: {
     addDocuments: (
@@ -340,6 +377,7 @@ const indexDocuments = async (
 
   for (const chunk of chunks) {
     await waitForTask(
+      runtimeConfig,
       taskClient,
       (await index.addDocuments(chunk, { primaryKey: "meiliId" })) as TaskRef
     );
@@ -393,20 +431,21 @@ const run = async (): Promise<void> => {
   const { client, index } = await createClientAndIndex(runtimeConfig);
   const embedderIndex = index as unknown as MeiliIndexWithEmbedders;
 
-  await resetIndexIfRequested(client.tasks, index, options);
+  await resetIndexIfRequested(runtimeConfig, client.tasks, index, options);
   await applyIndexSettings(
+    runtimeConfig,
     client.tasks,
     index as unknown as {
       updateSettings: (settings: unknown) => Promise<unknown>;
     }
   );
   await applyEmbeddersIfEnabled(
+    runtimeConfig,
     client.tasks,
     embedderIndex,
-    runtimeConfig,
     runtimeConfig.enableHybrid
   );
-  await indexDocuments(client.tasks, index, documents);
+  await indexDocuments(runtimeConfig, client.tasks, index, documents);
   writeSummary(runtimeConfig, documents);
 };
 
