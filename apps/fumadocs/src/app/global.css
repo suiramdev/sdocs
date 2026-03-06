@@ -432,6 +432,27 @@
   font-weight: 600;
 }
 
+.search-result-group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.9rem 0.2rem 0.5rem;
+  padding-inline: 0.15rem;
+  color: color-mix(in oklab, var(--color-fd-foreground) 88%, white 12%);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.search-result-group-label::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in oklab, var(--color-fd-border) 72%, transparent 28%);
+}
+
 .search-result-desc {
   display: block;
   margin-top: 0.25rem;
