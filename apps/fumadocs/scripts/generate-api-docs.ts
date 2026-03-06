@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -721,6 +728,29 @@ async function loadJsonFile<T>(filePath: string): Promise<T | null> {
   }
 }
 
+async function clearDirectoryContents(directoryPath: string): Promise<void> {
+  const directoryEntries = await readdir(directoryPath, {
+    withFileTypes: true,
+  }).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  });
+
+  if (!directoryEntries) {
+    return;
+  }
+
+  for (const entry of directoryEntries) {
+    await rm(path.join(directoryPath, entry.name), {
+      force: true,
+      recursive: true,
+    });
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -735,7 +765,8 @@ async function main() {
   const versionRoot = apiDocsRoot;
 
   if (options.clean && options.emitMdx) {
-    await rm(versionRoot, { force: true, recursive: true });
+    await mkdir(versionRoot, { recursive: true });
+    await clearDirectoryContents(versionRoot);
   }
 
   if (options.emitMdx) {
