@@ -20,8 +20,11 @@ interface IndexRuntimeConfig {
 }
 
 interface ExperimentalFeaturesResponse {
+  vectorStore?: boolean;
   vectorStoreSetting?: boolean;
 }
+
+type VectorStoreFeatureKey = "vectorStore" | "vectorStoreSetting";
 
 interface TaskRef {
   taskUid?: number;
@@ -169,9 +172,9 @@ const parseJsonResponse = async <T>(response: Response): Promise<T> => {
   return JSON.parse(bodyText) as T;
 };
 
-const isVectorStoreEnabled = async (
+const getExperimentalFeatures = async (
   runtimeConfig: IndexRuntimeConfig
-): Promise<boolean> => {
+): Promise<ExperimentalFeaturesResponse> => {
   const response = await fetch(
     buildMeiliUrl(runtimeConfig, "/experimental-features/"),
     {
@@ -179,16 +182,26 @@ const isVectorStoreEnabled = async (
       method: "GET",
     }
   );
-  const features =
-    await parseJsonResponse<ExperimentalFeaturesResponse>(response);
 
-  return features.vectorStoreSetting === true;
+  return parseJsonResponse<ExperimentalFeaturesResponse>(response);
+};
+
+const getVectorStoreFeatureKey = (
+  features: ExperimentalFeaturesResponse
+): VectorStoreFeatureKey => {
+  if (typeof features.vectorStoreSetting === "boolean") {
+    return "vectorStoreSetting";
+  }
+
+  return "vectorStore";
 };
 
 const enableVectorStoreExperimentalFeature = async (
   runtimeConfig: IndexRuntimeConfig
 ): Promise<void> => {
-  if (await isVectorStoreEnabled(runtimeConfig)) {
+  const features = await getExperimentalFeatures(runtimeConfig);
+  const vectorStoreFeatureKey = getVectorStoreFeatureKey(features);
+  if (features[vectorStoreFeatureKey] === true) {
     return;
   }
 
@@ -196,7 +209,7 @@ const enableVectorStoreExperimentalFeature = async (
     buildMeiliUrl(runtimeConfig, "/experimental-features/"),
     {
       body: JSON.stringify({
-        vectorStoreSetting: true,
+        [vectorStoreFeatureKey]: true,
       }),
       headers: buildMeiliHeaders(runtimeConfig),
       method: "PATCH",
