@@ -8,7 +8,14 @@ export default async function Layout({ children }: LayoutProps<"/docs">) {
   const tree = await mergeApiMethodsTree(source.getPageTree());
 
   return (
-    <DocsLayout tree={tree} {...baseOptions()}>
+    <DocsLayout
+      tree={tree}
+      containerProps={{
+        className:
+          "md:[--fd-sidebar-width:248px] lg:[--fd-sidebar-width:256px]",
+      }}
+      {...baseOptions()}
+    >
       {children}
     </DocsLayout>
   );

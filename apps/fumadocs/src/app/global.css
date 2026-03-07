@@ -2,6 +2,26 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
+@media (width >= 48rem) {
+  #nd-sidebar {
+    width: 264px !important;
+  }
+
+  #nd-sidebar > * {
+    width: 100% !important;
+  }
+}
+
+@media (width >= 64rem) {
+  #nd-sidebar {
+    width: 272px !important;
+  }
+
+  #nd-sidebar > * {
+    width: 100% !important;
+  }
+}
+
 .api-reference {
   --api-border: color-mix(in oklab, var(--color-fd-border) 88%, white 12%);
   --api-surface: color-mix(in oklab, var(--color-fd-card) 97%, white 3%);
