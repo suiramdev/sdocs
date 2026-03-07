@@ -35,7 +35,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -q -O - http://127.0.0.1:4000/ > /dev/null",
+          'bun -e ''fetch("http://127.0.0.1:4000/").then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))''',
         ]
       interval: 5s
       timeout: 3s
