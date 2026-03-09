@@ -57,22 +57,260 @@ After saving the config, restart your IDE/agent so it can discover the `sdocs` M
 Search for `Sandbox.Component`, inspect its members, then show the exact signature for `OnUpdate`.
 ```
 
-## What this gives your agent
+## Advanced
 
-Once connected, your tool can:
+The MCP server now behaves like a typical SDK documentation server rather than
+a generic docs search endpoint. It exposes a small set of structured tools that
+let an AI agent progressively discover the s&box API using the standard
+workflow:
 
-- `search_docs` - search the indexed s&box API docs by keyword or natural language
-- `resolve_symbol` - map short type names to fully-qualified API types
-- `get_symbol` - inspect a specific class, struct, interface, enum, or exact symbol id
-- `get_type_members` - list constructors, methods, and properties for a type
-- `get_method_details` - inspect one exact method overload with parameters and return docs
-- `get_examples` - fetch code examples for a symbol when available
-- `list_namespaces` - explore the namespace hierarchy and available types
+1. Search
+2. Inspect
+3. Read details
 
-Recommended workflow:
+In practice, an agent will usually:
 
-1. Start with `search_docs`
-2. Use `resolve_symbol` when the type name is ambiguous
-3. Inspect with `get_symbol`, `get_type_members`, and `get_method_details`
+1. Call `search_docs` to find the most relevant symbols for a question
+2. Call `resolve_symbol` if a short name like `Component` or `Scene` is ambiguous
+3. Call `get_symbol` or `get_type_members` to inspect a resolved type
+4. Call `get_method_details` to inspect one exact overload
+5. Call `get_examples` when sample code is needed
+6. Call `list_namespaces` when exploring the API tree from the top down
 
-Your IDE usually exposes these as built-in tools/actions after MCP connection.
+This makes the s&box documentation MCP feel closer to a .NET API browser, where
+namespaces, types, and members are returned in a predictable structure instead
+of as raw page text.
+
+## Tool Reference
+
+### `search_docs`
+
+Use this first. It performs keyword or semantic search across the indexed s&box
+API docs.
+
+Typical input:
+
+```json
+{
+  "query": "component update loop",
+  "kind": "method",
+  "typeName": "Sandbox.Component",
+  "limit": 5
+}
+```
+
+Typical output:
+
+- Ranked results
+- Each result includes a structured symbol summary
+- Common fields include symbol id, fully-qualified name, kind, signature, URL,
+  score, and summary text
+
+Example use:
+
+- Find methods related to `Sandbox.Component`
+- Search for `Ray`, `SceneTrace`, or `GameObject` by concept instead of exact id
+
+### `resolve_symbol`
+
+Use this when a type name is short, incomplete, or ambiguous. It resolves names
+to fully-qualified API types.
+
+Typical input:
+
+```json
+{
+  "name": "Component",
+  "limit": 5
+}
+```
+
+Typical output:
+
+- Matching types only
+- Fully-qualified names such as `Sandbox.Component`
+- Type metadata such as namespace, kind, and symbol id
+
+Example use:
+
+- Resolve `Component` before inspecting members
+- Narrow `Scene` or `Transform` to the exact s&box type you need
+
+### `get_symbol`
+
+Use this to inspect one resolved symbol. It returns structured metadata for a
+type or exact member reference.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component"
+}
+```
+
+Typical output:
+
+- Namespace and declaring type
+- Symbol kind such as class, struct, enum, method, or property
+- Signature and summary
+- URLs, inheritance or declaration context when available
+
+Example use:
+
+- Read the summary for `Sandbox.Component`
+- Inspect a property or exact member after resolving its symbol id
+
+### `get_type_members`
+
+Use this after `get_symbol` when you want to browse what a type exposes.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component",
+  "kind": "method",
+  "limit": 20
+}
+```
+
+Typical output:
+
+- Member list for the target type
+- Constructors, methods, or properties
+- Structured rows with name, member kind, signature, summary, and symbol id
+
+Example use:
+
+- List lifecycle methods on `Sandbox.Component`
+- Enumerate properties on a struct or class before asking about one specific member
+
+### `get_method_details`
+
+Use this when you already know the method you want and need the exact overload
+details.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component.OnUpdate()"
+}
+```
+
+Typical output:
+
+- Exact method signature
+- Parameters with names, types, and documentation
+- Return type and return documentation
+- Exceptions or related notes when indexed
+
+Example use:
+
+- Inspect `Sandbox.Component.OnUpdate()`
+- Read the parameters for a trace, spawn, or utility method overload
+
+### `get_examples`
+
+Use this to fetch code examples attached to a symbol. This is useful when an
+agent needs usage patterns instead of just signatures.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component.OnUpdate()",
+  "includeRelated": true
+}
+```
+
+Typical output:
+
+- Direct examples for the symbol when available
+- Optionally related examples from the declaring type
+- Structured example snippets with source context
+
+Example use:
+
+- Get examples for a method override
+- Fall back to type-level examples when a member has no dedicated sample
+
+### `list_namespaces`
+
+Use this to explore the API hierarchy from the top down.
+
+Typical input:
+
+```json
+{
+  "namespace": "Sandbox",
+  "limit": 50
+}
+```
+
+Typical output:
+
+- Child namespaces
+- Types defined in the namespace
+- Structured namespace and type summaries for navigation
+
+Example use:
+
+- Explore what lives under `Sandbox`
+- Discover related namespaces before searching deeper
+
+## Resources
+
+The MCP server also exposes canonical `docs://` resources for agents that
+already know the exact target they want to load. These resources complement the
+tools:
+
+- Use tools for discovery
+- Use resources for deterministic page loading
+
+Available resource patterns:
+
+- `docs://schema`
+- `docs://namespace/root`
+- `docs://namespace/{name}`
+- `docs://type/{full_name}`
+- `docs://member/{full_name}`
+
+Examples:
+
+```text
+docs://namespace/Sandbox
+docs://type/Sandbox.Component
+docs://member/Sandbox.Component.OnUpdate
+```
+
+Resources return structured JSON-style documentation pages. Depending on the
+resource, this can include:
+
+- Summary and description
+- Exact signatures and declarations
+- Parameters, return types, and return documentation
+- Examples
+- Child namespaces, member listings, and related resource links
+
+Typical usage:
+
+1. Use `search_docs` or `resolve_symbol` to identify the canonical symbol
+2. Read the matching `docs://type/...` or `docs://member/...` resource
+3. Use the structured resource payload as the canonical page for that API element
+
+## How Agents Use It
+
+For a question like "How do I update a custom component every frame?", a well
+behaved agent will usually:
+
+1. Use `search_docs` with a query like `component update every frame`
+2. Use `resolve_symbol` if it needs to confirm `Component` means `Sandbox.Component`
+3. Use `get_symbol` to inspect the type summary
+4. Use `get_type_members` to find lifecycle members such as `OnUpdate`
+5. Read `docs://member/Sandbox.Component.OnUpdate` to load the canonical member page
+6. Use `get_method_details` or `get_examples` when it needs an extra focused lookup
+
+That is the intended MCP interaction model: search broadly, inspect the right
+symbol, then read exact member details or the canonical resource page.
