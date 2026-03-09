@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { apiEntityTypes } from "@/features/api/utils/schemas";
+import {
+  apiEntityKinds,
+  apiMemberEntityKinds,
+  apiTypeEntityKinds,
+} from "@/features/api/utils/schemas";
 
 const optionalString = z.string().trim().min(1).optional();
 
@@ -19,51 +23,71 @@ export const entityIdSchema = z.object({
   id: z.string().trim().min(1),
 });
 
-export const searchApiBodySchema = z.object({
-  className: optionalString,
-  limit: z.number().int().min(1).max(50).optional(),
-  namespace: optionalString,
-  query: z.string().trim().min(1),
-  type: z.enum(apiEntityTypes).optional(),
-  useHybrid: z.boolean().optional(),
-});
-
-export const searchApiQuerySchema = z.object({
-  className: optionalString,
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  namespace: optionalString,
-  query: z.string().trim().min(1),
-  type: z.enum(apiEntityTypes).optional(),
-  useHybrid: optionalBooleanQuery,
-});
-
-export const askQuestionSchema = z.object({
-  limit: z.number().int().min(1).max(20).optional(),
-  question: z.string().trim().min(1),
-});
-
 export const toolNameSchema = z.enum([
-  "answer_question",
-  "describe_entity",
-  "get_signature",
+  "get_examples",
+  "get_method_details",
+  "get_symbol",
+  "get_type_members",
+  "list_namespaces",
+  "resolve_symbol",
   "search_docs",
 ]);
 
+export const searchDocsQuerySchema = z.object({
+  includeObsolete: optionalBooleanQuery,
+  kind: z.enum(apiEntityKinds).optional(),
+  limit: z.coerce.number().int().min(1).max(20).optional(),
+  namespace: optionalString,
+  query: z.string().trim().min(1),
+  typeName: optionalString,
+  useHybrid: optionalBooleanQuery,
+});
+
 export const searchDocsToolInputSchema = z.object({
-  className: optionalString,
+  includeObsolete: z.boolean().optional(),
+  kind: z.enum(apiEntityKinds).optional(),
   limit: z.number().int().min(1).max(20).optional(),
   namespace: optionalString,
   query: z.string().trim().min(1),
-  type: z.enum(apiEntityTypes).optional(),
+  typeName: optionalString,
   useHybrid: z.boolean().optional(),
 });
 
-export const describeEntityToolInputSchema = entityIdSchema;
+export const resolveSymbolToolInputSchema = z.object({
+  kind: z.enum(apiTypeEntityKinds).optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  name: z.string().trim().min(1),
+  namespace: optionalString,
+});
 
-export const getSignatureToolInputSchema = entityIdSchema;
+export const getSymbolToolInputSchema = z.object({
+  kind: z.enum(apiEntityKinds).optional(),
+  symbol: z.string().trim().min(1),
+});
 
-export const answerQuestionToolInputSchema = askQuestionSchema;
+export const getTypeMembersToolInputSchema = z.object({
+  includeObsolete: z.boolean().optional(),
+  kind: z.enum(apiMemberEntityKinds).optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+  symbol: z.string().trim().min(1),
+});
+
+export const getMethodDetailsToolInputSchema = z.object({
+  namespace: optionalString,
+  symbol: z.string().trim().min(1),
+  typeName: optionalString,
+});
+
+export const getExamplesToolInputSchema = z.object({
+  includeRelated: z.boolean().optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  symbol: z.string().trim().min(1),
+});
+
+export const listNamespacesToolInputSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+  namespace: optionalString,
+});
 
 export type ToolName = z.infer<typeof toolNameSchema>;
-export type SearchApiBodyInput = z.infer<typeof searchApiBodySchema>;
-export type SearchApiQueryInput = z.infer<typeof searchApiQuerySchema>;
+export type SearchDocsToolInput = z.infer<typeof searchDocsToolInputSchema>;

@@ -1,0 +1,29 @@
+{
+  "name": "get_examples",
+  "description": "Fetch direct code examples for a symbol and related type examples when available.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Exact symbol id or fully-qualified symbol reference."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Maximum number of examples per source."
+      },
+      "includeRelated": {
+        "type": "boolean",
+        "description": "Include examples from the declaring type when available."
+      }
+    },
+    "required": ["symbol"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/get_examples"
+  }
+}

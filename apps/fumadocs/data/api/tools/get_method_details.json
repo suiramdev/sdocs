@@ -1,0 +1,27 @@
+{
+  "name": "get_method_details",
+  "description": "Get exact method overload details including parameters and return documentation.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Method id, exact signature, or qualified member name."
+      },
+      "typeName": {
+        "type": "string",
+        "description": "Optional declaring type for disambiguation."
+      },
+      "namespace": {
+        "type": "string",
+        "description": "Optional exact namespace filter."
+      }
+    },
+    "required": ["symbol"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/get_method_details"
+  }
+}

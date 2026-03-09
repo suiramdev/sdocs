@@ -56,10 +56,10 @@ configuration are unchanged.
 bun run api:index --reset
 ```
 
-To use Chutes instead of OpenAI for grounded answers and hybrid embeddings,
-set `API_RAG_PROVIDER=chutes`, `MEILI_EMBEDDER_PROVIDER=chutes`,
-`CHUTES_API_KEY`, `CHUTES_API_BASE_URL`, and a valid `API_RAG_MODEL`, then
-re-run the indexer so Meilisearch rebuilds embeddings with the new provider.
+To use Chutes instead of OpenAI for hybrid embeddings, set
+`MEILI_EMBEDDER_PROVIDER=chutes`, `CHUTES_API_KEY`, and
+`CHUTES_API_BASE_URL`, then re-run the indexer so Meilisearch rebuilds
+embeddings with the new provider.
 
 If you hit `EMFILE: too many open files, watch` while developing with a fully generated API tree, increase your file descriptor limit before running dev:
 
@@ -75,22 +75,22 @@ bun run dev
 
 ## API Service Layer
 
-- `GET|POST /api/search`
-- `GET|POST /api/api/search`
-- `GET|POST /api/sbox/search`
-- `GET /api/api/describe`
-- `GET /api/api/get-signature`
-- `GET /api/api/tools/definitions`
-- `POST /api/api/tools/search-api`
-- `POST /api/api/tools/search-sbox-docs`
-- `POST /api/api/ask`
+- `GET /api/search` for the site search dialog
+- `GET /api/v1/tools`
+- `POST /api/v1/tools/:toolName`
+- `GET|POST /api/v1/search`
+- `GET|POST /api/v1/mcp`
+- `GET /api/v1/entities/:id`
+- `GET /api/v1/entities/:id/signature`
 
 ## Generation Outputs
 
 - Docs (optional MDX output): `content/api-generated/...`
 - Entities: `data/api/entities/latest.json`
 
-All AI answers should be grounded in search results and return exact indexed signatures.
+The documentation toolchain is exposed as a standardized SDK-style toolset:
+`search_docs`, `resolve_symbol`, `get_symbol`, `get_type_members`,
+`get_method_details`, `get_examples`, and `list_namespaces`.
 
 ## Docker Deployment
 

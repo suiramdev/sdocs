@@ -2,6 +2,7 @@ import { apiConfig } from "@/features/api/utils/config";
 import { loadApiEntities } from "@/features/api/utils/data";
 import type {
   ApiEntity,
+  ApiEntityKind,
   ApiSearchRequest,
   ApiSearchResult,
 } from "@/features/api/utils/schemas";
@@ -18,6 +19,7 @@ interface MeiliHit {
   class: string;
   description: string;
   displaySignature: string;
+  entityKind: ApiEntityKind;
   id: string;
   isObsolete?: boolean;
   name: string;
@@ -35,6 +37,7 @@ const toSearchResult = (hit: {
   class: string;
   description: string;
   displaySignature: string;
+  entityKind: ApiEntityKind;
   id: string;
   isObsolete?: boolean;
   name: string;
@@ -48,6 +51,7 @@ const toSearchResult = (hit: {
   class: hit.class,
   description: hit.description,
   displaySignature: hit.displaySignature,
+  entityKind: hit.entityKind,
   id: hit.id,
   isObsolete: hit.isObsolete,
   name: hit.name,
@@ -72,6 +76,10 @@ const buildFilter = (request: ApiSearchRequest): string[] => {
 
   if (request.className) {
     filters.push(`class = "${escapeFilterValue(request.className)}"`);
+  }
+
+  if (request.entityKind) {
+    filters.push(`entityKind = "${escapeFilterValue(request.entityKind)}"`);
   }
 
   return filters;
@@ -101,6 +109,7 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
       "id",
       "name",
       "type",
+      "entityKind",
       "namespace",
       "class",
       "signature",
@@ -129,6 +138,7 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
         class: hit.class,
         description: hit.description,
         displaySignature: hit.displaySignature,
+        entityKind: hit.entityKind,
         id: hit.id,
         isObsolete: hit.isObsolete,
         name: hit.name,
@@ -157,30 +167,42 @@ const scoreContains = (value: string, query: string, points: number): number =>
 const scoreTerms = (value: string, terms: string[], points: number): number =>
   terms.reduce((acc, term) => acc + (value.includes(term) ? points : 0), 0);
 
+const getSearchableFields = (entity: ApiEntity) => ({
+  className: entity.class.toLowerCase(),
+  description: entity.description.toLowerCase(),
+  name: entity.name.toLowerCase(),
+  namespace: entity.namespace.toLowerCase(),
+  signature: entity.displaySignature.toLowerCase(),
+});
+
+const scoreDirectMatches = (
+  fields: ReturnType<typeof getSearchableFields>,
+  query: string
+): number =>
+  scoreContains(fields.signature, query, 45) +
+  scoreContains(fields.name, query, 32) +
+  scoreContains(fields.description, query, 18) +
+  scoreContains(fields.namespace, query, 10) +
+  scoreContains(fields.className, query, 10);
+
+const scoreTokenMatches = (
+  fields: ReturnType<typeof getSearchableFields>,
+  terms: string[]
+): number =>
+  scoreTerms(fields.name, terms, 12) +
+  scoreTerms(fields.signature, terms, 10) +
+  scoreTerms(fields.description, terms, 5) +
+  scoreTerms(fields.namespace, terms, 4) +
+  scoreTerms(fields.className, terms, 4);
+
 const scoreEntity = (
   entity: ApiEntity,
   query: string,
   terms: string[]
 ): number => {
-  const className = entity.class.toLowerCase();
-  const description = entity.description.toLowerCase();
-  const name = entity.name.toLowerCase();
-  const namespace = entity.namespace.toLowerCase();
-  const signature = entity.displaySignature.toLowerCase();
-
-  const directMatchScore =
-    scoreContains(signature, query, 45) +
-    scoreContains(name, query, 32) +
-    scoreContains(description, query, 18) +
-    scoreContains(namespace, query, 10) +
-    scoreContains(className, query, 10);
-
-  const tokenMatchScore =
-    scoreTerms(name, terms, 12) +
-    scoreTerms(signature, terms, 10) +
-    scoreTerms(description, terms, 5) +
-    scoreTerms(namespace, terms, 4) +
-    scoreTerms(className, terms, 4);
+  const fields = getSearchableFields(entity);
+  const directMatchScore = scoreDirectMatches(fields, query);
+  const tokenMatchScore = scoreTokenMatches(fields, terms);
   const textScore = directMatchScore + tokenMatchScore;
 
   if (textScore === 0) {
@@ -206,6 +228,10 @@ const matchesRequestFilters = (
     return false;
   }
 
+  if (request.entityKind && entity.entityKind !== request.entityKind) {
+    return false;
+  }
+
   return true;
 };
 
@@ -228,6 +254,7 @@ const searchLocally = async (request: ApiSearchRequest) => {
         class: item.entity.class,
         description: item.entity.description,
         displaySignature: item.entity.displaySignature,
+        entityKind: item.entity.entityKind,
         id: item.entity.id,
         isObsolete: item.entity.isObsolete,
         name: item.entity.name,

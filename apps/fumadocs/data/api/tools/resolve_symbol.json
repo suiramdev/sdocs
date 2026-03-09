@@ -1,0 +1,34 @@
+{
+  "name": "resolve_symbol",
+  "description": "Resolve short or ambiguous type names to fully-qualified API types.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Short or fully-qualified type name."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Maximum number of matching types."
+      },
+      "namespace": {
+        "type": "string",
+        "description": "Optional exact namespace filter."
+      },
+      "kind": {
+        "type": "string",
+        "enum": ["class", "struct", "interface", "enum"],
+        "description": "Optional type kind filter."
+      }
+    },
+    "required": ["name"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/resolve_symbol"
+  }
+}

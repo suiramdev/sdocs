@@ -1,0 +1,54 @@
+{
+  "name": "search_docs",
+  "description": "Search the indexed s&box API documentation and return ranked SDK-style symbols.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Keyword or natural-language documentation query."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Maximum number of results."
+      },
+      "namespace": {
+        "type": "string",
+        "description": "Optional exact namespace filter."
+      },
+      "typeName": {
+        "type": "string",
+        "description": "Optional declaring type filter."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "class",
+          "struct",
+          "interface",
+          "enum",
+          "constructor",
+          "method",
+          "property"
+        ],
+        "description": "Optional symbol kind filter."
+      },
+      "includeObsolete": {
+        "type": "boolean",
+        "description": "Include obsolete symbols."
+      },
+      "useHybrid": {
+        "type": "boolean",
+        "description": "Enable hybrid semantic and keyword ranking when available."
+      }
+    },
+    "required": ["query"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/search_docs"
+  }
+}

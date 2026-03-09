@@ -13,16 +13,6 @@ const defaultSearchQuerySchema = z.object({
   query: z.string().trim().min(1),
 });
 
-const apiToolQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  q: z.string().trim().min(1),
-});
-
-const bodySchema = z.object({
-  limit: z.number().int().min(1).max(50).optional(),
-  query: z.string().trim().min(1),
-});
-
 interface FumadocsSearchResult {
   breadcrumbs: string[];
   content: string;
@@ -101,18 +91,6 @@ const runFumadocsSearch = async (
   return result.results.map(toFumadocsResult);
 };
 
-const runToolSearch = (request: NextRequest) => {
-  const parsed = apiToolQuerySchema.parse({
-    limit: request.nextUrl.searchParams.get("limit") ?? undefined,
-    q: request.nextUrl.searchParams.get("q") ?? "",
-  });
-
-  return searchApiService({
-    limit: parsed.limit,
-    query: parsed.q,
-  });
-};
-
 const handleSearchError = (error: unknown, message: string) => {
   if (error instanceof z.ZodError) {
     return invalidRequestResponse(message, error);
@@ -123,26 +101,8 @@ const handleSearchError = (error: unknown, message: string) => {
 
 export const GET = async (request: NextRequest) => {
   try {
-    if (request.nextUrl.searchParams.has("query")) {
-      return NextResponse.json(await runFumadocsSearch(request));
-    }
-
-    return NextResponse.json(await runToolSearch(request));
+    return NextResponse.json(await runFumadocsSearch(request));
   } catch (error) {
     return handleSearchError(error, "Invalid search query");
-  }
-};
-
-export const POST = async (request: NextRequest) => {
-  try {
-    const body = bodySchema.parse(await request.json());
-    return NextResponse.json(
-      await searchApiService({
-        limit: body.limit,
-        query: body.query,
-      })
-    );
-  } catch (error) {
-    return handleSearchError(error, "Invalid request body");
   }
 };

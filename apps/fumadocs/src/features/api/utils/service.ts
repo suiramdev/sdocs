@@ -3,12 +3,16 @@ import { performance } from "node:perf_hooks";
 import { getEntityById } from "@/features/api/utils/data";
 import { logApiError, logApiInfo } from "@/features/api/utils/logging";
 import { apiSearchRequestSchema } from "@/features/api/utils/schemas";
-import type { ApiEntityType } from "@/features/api/utils/schemas";
+import type {
+  ApiEntityKind,
+  ApiEntityType,
+} from "@/features/api/utils/schemas";
 import { searchApi } from "@/features/api/utils/search";
 import type { ApiSearchResponse } from "@/features/api/utils/search";
 
 interface SearchApiInput {
   className?: string;
+  entityKind?: ApiEntityKind;
   limit?: number;
   namespace?: string;
   query: string;
@@ -21,6 +25,7 @@ export const searchApiService = async (
 ): Promise<ApiSearchResponse> => {
   const request = apiSearchRequestSchema.parse({
     className: input.className,
+    entityKind: input.entityKind,
     limit: input.limit,
     namespace: input.namespace,
     query: input.query,
@@ -41,7 +46,7 @@ export const searchApiService = async (
       },
       durationMs: Math.round(performance.now() - started),
       query: request.query,
-      route: "/api/api/search",
+      route: "/api/v1/search",
     });
 
     return response;
@@ -51,7 +56,7 @@ export const searchApiService = async (
         action: "search",
         durationMs: Math.round(performance.now() - started),
         query: request.query,
-        route: "/api/api/search",
+        route: "/api/v1/search",
       },
       error
     );
@@ -71,7 +76,7 @@ export const describeApiEntityService = async (input: { id: string }) => {
         found: entity ? 1 : 0,
       },
       durationMs: Math.round(performance.now() - started),
-      route: "/api/api/describe",
+      route: "/api/v1/entities/[id]",
     });
 
     return {
@@ -82,7 +87,7 @@ export const describeApiEntityService = async (input: { id: string }) => {
       {
         action: "describe",
         durationMs: Math.round(performance.now() - started),
-        route: "/api/api/describe",
+        route: "/api/v1/entities/[id]",
       },
       error
     );
@@ -97,12 +102,12 @@ export const getSignatureService = async (input: { id: string }) => {
     const entity = await getEntityById(input.id);
 
     logApiInfo({
-      action: "get-signature",
+      action: "entity-signature",
       details: {
         found: entity ? 1 : 0,
       },
       durationMs: Math.round(performance.now() - started),
-      route: "/api/api/get-signature",
+      route: "/api/v1/entities/[id]/signature",
     });
 
     return {
@@ -117,9 +122,9 @@ export const getSignatureService = async (input: { id: string }) => {
   } catch (error) {
     logApiError(
       {
-        action: "get-signature",
+        action: "entity-signature",
         durationMs: Math.round(performance.now() - started),
-        route: "/api/api/get-signature",
+        route: "/api/v1/entities/[id]/signature",
       },
       error
     );

@@ -1,0 +1,34 @@
+{
+  "name": "get_type_members",
+  "description": "List constructors, methods, and properties for a type.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Type symbol id or fully-qualified type name."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200,
+        "description": "Maximum number of members."
+      },
+      "kind": {
+        "type": "string",
+        "enum": ["constructor", "method", "property"],
+        "description": "Optional member kind filter."
+      },
+      "includeObsolete": {
+        "type": "boolean",
+        "description": "Include obsolete members."
+      }
+    },
+    "required": ["symbol"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/get_type_members"
+  }
+}

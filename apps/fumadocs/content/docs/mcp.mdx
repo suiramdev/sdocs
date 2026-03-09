@@ -54,16 +54,25 @@ After saving the config, restart your IDE/agent so it can discover the `sdocs` M
 ## 3) Verify with a quick prompt
 
 ```text
-How do I implement Player movement in S&Box C#, and what is the exact API signature?
+Search for `Sandbox.Component`, inspect its members, then show the exact signature for `OnUpdate`.
 ```
 
 ## What this gives your agent
 
 Once connected, your tool can:
 
-- `search_docs` - search the s&box documentation by keyword
-- `describe_entity` - get a high-level description of an API entity
-- `get_signature` - fetch method and property signatures for an API entity
-- `answer_question` - answer natural-language questions grounded in the docs
+- `search_docs` - search the indexed s&box API docs by keyword or natural language
+- `resolve_symbol` - map short type names to fully-qualified API types
+- `get_symbol` - inspect a specific class, struct, interface, enum, or exact symbol id
+- `get_type_members` - list constructors, methods, and properties for a type
+- `get_method_details` - inspect one exact method overload with parameters and return docs
+- `get_examples` - fetch code examples for a symbol when available
+- `list_namespaces` - explore the namespace hierarchy and available types
+
+Recommended workflow:
+
+1. Start with `search_docs`
+2. Use `resolve_symbol` when the type name is ambiguous
+3. Inspect with `get_symbol`, `get_type_members`, and `get_method_details`
 
 Your IDE usually exposes these as built-in tools/actions after MCP connection.

@@ -5,7 +5,7 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
-  async redirects() {
+  redirects() {
     return [
       {
         destination: "/docs/api",
@@ -19,16 +19,8 @@ const config = {
       },
     ];
   },
-  async rewrites() {
+  rewrites() {
     return [
-      {
-        destination: "/api/api/tools/search-api",
-        source: "/api/sdk/tools/search-sdk",
-      },
-      {
-        destination: "/api/api/:path*",
-        source: "/api/sdk/:path*",
-      },
       {
         destination: "/llms.mdx/docs/:path*",
         source: "/docs/:path*.mdx",

@@ -1,6 +1,26 @@
 import { z } from "zod";
 
 export const apiEntityTypes = ["class", "method", "enum", "property"] as const;
+export const apiEntityKinds = [
+  "class",
+  "struct",
+  "interface",
+  "enum",
+  "constructor",
+  "method",
+  "property",
+] as const;
+export const apiTypeEntityKinds = [
+  "class",
+  "struct",
+  "interface",
+  "enum",
+] as const;
+export const apiMemberEntityKinds = [
+  "constructor",
+  "method",
+  "property",
+] as const;
 
 export const apiParameterSchema = z.object({
   defaultValue: z.string().optional(),
@@ -22,7 +42,7 @@ export const apiEntitySchema = z.object({
   description: z.string(),
   displaySignature: z.string(),
   docId: z.string(),
-  entityKind: z.string(),
+  entityKind: z.enum(apiEntityKinds),
   examples: z.array(z.string()),
   exceptions: z.array(apiExceptionSchema).default([]),
   id: z.string(),
@@ -47,9 +67,11 @@ export type ApiParameter = z.infer<typeof apiParameterSchema>;
 export type ApiException = z.infer<typeof apiExceptionSchema>;
 export type ApiEntity = z.infer<typeof apiEntitySchema>;
 export type ApiEntityType = (typeof apiEntityTypes)[number];
+export type ApiEntityKind = (typeof apiEntityKinds)[number];
 
 export const apiSearchRequestSchema = z.object({
   className: z.string().trim().min(1).optional(),
+  entityKind: z.enum(apiEntityKinds).optional(),
   limit: z.number().int().min(1).max(50).default(10),
   namespace: z.string().trim().min(1).optional(),
   query: z.string().trim().min(1),
@@ -63,6 +85,7 @@ export const apiSearchResultSchema = z.object({
   class: z.string(),
   description: z.string(),
   displaySignature: z.string(),
+  entityKind: z.enum(apiEntityKinds),
   id: z.string(),
   isObsolete: z.boolean().optional(),
   name: z.string(),

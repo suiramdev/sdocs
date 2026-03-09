@@ -1,0 +1,32 @@
+{
+  "name": "get_symbol",
+  "description": "Get structured metadata for a resolved API symbol.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Exact symbol id or fully-qualified symbol reference."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "class",
+          "struct",
+          "interface",
+          "enum",
+          "constructor",
+          "method",
+          "property"
+        ],
+        "description": "Optional expected symbol kind."
+      }
+    },
+    "required": ["symbol"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/get_symbol"
+  }
+}

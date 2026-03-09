@@ -1,14 +1,22 @@
-import { answerApiQuestion } from "@/features/api/utils/rag";
 import {
   describeApiEntityService,
   getSignatureService,
-  searchApiService,
 } from "@/features/api/utils/service";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
-import type { SearchApiBodyInput } from "@/features/api/v1/domain/schemas";
+import type { SearchDocsToolInput } from "@/features/api/v1/domain/schemas";
 
-export const searchApiReference = (input: SearchApiBodyInput) =>
-  searchApiService(input);
+import {
+  getDocumentationExamples,
+  getDocumentationMethodDetails,
+  getDocumentationSymbol,
+  getDocumentationTypeMembers,
+  listDocumentationNamespaces,
+  resolveDocumentationSymbol,
+  searchDocumentation,
+} from "./documentation-tools";
+
+export const searchApiReference = (input: SearchDocsToolInput) =>
+  searchDocumentation(input);
 
 export const getApiEntityById = async (id: string) => {
   const result = await describeApiEntityService({ id });
@@ -38,7 +46,45 @@ export const getApiSignatureById = async (id: string) => {
   return result;
 };
 
-export const askApiReferenceQuestion = (input: {
-  question: string;
+export const resolveApiReferenceSymbol = (input: {
+  kind?: "class" | "struct" | "interface" | "enum";
   limit?: number;
-}) => answerApiQuestion(input);
+  name: string;
+  namespace?: string;
+}) => resolveDocumentationSymbol(input);
+
+export const getApiReferenceSymbol = (input: {
+  kind?:
+    | "class"
+    | "constructor"
+    | "enum"
+    | "interface"
+    | "method"
+    | "property"
+    | "struct";
+  symbol: string;
+}) => getDocumentationSymbol(input);
+
+export const getApiReferenceTypeMembers = (input: {
+  includeObsolete?: boolean;
+  kind?: "constructor" | "method" | "property";
+  limit?: number;
+  symbol: string;
+}) => getDocumentationTypeMembers(input);
+
+export const getApiReferenceMethodDetails = (input: {
+  namespace?: string;
+  symbol: string;
+  typeName?: string;
+}) => getDocumentationMethodDetails(input);
+
+export const getApiReferenceExamples = (input: {
+  includeRelated?: boolean;
+  limit?: number;
+  symbol: string;
+}) => getDocumentationExamples(input);
+
+export const listApiReferenceNamespaces = (input: {
+  limit?: number;
+  namespace?: string;
+}) => listDocumentationNamespaces(input);

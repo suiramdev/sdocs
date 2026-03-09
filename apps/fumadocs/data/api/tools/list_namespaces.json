@@ -1,0 +1,24 @@
+{
+  "name": "list_namespaces",
+  "description": "Explore the namespace hierarchy and list types for a namespace.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Optional namespace to inspect. Omit to list the root."
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "description": "Maximum number of child namespaces and types."
+      }
+    }
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/list_namespaces"
+  }
+}
