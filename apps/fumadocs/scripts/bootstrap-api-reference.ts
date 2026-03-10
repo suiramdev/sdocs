@@ -37,6 +37,9 @@ const getApiJsonUrl = (): string => {
   return apiJsonUrl;
 };
 
+const isExecutableAvailable = (executable: string): boolean =>
+  typeof Bun.which === "function" ? Bun.which(executable) !== null : true;
+
 const formatError = (error: unknown): string => {
   if (error instanceof Error && error.message.length > 0) {
     return error.message;
@@ -238,6 +241,14 @@ const withTemporaryInputFile = async (
 
 const main = async (): Promise<void> => {
   const apiJsonUrl = getApiJsonUrl();
+  const hasGeneratedOutputs = await generationOutputsExist(true);
+
+  if (hasGeneratedOutputs && !isExecutableAvailable("git")) {
+    process.stdout.write(
+      "Git is unavailable in PATH. Using existing generated API reference outputs and skipping regeneration.\n"
+    );
+    return;
+  }
 
   if (await shouldSkipGeneration(apiJsonUrl)) {
     process.stdout.write(
