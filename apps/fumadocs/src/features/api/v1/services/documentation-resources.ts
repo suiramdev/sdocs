@@ -1,5 +1,5 @@
 import { getEntityById, loadApiEntities } from "@/features/api/utils/data";
-import type { ApiEntity } from "@/features/api/utils/schemas";
+import type { ApiEntity, ApiExample } from "@/features/api/utils/schemas";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
 
 import {
@@ -74,10 +74,9 @@ interface NamespaceResourceDocument {
 }
 
 interface TypeResourceDocument {
-  examples: {
-    code: string;
+  examples: (ApiExample & {
     source: "declaring_type" | "symbol";
-  }[];
+  })[];
   links: ResourceLink[];
   members: {
     docsUrl: string;
@@ -113,10 +112,9 @@ interface MemberResourceDocument {
     fullName: string;
     resourceUri: string;
   } | null;
-  examples: {
-    code: string;
+  examples: (ApiExample & {
     source: "declaring_type" | "symbol";
-  }[];
+  })[];
   links: ResourceLink[];
   member: {
     declaration: {
@@ -638,8 +636,7 @@ export const readDocumentationMemberResource = async (
       examples: [
         ...examplesResult.examples,
         ...examplesResult.relatedExamples.map((example) => ({
-          code: example.code,
-          source: example.source,
+          ...example,
         })),
       ],
       links: buildMemberResourceLinks({

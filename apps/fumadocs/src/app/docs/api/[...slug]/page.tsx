@@ -2,13 +2,13 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";
-import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import {
   DocsBody,
   DocsDescription,
   DocsPage,
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
+import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -28,6 +28,7 @@ import {
 } from "@/features/api/utils/reference";
 import type {
   ApiEntity,
+  ApiExample,
   ApiException,
   ApiParameter,
 } from "@/features/api/utils/schemas";
@@ -257,10 +258,10 @@ function TypeExpression({
 
   for (const match of value.matchAll(TYPE_TOKEN)) {
     const token = match[0];
-    const index = match.index ?? 0;
+    const matchOffset = match.index ?? 0;
 
-    if (index > lastIndex) {
-      chunks.push(value.slice(lastIndex, index));
+    if (matchOffset > lastIndex) {
+      chunks.push(value.slice(lastIndex, matchOffset));
     }
 
     const target = resolveTypeEntity(token, lookup);
@@ -271,7 +272,7 @@ function TypeExpression({
         <Link
           className="api-type-link"
           href={target.url}
-          key={`${token}-${index}`}
+          key={`${token}-${matchOffset}`}
           prefetch={false}
           title={target.class}
         >
@@ -281,7 +282,7 @@ function TypeExpression({
     } else {
       chunks.push(
         <span
-          key={`${token}-${index}`}
+          key={`${token}-${matchOffset}`}
           title={token.includes(".") ? token : undefined}
         >
           {displayValue}
@@ -289,7 +290,7 @@ function TypeExpression({
       );
     }
 
-    lastIndex = index + token.length;
+    lastIndex = matchOffset + token.length;
   }
 
   if (lastIndex < value.length) {
@@ -403,45 +404,184 @@ function ExceptionsTable({
   );
 }
 
-function ExamplesBlock({ examples }: { examples: string[] }) {
+function buildExampleTitles(prefix: string, count: number): string[] {
+  return Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`);
+}
+
+function formatExampleLineRange(example: ApiExample): string | null {
+  if (
+    example.lineStart &&
+    example.lineEnd &&
+    example.lineStart !== example.lineEnd
+  ) {
+    return `Lines ${example.lineStart}-${example.lineEnd}`;
+  }
+
+  if (example.lineStart) {
+    return `Line ${example.lineStart}`;
+  }
+
+  return null;
+}
+
+function buildSourceExampleAccordionTitle(
+  example: ApiExample,
+  index: number
+): ReactNode {
+  const filePath = example.filePath?.trim();
+  const repositoryName = example.repositoryName?.trim();
+  const title =
+    filePath && filePath.length > 0 ? filePath : `Implementation ${index + 1}`;
+
+  return (
+    <span className="api-example-source-title">
+      <span className="api-example-source-title-path">{title}</span>
+      {repositoryName ? (
+        <span className="api-example-source-title-repository">
+          {repositoryName}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function SourceExampleLink({ example }: { example: ApiExample }) {
+  const href = example.fileUrl ?? example.repositoryUrl;
+
+  if (!href) {
+    return null;
+  }
+
+  return (
+    <p className="api-example-source-link-row">
+      <a
+        className="api-example-source-link-anchor"
+        href={href}
+        rel="noopener"
+        target="_blank"
+      >
+        <span>Source</span>
+        <ExternalLinkIcon
+          aria-hidden="true"
+          className="api-example-source-link-icon"
+        />
+      </a>
+    </p>
+  );
+}
+
+function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
   if (examples.length === 0) {
     return null;
   }
 
-  if (examples.length === 1) {
-    return (
-      <DynamicCodeBlock
-        code={examples[0]}
-        codeblock={{ title: "Example" }}
-        lang="csharp"
-      />
-    );
-  }
-
-  const labels = examples.map((_, index) => {
-    if (index === 0) {
-      return "Basic Example";
-    }
-
-    if (index === 1) {
-      return "Advanced Example";
-    }
-
-    return `Example ${index + 1}`;
-  });
+  const titles = buildExampleTitles("Example", examples.length);
 
   return (
-    <Tabs items={labels}>
+    <Accordions
+      className="api-example-source-accordions"
+      defaultValue={[]}
+      type="multiple"
+    >
       {examples.map((example, index) => (
-        <Tab key={`${example.slice(0, 50)}-${index}`}>
-          <DynamicCodeBlock
-            code={example}
-            codeblock={{ title: labels[index] }}
-            lang="csharp"
-          />
-        </Tab>
+        <Accordion
+          id={`built-in-example-${index + 1}`}
+          key={`${example.sourceKind}-${titles[index]}-${example.code.slice(0, 50)}`}
+          title={titles[index]}
+          value={`${example.sourceKind}-example-${index + 1}`}
+        >
+          <div className="api-example-source-panel">
+            <div className="api-example-code">
+              <DynamicCodeBlock
+                code={example.code}
+                codeblock={{ title: "Code" }}
+                lang="csharp"
+              />
+            </div>
+          </div>
+        </Accordion>
       ))}
-    </Tabs>
+    </Accordions>
+  );
+}
+
+function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
+  if (examples.length === 0) {
+    return null;
+  }
+
+  return (
+    <Accordions
+      className="api-example-source-accordions"
+      defaultValue={[]}
+      type="multiple"
+    >
+      {examples.map((example, index) => (
+        <Accordion
+          id={`source-example-${index + 1}`}
+          key={
+            example.fileUrl ??
+            `${example.sourceKind}-${index}-${example.code.slice(0, 50)}`
+          }
+          title={buildSourceExampleAccordionTitle(example, index)}
+          value={
+            example.fileUrl ??
+            example.filePath ??
+            `${example.sourceKind}-implementation-${index + 1}`
+          }
+        >
+          <div className="api-example-source-panel">
+            <div className="api-example-code">
+              <DynamicCodeBlock
+                code={example.code}
+                codeblock={{ title: "Code" }}
+                lang="csharp"
+              />
+            </div>
+            <SourceExampleLink example={example} />
+          </div>
+        </Accordion>
+      ))}
+    </Accordions>
+  );
+}
+
+function ExamplesBlock({ examples }: { examples: ApiExample[] }) {
+  if (examples.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="api-example-stack">
+      <p className="api-example-summary">
+        Built-in examples define the default contract and should be read first.
+      </p>
+      <BuiltInExampleAccordionList examples={examples} />
+    </div>
+  );
+}
+
+function ImplementationsBlock({
+  examples,
+  hasBuiltInExamples,
+}: {
+  examples: ApiExample[];
+  hasBuiltInExamples: boolean;
+}) {
+  if (examples.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="api-example-stack">
+      {hasBuiltInExamples ? (
+        <p className="api-example-source-note">
+          Repository-derived implementations for comparison and real-world
+          context.
+        </p>
+      ) : null}
+      <SourceExampleAccordionList examples={examples} />
+    </div>
   );
 }
 
@@ -507,6 +647,12 @@ function MemberReference({
       (parameter.defaultValue?.trim().length ?? 0) > 0
   );
   const hasReturnsSection = entity.returnsDescription.trim().length > 0;
+  const builtInExamples = entity.examples.filter(
+    (example) => example.sourceKind !== "repository"
+  );
+  const implementations = entity.examples.filter(
+    (example) => example.sourceKind === "repository"
+  );
 
   return (
     <article className="api-member-card">
@@ -562,13 +708,26 @@ function MemberReference({
         </section>
       ) : null}
 
-      {entity.examples.length > 0 ? (
+      {builtInExamples.length > 0 ? (
         <section
           aria-labelledby={`${anchor}-example`}
           className="api-subsection"
         >
           <h4 id={`${anchor}-example`}>Example</h4>
-          <ExamplesBlock examples={entity.examples} />
+          <ExamplesBlock examples={builtInExamples} />
+        </section>
+      ) : null}
+
+      {implementations.length > 0 ? (
+        <section
+          aria-labelledby={`${anchor}-implementations`}
+          className="api-subsection"
+        >
+          <h4 id={`${anchor}-implementations`}>Implementations</h4>
+          <ImplementationsBlock
+            examples={implementations}
+            hasBuiltInExamples={builtInExamples.length > 0}
+          />
         </section>
       ) : null}
     </article>

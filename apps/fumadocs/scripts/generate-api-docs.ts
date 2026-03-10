@@ -1,3 +1,5 @@
+/* eslint-disable complexity, func-style, max-statements, no-nested-ternary */
+
 import { createHash } from "node:crypto";
 import {
   mkdir,
@@ -13,9 +15,12 @@ import { fileURLToPath } from "node:url";
 import { buildApiEntityAnchor } from "@/features/api/utils/reference";
 import type {
   ApiEntity,
+  ApiExample,
   ApiException,
   ApiParameter,
 } from "@/features/api/utils/schemas";
+
+import { buildRepositoryExamplesIndex } from "./repository-examples";
 
 interface CliOptions {
   input: string;
@@ -45,7 +50,7 @@ interface NormalizedDocumentation {
   summary: string;
   remarks: string;
   returnsDescription: string;
-  examples: string[];
+  examples: ApiExample[];
   exceptions: ApiException[];
 }
 
@@ -256,12 +261,16 @@ function sanitizeText(value?: string): string {
   return cleanXmlText(decodeHtmlEntities(stripCData(value)));
 }
 
-function sanitizeExamples(doc: RawDocumentation | undefined): string[] {
+function sanitizeExamples(doc: RawDocumentation | undefined): ApiExample[] {
   const examples = doc?.Examples ?? [];
 
   return examples
     .map((example) => sanitizeText(example))
-    .filter((example) => example.length > 0);
+    .filter((example) => example.length > 0)
+    .map((example) => ({
+      code: example,
+      sourceKind: "documentation" as const,
+    }));
 }
 
 function sanitizeExceptions(doc: RawDocumentation | undefined): ApiException[] {
@@ -584,34 +593,69 @@ function renderExceptionsSection(exceptions: ApiException[]): string {
 ${rows}`;
 }
 
-function renderExamplesSection(examples: string[]): string {
+function buildExampleLabel(
+  example: ApiExample,
+  index: number,
+  counts: Map<string, number>
+): string {
+  const baseLabel =
+    example.sourceKind === "repository"
+      ? (example.repositoryName ?? "Repository Example")
+      : index === 0
+        ? "Documentation"
+        : "Documentation Example";
+  const nextCount = (counts.get(baseLabel) ?? 0) + 1;
+  counts.set(baseLabel, nextCount);
+
+  return nextCount === 1 ? baseLabel : `${baseLabel} ${nextCount}`;
+}
+
+function renderExampleSource(example: ApiExample): string {
+  if (example.sourceKind !== "repository") {
+    return "";
+  }
+
+  const label = [example.repositoryName, example.filePath]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (example.fileUrl) {
+    return `Source: [${label || "Repository example"}](${example.fileUrl})`;
+  }
+
+  if (example.repositoryUrl) {
+    return `Source: [${example.repositoryName ?? "Repository"}](${example.repositoryUrl})`;
+  }
+
+  return label.length > 0 ? `Source: ${label}` : "";
+}
+
+function renderExampleBody(example: ApiExample): string {
+  const sourceLine = renderExampleSource(example);
+  const codeBlock = `\`\`\`csharp\n${example.code}\n\`\`\``;
+
+  return sourceLine.length > 0 ? `${sourceLine}\n\n${codeBlock}` : codeBlock;
+}
+
+function renderExamplesSection(examples: ApiExample[]): string {
   if (examples.length === 0) {
     return "";
   }
 
   if (examples.length === 1) {
-    return `\`\`\`csharp\n${examples[0]}\n\`\`\``;
+    return renderExampleBody(examples[0]);
   }
 
-  const labels = examples.map((_, index) => {
-    if (index === 0) {
-      return "Basic Example";
-    }
-
-    if (index === 1) {
-      return "Advanced Example";
-    }
-
-    return `Example ${index + 1}`;
-  });
+  const labelCounts = new Map<string, number>();
+  const labels = examples.map((example, index) =>
+    buildExampleLabel(example, index, labelCounts)
+  );
 
   const tabs = examples
     .map(
       (example, index) => `<Tab value=${quoteYaml(labels[index])}>
 
-\`\`\`csharp
-${example}
-\`\`\`
+${renderExampleBody(example)}
 
 </Tab>`
     )
@@ -719,6 +763,47 @@ async function writeTextFile(target: string, content: string): Promise<void> {
   await writeFile(target, content, "utf8");
 }
 
+function dedupeExamples(examples: ApiExample[]): ApiExample[] {
+  const seen = new Set<string>();
+  const deduped: ApiExample[] = [];
+
+  for (const example of examples) {
+    const key = JSON.stringify({
+      code: example.code,
+      fileUrl: example.fileUrl ?? null,
+      repositoryName: example.repositoryName ?? null,
+      sourceKind: example.sourceKind,
+    });
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(example);
+  }
+
+  return deduped;
+}
+
+function mergeExamples(
+  existingExamples: ApiExample[],
+  repositoryExamples: ApiExample[] | undefined
+): ApiExample[] {
+  if (!repositoryExamples || repositoryExamples.length === 0) {
+    return existingExamples;
+  }
+
+  return dedupeExamples([...existingExamples, ...repositoryExamples]);
+}
+
+function toGeneratedContentPath(entityPath: string): string {
+  return path.join(
+    projectRoot,
+    "content",
+    entityPath.replace(/^api\//u, "api-generated/")
+  );
+}
+
 async function loadJsonFile<T>(filePath: string): Promise<T | null> {
   try {
     const content = await readFile(filePath, "utf8");
@@ -751,7 +836,8 @@ async function clearDirectoryContents(directoryPath: string): Promise<void> {
   }
 }
 
-async function main() {
+// eslint-disable-next-line max-statements
+const main = async () => {
   const options = parseArgs(process.argv.slice(2));
 
   const rawContent = await readFile(options.input, "utf8");
@@ -837,13 +923,7 @@ async function main() {
       description: typeDescription,
       displaySignature: buildTypeDisplaySignature(rawType),
       docId: typeDocId,
-      entityKind: rawType.IsEnum
-        ? "enum"
-        : rawType.IsInterface
-          ? "interface"
-          : rawType.IsValueType
-            ? "struct"
-            : "class",
+      entityKind: typeKind,
       examples: typeDocs.examples,
       exceptions: typeDocs.exceptions,
       id: typeEntityId,
@@ -869,9 +949,6 @@ async function main() {
     typeEntity.url = typeDocLocation.url;
     typeEntity.canonicalUrl = typeDocLocation.url;
 
-    if (options.emitMdx) {
-      await writeTextFile(typePagePath, renderMdxPage(typeEntity));
-    }
     entities.push(typeEntity);
 
     if (typeEntity.type === "enum") {
@@ -952,9 +1029,6 @@ async function main() {
       methodEntity.url = methodDocLocation.url;
       methodEntity.anchor = buildApiEntityAnchor(methodEntity);
 
-      if (options.emitMdx) {
-        await writeTextFile(methodPath, renderMdxPage(methodEntity));
-      }
       entities.push(methodEntity);
       namespaceBucket.methods += 1;
     }
@@ -1019,12 +1093,19 @@ async function main() {
       propertyEntity.url = propertyDocLocation.url;
       propertyEntity.anchor = buildApiEntityAnchor(propertyEntity);
 
-      if (options.emitMdx) {
-        await writeTextFile(propertyPath, renderMdxPage(propertyEntity));
-      }
       entities.push(propertyEntity);
       namespaceBucket.properties += 1;
     }
+  }
+
+  const repositoryExamplesByDocId =
+    await buildRepositoryExamplesIndex(entities);
+
+  for (const entity of entities) {
+    entity.examples = mergeExamples(
+      entity.examples,
+      repositoryExamplesByDocId.get(entity.docId)
+    );
   }
 
   const namespaceItems = [...namespaceStats.entries()].toSorted((a, b) =>
@@ -1032,6 +1113,13 @@ async function main() {
   );
 
   if (options.emitMdx) {
+    for (const entity of entities) {
+      await writeTextFile(
+        toGeneratedContentPath(entity.path),
+        renderMdxPage(entity)
+      );
+    }
+
     for (const [namespaceName, counts] of namespaceItems) {
       const namespacePath = path.join(...toNamespaceSegments(namespaceName));
       const namespaceRoot = path.join(versionRoot, namespacePath);
@@ -1152,10 +1240,12 @@ API MDX files are generated for offline/reference output under content/api-gener
       output: versionRoot,
     })}\n`
   );
-}
+};
 
-main().catch((error: unknown) => {
+try {
+  await main();
+} catch (error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error";
   process.stderr.write(`API generation failed: ${message}\n`);
   process.exit(1);
-});
+}

@@ -15,6 +15,10 @@ import {
   writeApiReferenceState,
 } from "./api-reference-state";
 
+type SearchIndexDocument = Omit<ApiEntity, "examples"> & {
+  examples: string[];
+};
+
 interface CliOptions {
   reset: boolean;
 }
@@ -105,6 +109,24 @@ const indexSettings = {
 
 const DEFAULT_TASK_POLL_INTERVAL_MS = 250;
 const DEFAULT_TASK_TIMEOUT_MS = 30 * 60 * 1000;
+
+const formatDuration = (durationMs: number): string => {
+  if (durationMs < 1000) {
+    return `${durationMs.toFixed(0)}ms`;
+  }
+
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(2)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = ((durationMs % 60_000) / 1000).toFixed(1);
+  return `${minutes}m ${seconds}s`;
+};
+
+const logIndexProgress = (message: string): void => {
+  process.stdout.write(`[api-index] ${message}\n`);
+};
 
 const getNonNegativeInteger = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -270,15 +292,18 @@ const enableVectorStoreExperimentalFeature = async (
   await parseJsonResponse<ExperimentalFeaturesResponse>(response);
 };
 
-const getDocuments = async (): Promise<ApiEntity[]> => {
-  const documents = await readJson<ApiEntity[]>(entitiesFile);
-  if (!documents || documents.length === 0) {
+const getDocuments = async (): Promise<SearchIndexDocument[]> => {
+  const entities = await readJson<ApiEntity[]>(entitiesFile);
+  if (!entities || entities.length === 0) {
     throw new Error(
       "No generated API entities found at data/api/entities/latest.json. Run api:generate first."
     );
   }
 
-  return documents;
+  return entities.map((entity) => ({
+    ...entity,
+    examples: entity.examples.map((example) => example.code),
+  }));
 };
 
 const buildMeiliEmbedders = (): Record<string, unknown> | null => {
@@ -412,19 +437,34 @@ const indexDocuments = async (
   taskClient: MeiliTaskClient,
   index: {
     addDocuments: (
-      documents: ApiEntity[],
+      documents: SearchIndexDocument[],
       options: { primaryKey: string }
     ) => Promise<unknown>;
   },
-  documents: ApiEntity[]
+  documents: SearchIndexDocument[]
 ): Promise<void> => {
   const chunks = chunkDocuments(documents, 1000);
+  const indexingStart = performance.now();
 
-  for (const chunk of chunks) {
+  logIndexProgress(
+    `indexing ${documents.length} documents in ${chunks.length} chunk${chunks.length === 1 ? "" : "s"}`
+  );
+
+  for (const [chunkIndex, chunk] of chunks.entries()) {
+    const chunkStart = performance.now();
+    logIndexProgress(
+      `chunk ${chunkIndex + 1}/${chunks.length}: sending ${chunk.length} document${chunk.length === 1 ? "" : "s"}`
+    );
     await waitForTask(
       runtimeConfig,
       taskClient,
       (await index.addDocuments(chunk, { primaryKey: "meiliId" })) as TaskRef
+    );
+
+    logIndexProgress(
+      `chunk ${chunkIndex + 1}/${chunks.length}: indexed ${chunk.length} document${chunk.length === 1 ? "" : "s"} in ${formatDuration(
+        performance.now() - chunkStart
+      )}; elapsed ${formatDuration(performance.now() - indexingStart)}`
     );
   }
 };
@@ -450,13 +490,13 @@ const createClientAndIndex = async (
 
   return {
     client,
-    index: client.index<ApiEntity>(runtimeConfig.indexName),
+    index: client.index<SearchIndexDocument>(runtimeConfig.indexName),
   };
 };
 
 const writeSummary = (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   skipped: boolean
 ): void => {
   process.stdout.write(
@@ -508,7 +548,7 @@ const isIndexStateCurrent = (input: {
 
 const shouldSkipIndexing = async (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   documentsHash: string
 ): Promise<boolean> => {
   const state = await readApiReferenceState();
@@ -530,7 +570,7 @@ const shouldSkipIndexing = async (
 
 const updateIndexingState = async (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   documentsHash: string
 ): Promise<void> => {
   const currentState = await readApiReferenceState();
@@ -549,56 +589,173 @@ const updateIndexingState = async (
   });
 };
 
-const reindexDocuments = async (
-  runtimeConfig: IndexRuntimeConfig,
+const getShouldResetIndex = (
   options: CliOptions,
-  documents: ApiEntity[],
-  documentsHash: string
-): Promise<void> => {
-  const { client, index } = await createClientAndIndex(runtimeConfig);
-  const embedderIndex = index as unknown as MeiliIndexWithEmbedders;
-  const indexStats = await getIndexStats(runtimeConfig);
-  const shouldReset =
-    (options.reset && indexStats !== null) ||
-    (indexStats?.numberOfDocuments ?? 0) > 0;
+  indexStats: IndexStatsResponse | null
+): boolean =>
+  (options.reset && indexStats !== null) ||
+  (indexStats?.numberOfDocuments ?? 0) > 0;
 
-  await resetIndexIfRequested(runtimeConfig, client.tasks, index, shouldReset);
+const logReindexStart = (
+  runtimeConfig: IndexRuntimeConfig,
+  documents: SearchIndexDocument[]
+): void => {
+  logIndexProgress(
+    `reindex started for ${documents.length} documents on ${runtimeConfig.indexName}`
+  );
+};
+
+const logReindexCompleted = (startedAt: number): void => {
+  logIndexProgress(
+    `reindex completed in ${formatDuration(performance.now() - startedAt)}`
+  );
+};
+
+const logResetState = (shouldReset: boolean): void => {
+  logIndexProgress(
+    shouldReset ? "existing index contents cleared" : "index reset skipped"
+  );
+};
+
+const applyIndexConfiguration = async (
+  runtimeConfig: IndexRuntimeConfig,
+  taskClient: MeiliTaskClient,
+  index: ReturnType<
+    Awaited<ReturnType<typeof importMeiliSearchClient>>["index"]
+  >,
+  embedderIndex: MeiliIndexWithEmbedders
+): Promise<void> => {
   await applyIndexSettings(
     runtimeConfig,
-    client.tasks,
+    taskClient,
     index as unknown as {
       updateSettings: (settings: unknown) => Promise<unknown>;
     }
   );
+  logIndexProgress("index settings applied");
   await applyEmbeddersIfEnabled(
     runtimeConfig,
-    client.tasks,
+    taskClient,
     embedderIndex,
     runtimeConfig.enableHybrid
   );
+  if (runtimeConfig.enableHybrid) {
+    logIndexProgress("embedder configuration applied");
+  }
+};
+
+const createReindexSession = async (
+  runtimeConfig: IndexRuntimeConfig,
+  options: CliOptions
+): Promise<{
+  client: Awaited<ReturnType<typeof importMeiliSearchClient>>;
+  embedderIndex: MeiliIndexWithEmbedders;
+  index: ReturnType<
+    Awaited<ReturnType<typeof importMeiliSearchClient>>["index"]
+  >;
+  shouldReset: boolean;
+}> => {
+  const { client, index } = await createClientAndIndex(runtimeConfig);
+  const indexStats = await getIndexStats(runtimeConfig);
+
+  return {
+    client,
+    embedderIndex: index as unknown as MeiliIndexWithEmbedders,
+    index,
+    shouldReset: getShouldResetIndex(options, indexStats),
+  };
+};
+
+const reindexDocuments = async (
+  runtimeConfig: IndexRuntimeConfig,
+  options: CliOptions,
+  documents: SearchIndexDocument[],
+  documentsHash: string
+): Promise<void> => {
+  const reindexStart = performance.now();
+  const { client, embedderIndex, index, shouldReset } =
+    await createReindexSession(runtimeConfig, options);
+
+  logReindexStart(runtimeConfig, documents);
+  await resetIndexIfRequested(runtimeConfig, client.tasks, index, shouldReset);
+  logResetState(shouldReset);
+  await applyIndexConfiguration(
+    runtimeConfig,
+    client.tasks,
+    index,
+    embedderIndex
+  );
   await indexDocuments(runtimeConfig, client.tasks, index, documents);
   await updateIndexingState(runtimeConfig, documents, documentsHash);
+  logReindexCompleted(reindexStart);
   writeSummary(runtimeConfig, documents, false);
 };
 
+const loadDocumentsForIndexing = async (
+  runtimeConfig: IndexRuntimeConfig
+): Promise<SearchIndexDocument[]> => {
+  logIndexProgress(
+    `loading documents from ${entitiesFile} for index ${runtimeConfig.indexName}`
+  );
+  const documents = await getDocuments();
+  logIndexProgress(`loaded ${documents.length} documents`);
+  return documents;
+};
+
+const shouldSkipCurrentRun = (input: {
+  documents: SearchIndexDocument[];
+  documentsHash: string;
+  options: CliOptions;
+  runtimeConfig: IndexRuntimeConfig;
+}): Promise<boolean> => {
+  if (input.options.reset) {
+    return Promise.resolve(false);
+  }
+
+  return shouldSkipIndexing(
+    input.runtimeConfig,
+    input.documents,
+    input.documentsHash
+  );
+};
+
+const writeSkipSummary = (
+  runtimeConfig: IndexRuntimeConfig,
+  documents: SearchIndexDocument[]
+): void => {
+  process.stdout.write(
+    `Meilisearch index ${runtimeConfig.indexName} is already current for ${documents.length} documents. Skipping reindex.\n`
+  );
+  writeSummary(runtimeConfig, documents, true);
+};
+
+const logRunCompleted = (startedAt: number): void => {
+  logIndexProgress(
+    `api index run finished in ${formatDuration(performance.now() - startedAt)}`
+  );
+};
+
 const run = async (): Promise<void> => {
+  const runStart = performance.now();
   const options = parseArgs(process.argv.slice(2));
   const runtimeConfig = getIndexRuntimeConfig();
-  const documents = await getDocuments();
+  const documents = await loadDocumentsForIndexing(runtimeConfig);
   const documentsHash = hashContent(JSON.stringify(documents));
 
   if (
-    !options.reset &&
-    (await shouldSkipIndexing(runtimeConfig, documents, documentsHash))
+    await shouldSkipCurrentRun({
+      documents,
+      documentsHash,
+      options,
+      runtimeConfig,
+    })
   ) {
-    process.stdout.write(
-      `Meilisearch index ${runtimeConfig.indexName} is already current for ${documents.length} documents. Skipping reindex.\n`
-    );
-    writeSummary(runtimeConfig, documents, true);
+    writeSkipSummary(runtimeConfig, documents);
     return;
   }
 
   await reindexDocuments(runtimeConfig, options, documents, documentsHash);
+  logRunCompleted(runStart);
 };
 
 const main = async (): Promise<void> => {
