@@ -48,10 +48,8 @@ interface ExampleMemberCandidate {
 }
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const workspaceRoot = path.resolve(projectRoot, "..", "..");
 const repositoryCacheRoot = path.join(
-  workspaceRoot,
-  ".cache",
+  process.env.XDG_CACHE_HOME ?? path.join(projectRoot, ".cache"),
   "api-example-repositories"
 );
 const exampleRepositoriesConfigPath = path.join(
