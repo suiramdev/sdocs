@@ -19,6 +19,17 @@ RUN bun run build
 FROM oven/bun:1.3.5 AS runner
 WORKDIR /app
 
+RUN if command -v apt-get >/dev/null 2>&1; then \
+      apt-get update && \
+      apt-get install -y --no-install-recommends git && \
+      rm -rf /var/lib/apt/lists/*; \
+    elif command -v apk >/dev/null 2>&1; then \
+      apk add --no-cache git; \
+    else \
+      echo "Unsupported package manager: unable to install git" >&2; \
+      exit 1; \
+    fi
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0

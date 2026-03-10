@@ -120,6 +120,9 @@ const SYSTEM_TYPE_ALIASES: Record<string, string> = {
 const hashValue = (value: string): string =>
   createHash("sha1").update(value).digest("hex");
 
+const isExecutableAvailable = (executable: string): boolean =>
+  typeof Bun.which === "function" ? Bun.which(executable) !== null : true;
+
 const formatDuration = (durationMs: number): string => {
   if (durationMs < 1000) {
     return `${durationMs.toFixed(0)}ms`;
@@ -138,6 +141,8 @@ const logIndexerProgress = (message: string): void => {
   process.stdout.write(`[repo-example-indexer] ${message}\n`);
 };
 
+const isGitAvailable = (): boolean => isExecutableAvailable("git");
+
 const toCacheKey = (repositoryUrl: string): string =>
   hashValue(repositoryUrl).slice(0, 12);
 
@@ -150,6 +155,14 @@ const readJsonFile = async <T>(filePath: string): Promise<T | null> => {
   }
 };
 
+const formatError = (error: unknown): string => {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+
+  return "Unknown error";
+};
+
 const runCommand = (
   cmd: string[],
   cwd?: string
@@ -158,18 +171,26 @@ const runCommand = (
   stderr: string;
   stdout: string;
 } => {
-  const result = Bun.spawnSync({
-    cmd,
-    cwd,
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  try {
+    const result = Bun.spawnSync({
+      cmd,
+      cwd,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
 
-  return {
-    exitCode: result.exitCode,
-    stderr: result.stderr.toString("utf8"),
-    stdout: result.stdout.toString("utf8"),
-  };
+    return {
+      exitCode: result.exitCode,
+      stderr: result.stderr.toString("utf8"),
+      stdout: result.stdout.toString("utf8"),
+    };
+  } catch (error: unknown) {
+    return {
+      exitCode: 1,
+      stderr: formatError(error),
+      stdout: "",
+    };
+  }
 };
 
 const ensureSuccess = (
@@ -1042,6 +1063,18 @@ export const getExampleRepositoriesFingerprint = async (): Promise<string> => {
     return hashValue("none");
   }
 
+  if (!isGitAvailable()) {
+    logIndexerProgress(
+      "git is unavailable; repository example fingerprinting will use repository config only"
+    );
+    return hashValue(
+      JSON.stringify({
+        config: toFingerprint(repositories),
+        revisions: "git-unavailable",
+      })
+    );
+  }
+
   const revisions = repositories.map((repository) => ({
     name: repository.name,
     revision: getRemoteHeadRevision(repository),
@@ -1067,6 +1100,13 @@ export const buildRepositoryExamplesIndex = async (
 
   const candidateIndex = buildMemberCandidateIndex(entities);
   if (candidateIndex.size === 0) {
+    return new Map();
+  }
+
+  if (!isGitAvailable()) {
+    logIndexerProgress(
+      "git is unavailable; skipping repository implementation indexing"
+    );
     return new Map();
   }
 
