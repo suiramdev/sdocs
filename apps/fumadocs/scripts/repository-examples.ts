@@ -64,6 +64,7 @@ const exampleRepositoriesConfigPath = path.join(
 const CSHARP_EXTENSION = ".cs";
 const DEFAULT_MAX_EXAMPLES_PER_MEMBER = 5;
 const MAX_EXAMPLE_LINES = 80;
+const FILE_PROGRESS_INTERVAL = 25;
 const CLASS_DECLARATION_REGEX =
   /(?:^|\n)\s*(?:(?:public|private|protected|internal|sealed|abstract|static|partial|new)\s+)*(?:class|record|struct)\s+([A-Za-z_][A-Za-z0-9_]*)(?:<[^>{;\n]+>)?\s*(?::([^\\{]+))?\s*\{/gmu;
 const METHOD_DECLARATION_REGEX =
@@ -118,6 +119,24 @@ const SYSTEM_TYPE_ALIASES: Record<string, string> = {
 
 const hashValue = (value: string): string =>
   createHash("sha1").update(value).digest("hex");
+
+const formatDuration = (durationMs: number): string => {
+  if (durationMs < 1000) {
+    return `${durationMs.toFixed(0)}ms`;
+  }
+
+  if (durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(2)}s`;
+  }
+
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = ((durationMs % 60_000) / 1000).toFixed(1);
+  return `${minutes}m ${seconds}s`;
+};
+
+const logIndexerProgress = (message: string): void => {
+  process.stdout.write(`[repo-example-indexer] ${message}\n`);
+};
 
 const toCacheKey = (repositoryUrl: string): string =>
   hashValue(repositoryUrl).slice(0, 12);
@@ -833,17 +852,18 @@ const mergeExamples = (
   docId: string,
   example: ApiExample,
   maxExamplesPerMember: number
-): void => {
+): boolean => {
   const existing = target.get(docId) ?? [];
   const alreadyExists = existing.some(
     (item) => item.code === example.code && item.fileUrl === example.fileUrl
   );
   if (alreadyExists || existing.length >= maxExamplesPerMember) {
-    return;
+    return false;
   }
 
   existing.push(example);
   target.set(docId, existing);
+  return true;
 };
 
 const parseRepositoryDeclarations = async (input: {
@@ -852,13 +872,20 @@ const parseRepositoryDeclarations = async (input: {
   repositoryRoot: string;
 }): Promise<{
   classDeclarations: ParsedClassDeclaration[];
+  filesScanned: number;
   memberDeclarations: ParsedMemberDeclaration[];
 }> => {
   const files = await listCSharpFiles(input.repositoryRoot);
   const classDeclarations: ParsedClassDeclaration[] = [];
   const memberDeclarations: ParsedMemberDeclaration[] = [];
+  const parseStart = performance.now();
 
-  for (const absolutePath of files) {
+  logIndexerProgress(
+    `${input.repository.name}: parsing ${files.length} C# file${files.length === 1 ? "" : "s"}`
+  );
+
+  for (const [fileIndex, absolutePath] of files.entries()) {
+    const fileStart = performance.now();
     const fileStat = await stat(absolutePath);
     if (!fileStat.isFile()) {
       continue;
@@ -868,6 +895,7 @@ const parseRepositoryDeclarations = async (input: {
     const relativePath = path.relative(input.repositoryRoot, absolutePath);
     const fileClasses = parseClassDeclarations(content, relativePath);
     classDeclarations.push(...fileClasses);
+    const memberCountBefore = memberDeclarations.length;
 
     for (const classDeclaration of fileClasses) {
       const classBody = content.slice(
@@ -896,10 +924,24 @@ const parseRepositoryDeclarations = async (input: {
         })
       );
     }
+
+    const shouldLogProgress =
+      (fileIndex + 1) % FILE_PROGRESS_INTERVAL === 0 ||
+      fileIndex + 1 === files.length;
+    if (shouldLogProgress) {
+      logIndexerProgress(
+        `${input.repository.name}: parsed ${fileIndex + 1}/${files.length} files (${relativePath}) in ${formatDuration(
+          performance.now() - fileStart
+        )}; +${fileClasses.length} classes, +${
+          memberDeclarations.length - memberCountBefore
+        } members; elapsed ${formatDuration(performance.now() - parseStart)}`
+      );
+    }
   }
 
   return {
     classDeclarations,
+    filesScanned: files.length,
     memberDeclarations,
   };
 };
@@ -1017,6 +1059,7 @@ export const getExampleRepositoriesFingerprint = async (): Promise<string> => {
 export const buildRepositoryExamplesIndex = async (
   entities: ApiEntity[]
 ): Promise<Map<string, ApiExample[]>> => {
+  const overallStart = performance.now();
   const repositories = await loadExampleRepositories();
   if (repositories.length === 0) {
     return new Map();
@@ -1029,23 +1072,42 @@ export const buildRepositoryExamplesIndex = async (
 
   const examplesByDocId = new Map<string, ApiExample[]>();
 
+  logIndexerProgress(
+    `starting repository implementation indexing for ${repositories.length} repos with ${candidateIndex.size} candidate member bucket${candidateIndex.size === 1 ? "" : "s"}`
+  );
+
   for (const repository of repositories) {
-    process.stdout.write(
-      `Scanning repository examples from ${repository.name}...\n`
-    );
+    const repositoryStart = performance.now();
+    logIndexerProgress(`${repository.name}: checkout started`);
     const repositoryRoot = await ensureRepositoryCheckout(repository);
+    logIndexerProgress(
+      `${repository.name}: checkout ready in ${formatDuration(
+        performance.now() - repositoryStart
+      )}`
+    );
     const repositoryRevision = getRepositoryHeadRevision(repositoryRoot);
+    logIndexerProgress(
+      `${repository.name}: using revision ${repositoryRevision.slice(0, 12)}`
+    );
+    const parseStart = performance.now();
     const parsedRepository = await parseRepositoryDeclarations({
       repository,
       repositoryRevision,
       repositoryRoot,
     });
+    logIndexerProgress(
+      `${repository.name}: parsed ${parsedRepository.filesScanned} files into ${parsedRepository.classDeclarations.length} classes and ${parsedRepository.memberDeclarations.length} member declarations in ${formatDuration(
+        performance.now() - parseStart
+      )}`
+    );
     const classMap = buildClassMap(parsedRepository.classDeclarations);
     const inheritanceCache = new Map<string, Set<string>>();
     const maxExamplesPerMember =
       repository.maxExamplesPerMember ?? DEFAULT_MAX_EXAMPLES_PER_MEMBER;
+    let indexedCount = 0;
 
     for (const declaration of parsedRepository.memberDeclarations) {
+      const declarationStart = performance.now();
       const candidates = candidateIndex.get(declaration.name) ?? [];
       if (candidates.length === 0) {
         continue;
@@ -1084,7 +1146,7 @@ export const buildRepositoryExamplesIndex = async (
         continue;
       }
 
-      mergeExamples(
+      const wasIndexed = mergeExamples(
         examplesByDocId,
         topCandidates[0].candidate.docId,
         toApiExample({
@@ -1094,8 +1156,31 @@ export const buildRepositoryExamplesIndex = async (
         }),
         maxExamplesPerMember
       );
+
+      if (!wasIndexed) {
+        continue;
+      }
+
+      indexedCount += 1;
+      logIndexerProgress(
+        `${repository.name}: indexed ${indexedCount} -> ${topCandidates[0].candidate.docId} from ${declaration.filePath}:${declaration.lineStart} in ${formatDuration(
+          performance.now() - declarationStart
+        )}`
+      );
     }
+
+    logIndexerProgress(
+      `${repository.name}: completed with ${indexedCount} implementation${indexedCount === 1 ? "" : "s"} indexed in ${formatDuration(
+        performance.now() - repositoryStart
+      )}`
+    );
   }
+
+  logIndexerProgress(
+    `finished repository implementation indexing in ${formatDuration(
+      performance.now() - overallStart
+    )}; produced ${examplesByDocId.size} member bucket${examplesByDocId.size === 1 ? "" : "s"}`
+  );
 
   return examplesByDocId;
 };
