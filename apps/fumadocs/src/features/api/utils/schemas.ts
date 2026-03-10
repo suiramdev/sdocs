@@ -34,6 +34,31 @@ export const apiExceptionSchema = z.object({
   type: z.string(),
 });
 
+export const apiExampleSourceKinds = ["documentation", "repository"] as const;
+
+const apiStructuredExampleSchema = z.object({
+  code: z.string(),
+  filePath: z.string().optional(),
+  fileUrl: z.string().optional(),
+  lineEnd: z.number().int().min(1).optional(),
+  lineStart: z.number().int().min(1).optional(),
+  repositoryName: z.string().optional(),
+  repositoryRef: z.string().optional(),
+  repositoryUrl: z.string().optional(),
+  sourceKind: z.enum(apiExampleSourceKinds),
+});
+
+export const apiExampleSchema = z.preprocess(
+  (value) =>
+    typeof value === "string"
+      ? {
+          code: value,
+          sourceKind: "documentation" as const,
+        }
+      : value,
+  apiStructuredExampleSchema
+);
+
 export const apiEntitySchema = z.object({
   anchor: z.string().optional(),
   assembly: z.string(),
@@ -43,7 +68,7 @@ export const apiEntitySchema = z.object({
   displaySignature: z.string(),
   docId: z.string(),
   entityKind: z.enum(apiEntityKinds),
-  examples: z.array(z.string()),
+  examples: z.array(apiExampleSchema),
   exceptions: z.array(apiExceptionSchema).default([]),
   id: z.string(),
   isObsolete: z.boolean().default(false),
@@ -65,6 +90,7 @@ export const apiEntitySchema = z.object({
 
 export type ApiParameter = z.infer<typeof apiParameterSchema>;
 export type ApiException = z.infer<typeof apiExceptionSchema>;
+export type ApiExample = z.infer<typeof apiExampleSchema>;
 export type ApiEntity = z.infer<typeof apiEntitySchema>;
 export type ApiEntityType = (typeof apiEntityTypes)[number];
 export type ApiEntityKind = (typeof apiEntityKinds)[number];

@@ -14,6 +14,7 @@ import {
   readApiReferenceState,
   writeApiReferenceState,
 } from "./api-reference-state";
+import { getExampleRepositoriesFingerprint } from "./repository-examples";
 
 const DEFAULT_API_JSON_URL =
   "https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json";
@@ -165,11 +166,14 @@ const runGeneration = async (
 const shouldSkipGeneration = async (apiJsonUrl: string): Promise<boolean> => {
   const state = await readApiReferenceState();
   const generatorHash = await getGenerateScriptHash();
+  const repositoryExamplesFingerprint =
+    await getExampleRepositoriesFingerprint();
   const sourceVersion = buildSourceVersion(apiJsonUrl);
   const expectedCacheKey = buildGenerationCacheKey({
     emitMdx: true,
     generatorHash,
     includeNonPublic: false,
+    repositoryExamplesFingerprint,
     sourceVersion,
   });
 
@@ -187,6 +191,8 @@ const shouldSkipGeneration = async (apiJsonUrl: string): Promise<boolean> => {
 const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
   const currentState = await readApiReferenceState();
   const generatorHash = await getGenerateScriptHash();
+  const repositoryExamplesFingerprint =
+    await getExampleRepositoriesFingerprint();
   const sourceVersion = buildSourceVersion(apiJsonUrl);
   const entitiesContent = await readFile(entitiesFile, "utf8");
   const entities = JSON.parse(entitiesContent) as unknown[];
@@ -197,6 +203,7 @@ const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
         emitMdx: true,
         generatorHash,
         includeNonPublic: false,
+        repositoryExamplesFingerprint,
         sourceVersion,
       }),
       emitMdx: true,
@@ -205,6 +212,7 @@ const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
       generatedAt: new Date().toISOString(),
       generatorHash,
       includeNonPublic: false,
+      repositoryExamplesFingerprint,
     },
     indexing: currentState?.indexing,
     schemaVersion: 1,

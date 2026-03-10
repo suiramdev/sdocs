@@ -1083,8 +1083,8 @@ export const getDocumentationExamples = async (input: GetExamplesInput) => {
   const entity = await resolveEntityForExamples(input.symbol);
   const directExamples = entity.examples
     .slice(0, input.limit ?? 20)
-    .map((code) => ({
-      code,
+    .map((example) => ({
+      ...example,
       source: "symbol" as const,
     }));
   const includeRelated = input.includeRelated ?? true;
@@ -1093,8 +1093,8 @@ export const getDocumentationExamples = async (input: GetExamplesInput) => {
       ? await resolveTypeEntity(entity.class).catch(() => null)
       : null;
   const relatedExamples = declaringType
-    ? declaringType.examples.slice(0, input.limit ?? 20).map((code) => ({
-        code,
+    ? declaringType.examples.slice(0, input.limit ?? 20).map((example) => ({
+        ...example,
         source: "declaring_type" as const,
         symbol: toSymbolRef(declaringType),
       }))

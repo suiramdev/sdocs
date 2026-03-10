@@ -15,6 +15,10 @@ import {
   writeApiReferenceState,
 } from "./api-reference-state";
 
+type SearchIndexDocument = Omit<ApiEntity, "examples"> & {
+  examples: string[];
+};
+
 interface CliOptions {
   reset: boolean;
 }
@@ -270,15 +274,18 @@ const enableVectorStoreExperimentalFeature = async (
   await parseJsonResponse<ExperimentalFeaturesResponse>(response);
 };
 
-const getDocuments = async (): Promise<ApiEntity[]> => {
-  const documents = await readJson<ApiEntity[]>(entitiesFile);
-  if (!documents || documents.length === 0) {
+const getDocuments = async (): Promise<SearchIndexDocument[]> => {
+  const entities = await readJson<ApiEntity[]>(entitiesFile);
+  if (!entities || entities.length === 0) {
     throw new Error(
       "No generated API entities found at data/api/entities/latest.json. Run api:generate first."
     );
   }
 
-  return documents;
+  return entities.map((entity) => ({
+    ...entity,
+    examples: entity.examples.map((example) => example.code),
+  }));
 };
 
 const buildMeiliEmbedders = (): Record<string, unknown> | null => {
@@ -412,11 +419,11 @@ const indexDocuments = async (
   taskClient: MeiliTaskClient,
   index: {
     addDocuments: (
-      documents: ApiEntity[],
+      documents: SearchIndexDocument[],
       options: { primaryKey: string }
     ) => Promise<unknown>;
   },
-  documents: ApiEntity[]
+  documents: SearchIndexDocument[]
 ): Promise<void> => {
   const chunks = chunkDocuments(documents, 1000);
 
@@ -450,13 +457,13 @@ const createClientAndIndex = async (
 
   return {
     client,
-    index: client.index<ApiEntity>(runtimeConfig.indexName),
+    index: client.index<SearchIndexDocument>(runtimeConfig.indexName),
   };
 };
 
 const writeSummary = (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   skipped: boolean
 ): void => {
   process.stdout.write(
@@ -508,7 +515,7 @@ const isIndexStateCurrent = (input: {
 
 const shouldSkipIndexing = async (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   documentsHash: string
 ): Promise<boolean> => {
   const state = await readApiReferenceState();
@@ -530,7 +537,7 @@ const shouldSkipIndexing = async (
 
 const updateIndexingState = async (
   runtimeConfig: IndexRuntimeConfig,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   documentsHash: string
 ): Promise<void> => {
   const currentState = await readApiReferenceState();
@@ -552,7 +559,7 @@ const updateIndexingState = async (
 const reindexDocuments = async (
   runtimeConfig: IndexRuntimeConfig,
   options: CliOptions,
-  documents: ApiEntity[],
+  documents: SearchIndexDocument[],
   documentsHash: string
 ): Promise<void> => {
   const { client, index } = await createClientAndIndex(runtimeConfig);

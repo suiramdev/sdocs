@@ -16,6 +16,7 @@ export interface ApiReferenceGenerationState {
   generatedAt: string;
   generatorHash: string;
   includeNonPublic: boolean;
+  repositoryExamplesFingerprint?: string;
 }
 
 export interface ApiReferenceIndexingState {
@@ -78,6 +79,7 @@ export const buildGenerationCacheKey = (input: {
   emitMdx: boolean;
   generatorHash: string;
   includeNonPublic: boolean;
+  repositoryExamplesFingerprint?: string;
   sourceVersion: string;
 }): string =>
   hashContent(
@@ -85,6 +87,8 @@ export const buildGenerationCacheKey = (input: {
       emitMdx: input.emitMdx,
       generatorHash: input.generatorHash,
       includeNonPublic: input.includeNonPublic,
+      repositoryExamplesFingerprint:
+        input.repositoryExamplesFingerprint ?? null,
       sourceVersion: input.sourceVersion,
     })
   );

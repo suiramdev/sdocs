@@ -302,6 +302,100 @@
   text-transform: uppercase;
 }
 
+.api-example-stack {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.api-example-summary,
+.api-example-source-note {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--api-muted);
+}
+
+.api-example-source-note {
+  font-weight: 500;
+}
+
+.api-example-source-accordions {
+  margin-top: -0.15rem;
+}
+
+.api-example-source-panel {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 0.25rem;
+}
+
+.api-example-source-link-row {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.api-example-source-link-anchor {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--api-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.api-example-source-link-icon {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
+.api-example-source-title {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.api-example-source-title-path {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-fd-foreground);
+}
+
+.api-example-source-title-repository {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--api-muted);
+}
+
+.api-example-code {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in oklab, var(--api-border) 54%, transparent 46%);
+  background: color-mix(
+    in oklab,
+    var(--api-border) 10%,
+    var(--api-surface) 90%
+  );
+}
+
+.api-example-code > * {
+  margin: 0 !important;
+}
+
+.api-example-code :where(pre) {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.api-example-code :where(code) {
+  font-size: inherit;
+}
+
 .api-inline-link {
   text-decoration: underline;
   text-underline-offset: 0.15rem;
