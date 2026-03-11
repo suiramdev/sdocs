@@ -12,13 +12,32 @@ Use MCP when your IDE or agent supports MCP servers.
 
 ## 1) Configure your preferred tool
 
-<Tabs items={["Cursor", "Other MCP tools"]}>
+<Tabs items={["Visual Studio Code", "Cursor", "Other MCP tools"]}>
+  <Tab>
+    Install with one click from Visual Studio Code:
+
+    <McpVscodeInstallButton />
+
+    Or paste this in your Visual Studio Code MCP settings:
+
+    ```jsonc
+    {
+      "servers": {
+        "sdocs": {
+          "url": "https://sdocs.suiram.dev/api/v1/mcp",
+          "type": "http"
+        }
+      }
+    }
+    ```
+
+  </Tab>
   <Tab>
     Install with one click:
 
     <McpCursorInstallButton />
 
-    Or paste this server config in Cursor MCP settings:
+    Or paste this in your Cursor MCP settings:
 
     ```jsonc
     {
@@ -32,16 +51,11 @@ Use MCP when your IDE or agent supports MCP servers.
 
   </Tab>
   <Tab>
-    In your tool's MCP settings (Windsurf, Cline, Zed, Claude Desktop, and similar), add:
+    In your tool's MCP settings (Windsurf, Cline, Zed, Claude Desktop, and
+    similar), register an HTTP MCP server that points to:
 
-    ```jsonc
-    {
-      "mcpServers": {
-        "sdocs": {
-          "url": "https://sdocs.suiram.dev/api/v1/mcp"
-        }
-      }
-    }
+    ```text
+    https://sdocs.suiram.dev/api/v1/mcp
     ```
 
   </Tab>

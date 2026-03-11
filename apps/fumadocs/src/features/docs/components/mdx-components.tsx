@@ -3,7 +3,10 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import type { MDXComponents } from "mdx/types";
 
-import { McpCursorInstallButton } from "./mcp-config-copy-button";
+import {
+  McpCursorInstallButton,
+  McpVscodeInstallButton,
+} from "./mcp-config-copy-button";
 
 export const getMDXComponents = (
   components?: MDXComponents
@@ -11,6 +14,7 @@ export const getMDXComponents = (
   Accordion,
   Accordions,
   McpCursorInstallButton,
+  McpVscodeInstallButton,
   Tab,
   Tabs,
   ...defaultMdxComponents,
