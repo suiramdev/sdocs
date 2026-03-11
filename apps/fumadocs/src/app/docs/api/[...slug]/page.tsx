@@ -14,6 +14,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
 import {
@@ -270,7 +280,7 @@ function TypeExpression({
     if (target) {
       chunks.push(
         <Link
-          className="api-type-link"
+          className="text-primary underline underline-offset-2"
           href={target.url}
           key={`${token}-${matchOffset}`}
           prefetch={false}
@@ -297,7 +307,7 @@ function TypeExpression({
     chunks.push(value.slice(lastIndex));
   }
 
-  return <code className="api-inline-type">{chunks}</code>;
+  return <code className="text-sm whitespace-nowrap">{chunks}</code>;
 }
 
 function AdvisoryCallout({ remarks }: { remarks: string }) {
@@ -307,7 +317,7 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
 
   const isWarning = WARNING_HINT.test(remarks);
   const isPerformance = PERFORMANCE_HINT.test(remarks);
-  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
+  const title = isWarning ? "Warning" : (isPerformance ? "Performance" : "Note");
 
   return (
     <Callout title={title} type={isWarning ? "warning" : "info"}>
@@ -351,7 +361,7 @@ function ParameterNotes({ parameters }: { parameters: ApiParameter[] }) {
   }
 
   return (
-    <ul className="api-detail-list">
+    <ul className="grid list-disc gap-1 pl-5 text-sm leading-relaxed">
       {entries.map((entry) => (
         <li key={entry.key}>
           <code>{entry.name}</code>
@@ -368,7 +378,7 @@ function ReturnsNotes({ description }: { description: string }) {
     return null;
   }
 
-  return <p className="api-detail-text">{details}</p>;
+  return <p className="text-sm leading-relaxed">{details}</p>;
 }
 
 function ExceptionsTable({
@@ -383,24 +393,24 @@ function ExceptionsTable({
   }
 
   return (
-    <table className="api-table">
-      <thead>
-        <tr>
-          <th>Exception</th>
-          <th>Condition</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table className="mt-2 border-y">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Exception</TableHead>
+          <TableHead>Condition</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {exceptions.map((exception) => (
-          <tr key={`${exception.type}-${exception.description ?? ""}`}>
-            <td>
+          <TableRow key={`${exception.type}-${exception.description ?? ""}`}>
+            <TableCell>
               <TypeExpression lookup={lookup} value={exception.type} />
-            </td>
-            <td>{exception.description?.trim() ?? ""}</td>
-          </tr>
+            </TableCell>
+            <TableCell>{exception.description?.trim() ?? ""}</TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -434,10 +444,10 @@ function buildSourceExampleAccordionTitle(
     filePath && filePath.length > 0 ? filePath : `Implementation ${index + 1}`;
 
   return (
-    <span className="api-example-source-title">
-      <span className="api-example-source-title-path">{title}</span>
+    <span className="grid gap-0.5">
+      <span className="text-sm leading-6 font-semibold">{title}</span>
       {repositoryName ? (
-        <span className="api-example-source-title-repository">
+        <span className="text-muted-foreground text-xs leading-5">
           {repositoryName}
         </span>
       ) : null}
@@ -453,18 +463,15 @@ function SourceExampleLink({ example }: { example: ApiExample }) {
   }
 
   return (
-    <p className="api-example-source-link-row">
+    <p className="m-0 flex items-center text-xs leading-6">
       <a
-        className="api-example-source-link-anchor"
+        className="inline-flex items-center gap-1.5 text-muted-foreground underline underline-offset-2"
         href={href}
         rel="noopener"
         target="_blank"
       >
         <span>Source</span>
-        <ExternalLinkIcon
-          aria-hidden="true"
-          className="api-example-source-link-icon"
-        />
+        <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
       </a>
     </p>
   );
@@ -478,11 +485,7 @@ function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
   const titles = buildExampleTitles("Example", examples.length);
 
   return (
-    <Accordions
-      className="api-example-source-accordions"
-      defaultValue={[]}
-      type="multiple"
-    >
+    <Accordions className="-mt-0.5" defaultValue={[]} type="multiple">
       {examples.map((example, index) => (
         <Accordion
           id={`built-in-example-${index + 1}`}
@@ -490,8 +493,8 @@ function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
           title={titles[index]}
           value={`${example.sourceKind}-example-${index + 1}`}
         >
-          <div className="api-example-source-panel">
-            <div className="api-example-code">
+          <div className="grid gap-3 pt-1">
+            <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
               <DynamicCodeBlock
                 code={example.code}
                 codeblock={{ title: "Code" }}
@@ -511,11 +514,7 @@ function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
   }
 
   return (
-    <Accordions
-      className="api-example-source-accordions"
-      defaultValue={[]}
-      type="multiple"
-    >
+    <Accordions className="-mt-0.5" defaultValue={[]} type="multiple">
       {examples.map((example, index) => (
         <Accordion
           id={`source-example-${index + 1}`}
@@ -530,8 +529,8 @@ function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
             `${example.sourceKind}-implementation-${index + 1}`
           }
         >
-          <div className="api-example-source-panel">
-            <div className="api-example-code">
+          <div className="grid gap-3 pt-1">
+            <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
               <DynamicCodeBlock
                 code={example.code}
                 codeblock={{ title: "Code" }}
@@ -552,8 +551,8 @@ function ExamplesBlock({ examples }: { examples: ApiExample[] }) {
   }
 
   return (
-    <div className="api-example-stack">
-      <p className="api-example-summary">
+    <div className="grid gap-4">
+      <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
         Built-in examples define the default contract and should be read first.
       </p>
       <BuiltInExampleAccordionList examples={examples} />
@@ -573,9 +572,9 @@ function ImplementationsBlock({
   }
 
   return (
-    <div className="api-example-stack">
+    <div className="grid gap-4">
       {hasBuiltInExamples ? (
-        <p className="api-example-source-note">
+        <p className="max-w-[68ch] text-sm leading-relaxed font-medium text-muted-foreground">
           Repository-derived implementations for comparison and real-world
           context.
         </p>
@@ -604,19 +603,22 @@ function MemberHeader({
   );
 
   return (
-    <h3 className="api-member-title" id={anchor}>
-      <span className="api-member-title-row">
-        <span className="api-member-title-signature">
+    <h3 className="m-0 text-base leading-6" id={anchor}>
+      <span className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <span className="min-w-0">
           <SignatureText
             getTokenHref={(token) => resolveSignatureTokenHref(token, lookup)}
             value={title}
           />
         </span>
-        <span className="api-member-title-actions">
+        <span className="inline-flex items-center gap-2">
           {isObsolete ? (
-            <span className="api-obsolete-badge" title={badgeTitle}>
+            <Badge
+              className="border-destructive/40 text-destructive"
+              title={badgeTitle}
+            >
               Obsolete
-            </span>
+            </Badge>
           ) : null}
           <SignatureAnchorButton anchor={anchor} signature={title} />
         </span>
@@ -655,8 +657,8 @@ function MemberReference({
   );
 
   return (
-    <article className="api-member-card">
-      <header className="api-member-header">
+    <Card className="p-5">
+      <header className="grid gap-2">
         <MemberHeader
           anchor={anchor}
           isObsolete={entity.isObsolete}
@@ -665,72 +667,86 @@ function MemberReference({
           title={entity.displaySignature}
         />
         {summary.length > 0 ? (
-          <p className="api-member-summary">{summary}</p>
+          <p className="max-w-[85ch] text-sm leading-relaxed text-muted-foreground">
+            {summary}
+          </p>
         ) : null}
         {entity.isObsolete ? (
-          <p className="api-obsolete-message">Obsolete: {obsoleteNotice}</p>
+          <p className="max-w-[85ch] text-sm leading-relaxed font-medium text-destructive">
+            Obsolete: {obsoleteNotice}
+          </p>
         ) : null}
       </header>
 
       {remarks.length > 0 ? (
-        <section className="api-subsection">
+        <section className="mt-5">
           <AdvisoryCallout remarks={remarks} />
         </section>
       ) : null}
 
       {hasParameterSection ? (
-        <section
-          aria-labelledby={`${anchor}-parameters`}
-          className="api-subsection"
-        >
-          <h4 id={`${anchor}-parameters`}>Parameters</h4>
+        <section aria-labelledby={`${anchor}-parameters`} className="mt-5">
+          <h4
+            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            id={`${anchor}-parameters`}
+          >
+            Parameters
+          </h4>
           <ParameterNotes parameters={entity.parameters} />
         </section>
       ) : null}
 
       {hasReturnsSection ? (
-        <section
-          aria-labelledby={`${anchor}-returns`}
-          className="api-subsection"
-        >
-          <h4 id={`${anchor}-returns`}>Returns</h4>
+        <section aria-labelledby={`${anchor}-returns`} className="mt-5">
+          <h4
+            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            id={`${anchor}-returns`}
+          >
+            Returns
+          </h4>
           <ReturnsNotes description={entity.returnsDescription} />
         </section>
       ) : null}
 
       {entity.exceptions.length > 0 ? (
-        <section
-          aria-labelledby={`${anchor}-exceptions`}
-          className="api-subsection"
-        >
-          <h4 id={`${anchor}-exceptions`}>Exceptions</h4>
+        <section aria-labelledby={`${anchor}-exceptions`} className="mt-5">
+          <h4
+            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            id={`${anchor}-exceptions`}
+          >
+            Exceptions
+          </h4>
           <ExceptionsTable exceptions={entity.exceptions} lookup={lookup} />
         </section>
       ) : null}
 
       {builtInExamples.length > 0 ? (
-        <section
-          aria-labelledby={`${anchor}-example`}
-          className="api-subsection"
-        >
-          <h4 id={`${anchor}-example`}>Example</h4>
+        <section aria-labelledby={`${anchor}-example`} className="mt-5">
+          <h4
+            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            id={`${anchor}-example`}
+          >
+            Example
+          </h4>
           <ExamplesBlock examples={builtInExamples} />
         </section>
       ) : null}
 
       {implementations.length > 0 ? (
-        <section
-          aria-labelledby={`${anchor}-implementations`}
-          className="api-subsection"
-        >
-          <h4 id={`${anchor}-implementations`}>Implementations</h4>
+        <section aria-labelledby={`${anchor}-implementations`} className="mt-5">
+          <h4
+            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            id={`${anchor}-implementations`}
+          >
+            Implementations
+          </h4>
           <ImplementationsBlock
             examples={implementations}
             hasBuiltInExamples={builtInExamples.length > 0}
           />
         </section>
       ) : null}
-    </article>
+    </Card>
   );
 }
 
@@ -753,7 +769,7 @@ function MemberGroups({
   }
 
   return (
-    <div className="api-member-groups" id={sectionId}>
+    <div className="grid gap-4" id={sectionId}>
       {groups.map((group) => {
         if (group.members.length === 1) {
           return (
@@ -776,7 +792,7 @@ function MemberGroups({
               id={group.anchor}
               title={`${group.label} (${group.members.length})`}
             >
-              <div className="api-member-overloads">
+              <div className="grid gap-4 py-2">
                 {group.members.map((member) => (
                   <MemberReference
                     entity={member}
@@ -931,11 +947,17 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
   const selectedAnchor = buildEntityAnchor(selectedEntity);
 
   return (
-    <DocsPage full tableOfContent={{ enabled: true }} toc={toc}>
+    <DocsPage
+      className="xl:layout:[--fd-toc-width:268px]"
+      full
+      tableOfContent={{ enabled: true }}
+      toc={toc}
+    >
       <DocsTitle>
-        <span className="api-page-title-row">
-          <span className="api-page-signature api-reference">
+        <span className="flex flex-wrap items-center gap-2">
+          <span>
             <SignatureText
+              className="text-[clamp(1.05rem,0.95rem+0.55vw,1.34rem)] leading-tight"
               getTokenHref={(token) =>
                 resolveSignatureTokenHref(token, typeLookup)
               }
@@ -943,22 +965,28 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
             />
           </span>
           {typeEntity.isObsolete ? (
-            <span className="api-obsolete-badge" title={typeObsoleteNotice}>
+            <Badge
+              className="border-destructive/40 text-destructive"
+              title={typeObsoleteNotice}
+            >
               Obsolete
-            </span>
+            </Badge>
           ) : null}
         </span>
       </DocsTitle>
       {summary.summary.length > 0 ? (
         <DocsDescription>{summary.summary}</DocsDescription>
       ) : null}
-      <DocsBody className="api-reference">
+      <DocsBody>
         {selectedEntity.id !== typeEntity.id ? (
           <Callout title="Info" type="info">
             <p>
               Opened from member route <code>{selectedEntity.name}</code>. Jump
               to
-              <a className="ms-1 api-inline-link" href={`#${selectedAnchor}`}>
+              <a
+                className="ms-1 underline underline-offset-2"
+                href={`#${selectedAnchor}`}
+              >
                 selected member
               </a>
               .
@@ -976,7 +1004,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         ) : null}
 
         {constructorGroups.length > 0 ? (
-          <section id="constructors">
+          <section className="pt-0" id="constructors">
             <h2>Constructors</h2>
             <MemberGroups
               groups={constructorGroups}
@@ -987,7 +1015,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         ) : null}
 
         {methodGroups.length > 0 ? (
-          <section id="methods">
+          <section className="pt-0 mt-9" id="methods">
             <h2>Methods</h2>
             <MemberGroups
               groups={methodGroups}
@@ -998,7 +1026,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         ) : null}
 
         {propertyGroups.length > 0 ? (
-          <section id="properties">
+          <section className="pt-0 mt-9" id="properties">
             <h2>Properties</h2>
             <MemberGroups
               groups={propertyGroups}
@@ -1008,42 +1036,42 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
           </section>
         ) : null}
 
-        <section id="metadata">
+        <section className="pt-0 mt-9" id="metadata">
           <h2>Metadata</h2>
-          <table className="api-table">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Namespace</td>
-                <td>
+          <Table className="mt-2 border-y">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Field</TableHead>
+                <TableHead>Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Namespace</TableCell>
+                <TableCell>
                   <code>{typeEntity.namespace}</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Type</td>
-                <td>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Type</TableCell>
+                <TableCell>
                   <code>{typeEntity.entityKind}</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Assembly</td>
-                <td>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Assembly</TableCell>
+                <TableCell>
                   <code>{typeEntity.assembly}</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Doc ID</td>
-                <td>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Doc ID</TableCell>
+                <TableCell>
                   <code>{typeEntity.docId}</code>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </section>
       </DocsBody>
     </DocsPage>

@@ -6,6 +6,14 @@ import {
   DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { loadApiEntities } from "@/features/api/utils/data";
 
 export default async function ApiIndexPage() {
@@ -23,6 +31,7 @@ export default async function ApiIndexPage() {
 
   return (
     <DocsPage
+      className="xl:layout:[--fd-toc-width:268px]"
       full
       tableOfContent={{ enabled: true }}
       toc={[
@@ -36,7 +45,7 @@ export default async function ApiIndexPage() {
         Generated C# API reference with grouped type/member navigation and
         structured method documentation.
       </DocsDescription>
-      <DocsBody className="api-reference">
+      <DocsBody>
         <section id="overview">
           <h2>Overview</h2>
           <Callout title="Note" type="info">
@@ -50,36 +59,36 @@ export default async function ApiIndexPage() {
 
         <section id="coverage">
           <h2>Coverage</h2>
-          <table className="api-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Classes / Structs / Interfaces</td>
-                <td>{classCount}</td>
-              </tr>
-              <tr>
-                <td>Enums</td>
-                <td>{enumCount}</td>
-              </tr>
-              <tr>
-                <td>Methods (incl. constructors)</td>
-                <td>{methodCount}</td>
-              </tr>
-              <tr>
-                <td>Properties</td>
-                <td>{propertyCount}</td>
-              </tr>
-              <tr>
-                <td>Total entities</td>
-                <td>{entities.length}</td>
-              </tr>
-            </tbody>
-          </table>
+          <Table className="mt-2 border-y">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead>Count</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Classes / Structs / Interfaces</TableCell>
+                <TableCell>{classCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Enums</TableCell>
+                <TableCell>{enumCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Methods (incl. constructors)</TableCell>
+                <TableCell>{methodCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Properties</TableCell>
+                <TableCell>{propertyCount}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Total entities</TableCell>
+                <TableCell>{entities.length}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </section>
 
         <section id="navigation">

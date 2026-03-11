@@ -1,5 +1,4 @@
 "use client";
-import { buttonVariants } from "fumadocs-ui/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -15,8 +14,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { usePageReadQuery } from "@/features/docs/hooks/use-page-read-query";
-import { cn } from "@/shared/utils/cn";
 
 const cache = new Map<string, string>();
 
@@ -54,20 +53,16 @@ export function LLMCopyButton({
   });
 
   return (
-    <button
+    <Button
+      className="gap-2 [&_svg]:size-3.5 [&_svg]:text-muted-foreground"
       disabled={isLoading}
-      className={cn(
-        buttonVariants({
-          className: "gap-2 [&_svg]:size-3.5 [&_svg]:text-fd-muted-foreground",
-          color: "secondary",
-          size: "sm",
-        })
-      )}
       onClick={onClick}
+      size="sm"
+      variant="secondary"
     >
       {checked ? <Check /> : <Copy />}
       Copy Markdown
-    </button>
+    </Button>
   );
 }
 
@@ -226,17 +221,11 @@ export function ViewOptions({
 
   return (
     <Popover>
-      <PopoverTrigger
-        className={cn(
-          buttonVariants({
-            className: "gap-2",
-            color: "secondary",
-            size: "sm",
-          })
-        )}
-      >
-        Open
-        <ChevronDown className="size-3.5 text-fd-muted-foreground" />
+      <PopoverTrigger asChild>
+        <Button className="gap-2" size="sm" variant="secondary">
+          Open
+          <ChevronDown className="size-3.5 text-muted-foreground" />
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col">
         {items.map((item) => (
@@ -245,11 +234,11 @@ export function ViewOptions({
             href={item.href}
             rel="noreferrer noopener"
             target="_blank"
-            className="text-sm p-2 rounded-lg inline-flex items-center gap-2 hover:text-fd-accent-foreground hover:bg-fd-accent [&_svg]:size-4"
+            className="inline-flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-accent hover:text-accent-foreground [&_svg]:size-4"
           >
             {item.icon}
             {item.title}
-            <ExternalLinkIcon className="text-fd-muted-foreground size-3.5 ms-auto" />
+            <ExternalLinkIcon className="ms-auto size-3.5 text-muted-foreground" />
           </a>
         ))}
       </PopoverContent>
