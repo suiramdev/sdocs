@@ -36,13 +36,13 @@ const buildSearchContent = (result: ApiSearchResult): string => {
       obsoleteMessage.length > 0
         ? ` title="${escapeHtml(obsoleteMessage)}"`
         : "";
-    obsoletePart = `<span class="search-result-obsolete-row"><span class="api-obsolete-badge"${obsoleteTitle}>Obsolete</span></span>`;
+    obsoletePart = `<span class="block pt-1"><span class="inline-flex items-center rounded-full border border-destructive/40 px-2 py-0.5 text-[0.72rem] font-semibold tracking-wide text-destructive uppercase"${obsoleteTitle}>Obsolete</span></span>`;
   }
 
   const signaturePart = signatureToHtml(result.displaySignature);
   const desc =
     (result.description?.trim().length ?? 0) > 0
-      ? `<span class="search-result-desc">${escapeHtml(result.description.trim())}</span>`
+      ? `<span class="mt-1 block text-xs leading-5 text-muted-foreground">${escapeHtml(result.description.trim())}</span>`
       : "";
   return signaturePart + obsoletePart + (desc ? " " + desc : "");
 };

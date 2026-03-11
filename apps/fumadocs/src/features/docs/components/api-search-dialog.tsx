@@ -243,7 +243,7 @@ const isApiHtmlContent = (
 } =>
   item.type === "page" &&
   typeof item.content === "string" &&
-  item.content.includes("search-result-signature");
+  item.content.includes("font-mono text-sm");
 
 const renderHighlights = (
   highlights: NonNullable<NonActionSearchItem["contentWithHighlights"]>
@@ -278,7 +278,12 @@ const getSearchItemContentClassName = (item: NonActionSearchItem): string => {
 };
 
 const SearchGroupLabel = ({ label }: { label?: string }) =>
-  label ? <div className="search-result-group-label">{label}</div> : null;
+  label ? (
+    <div className="my-3 flex items-center gap-2 px-0.5 text-[0.69rem] font-bold tracking-[0.18em] text-foreground/90 uppercase">
+      <span>{label}</span>
+      <span className="h-px flex-1 bg-border/70" />
+    </div>
+  ) : null;
 
 const SearchItemContent = ({ item }: { item: SearchItemType }) => {
   if (item.type === "action") {
@@ -319,7 +324,7 @@ const SearchItemContent = ({ item }: { item: SearchItemType }) => {
 
   return (
     <div
-      className="min-w-0 text-fd-popover-foreground/90"
+      className="min-w-0 text-popover-foreground/90"
       dangerouslySetInnerHTML={{ __html: item.content }}
     />
   );

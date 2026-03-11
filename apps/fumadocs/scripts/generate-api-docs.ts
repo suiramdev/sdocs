@@ -36,13 +36,13 @@ interface RawDocumentation {
   Params?: Record<string, string>;
   Examples?: string[];
   Exceptions?:
-    | Array<{
+    | {
         Cref?: string;
         Type?: string;
         Name?: string;
         Description?: string;
         Value?: string;
-      }>
+      }[]
     | Record<string, string>;
 }
 

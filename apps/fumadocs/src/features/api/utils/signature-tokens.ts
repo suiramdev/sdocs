@@ -231,13 +231,22 @@ const escapeHtml = (text: string): string =>
     .replaceAll('"', "&quot;");
 
 /**
- * Renders a signature as HTML with api-token-* spans for search results.
+ * Renders a signature as HTML with Tailwind utility classes for search results.
  */
 export function signatureToHtml(displaySignature: string): string {
   const tokens = tokenizeSignature(displaySignature);
+  const tokenClassNames: Record<SignatureTokenKind, string> = {
+    default: "text-foreground/90",
+    generic: "text-purple-700 dark:text-purple-300",
+    keyword: "text-indigo-700 dark:text-indigo-300",
+    member: "font-semibold text-foreground",
+    modifier: "text-violet-700 dark:text-violet-300",
+    parameter: "text-amber-700 dark:text-amber-300",
+    type: "text-teal-700 dark:text-teal-300",
+  };
   const parts = tokens.map(
-    (t) =>
-      `<span class="api-token api-token-${t.kind}">${escapeHtml(t.value)}</span>`
+    (token) =>
+      `<span class="${tokenClassNames[token.kind]}">${escapeHtml(token.value)}</span>`
   );
-  return `<span class="search-result-signature api-signature">${parts.join("")}</span>`;
+  return `<span class="inline whitespace-pre-wrap break-words font-mono text-sm leading-6 tracking-tight">${parts.join("")}</span>`;
 }
