@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MemberSectionSearch } from "@/features/api/components/member-section-search";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
 import {
@@ -55,6 +56,15 @@ interface TypeLinkLookup {
   bySimpleName: Map<string, ApiEntity | null>;
 }
 
+type SectionFilterKey = "constructors" | "methods" | "properties";
+
+interface MemberGroup {
+  anchor: string;
+  key: string;
+  label: string;
+  members: ApiEntity[];
+}
+
 const SYSTEM_TYPE_ALIASES: Record<string, string> = {
   "System.Boolean": "bool",
   "System.Byte": "byte",
@@ -78,7 +88,6 @@ const WARNING_HINT = /\b(warning|obsolete|deprecated|breaking)\b/iu;
 const PERFORMANCE_HINT =
   /\b(performance|allocation|allocates|expensive|slow|cache)\b/iu;
 const TYPE_TOKEN = /[A-Za-z_][A-Za-z0-9_.`]*/gu;
-
 function buildUrl(slug: string[]): string {
   return `/docs/api/${slug.join("/")}`;
 }
@@ -144,12 +153,7 @@ function compareEntities(left: ApiEntity, right: ApiEntity): number {
 function groupOverloads(
   members: ApiEntity[],
   typeEntity: ApiEntity
-): {
-  anchor: string;
-  key: string;
-  label: string;
-  members: ApiEntity[];
-}[] {
+): MemberGroup[] {
   const grouped = new Map<string, ApiEntity[]>();
 
   for (const member of members.toSorted(compareEntities)) {
@@ -174,6 +178,37 @@ function groupOverloads(
       };
     })
     .toSorted((left, right) => left.key.localeCompare(right.key));
+}
+
+function countMembers(groups: MemberGroup[]): number {
+  let count = 0;
+
+  for (const group of groups) {
+    count += group.members.length;
+  }
+
+  return count;
+}
+
+function buildMemberSearchText(entity: ApiEntity): string {
+  return [
+    entity.name,
+    entity.displaySignature,
+    entity.signature,
+    entity.summary,
+    entity.description,
+    entity.remarks,
+    entity.returnsDescription,
+    ...entity.parameters.map(
+      (parameter) =>
+        `${parameter.name} ${parameter.type} ${parameter.description ?? ""} ${parameter.defaultValue ?? ""}`
+    ),
+    ...entity.exceptions.map(
+      (exception) => `${exception.type} ${exception.description ?? ""}`
+    ),
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
 }
 
 function buildTypeLookup(entities: ApiEntity[]): TypeLinkLookup {
@@ -312,7 +347,7 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
 
   const isWarning = WARNING_HINT.test(remarks);
   const isPerformance = PERFORMANCE_HINT.test(remarks);
-  const title = isWarning ? "Warning" : (isPerformance ? "Performance" : "Note");
+  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
 
   return (
     <Callout title={title} type={isWarning ? "warning" : "info"}>
@@ -656,7 +691,11 @@ function MemberReference({
   );
 
   return (
-    <article className="group/member">
+    <article
+      className="group/member"
+      data-member-item=""
+      data-member-search={buildMemberSearchText(entity)}
+    >
       <header>
         <MemberHeader
           anchor={anchor}
@@ -750,16 +789,13 @@ function MemberReference({
 }
 
 function MemberGroups({
+  emptyMessageId,
   groups,
   lookup,
   sectionId,
 }: {
-  groups: {
-    anchor: string;
-    key: string;
-    label: string;
-    members: ApiEntity[];
-  }[];
+  emptyMessageId: string;
+  groups: MemberGroup[];
   lookup: TypeLinkLookup;
   sectionId: string;
 }) {
@@ -768,59 +804,54 @@ function MemberGroups({
   }
 
   return (
-    <div className="grid gap-4" id={sectionId}>
-      {groups.map((group) => {
-        if (group.members.length === 1) {
-          return (
-            <MemberReference
-              entity={group.members[0]}
-              key={group.members[0].id}
-              lookup={lookup}
-            />
-          );
-        }
-
-        return (
-          <Accordions
-            className="my-4"
-            defaultValue={[]}
-            key={group.key}
-            type="multiple"
-          >
-            <Accordion
-              id={group.anchor}
-              title={`${group.label} (${group.members.length})`}
-            >
-              <div className="grid gap-4 py-2">
-                {group.members.map((member) => (
-                  <MemberReference
-                    entity={member}
-                    key={member.id}
-                    lookup={lookup}
-                  />
-                ))}
+    <>
+      <div className="grid gap-4" id={sectionId}>
+        {groups.map((group) => {
+          if (group.members.length === 1) {
+            return (
+              <div data-member-group="" key={group.members[0].id}>
+                <MemberReference entity={group.members[0]} lookup={lookup} />
               </div>
-            </Accordion>
-          </Accordions>
-        );
-      })}
-    </div>
+            );
+          }
+
+          return (
+            <div data-member-group="" key={group.key}>
+              <Accordions className="my-4" defaultValue={[]} type="multiple">
+                <Accordion
+                  id={group.anchor}
+                  title={`${group.label} (${group.members.length})`}
+                >
+                  <div className="grid gap-4 py-2">
+                    {group.members.map((member) => (
+                      <MemberReference
+                        entity={member}
+                        key={member.id}
+                        lookup={lookup}
+                      />
+                    ))}
+                  </div>
+                </Accordion>
+              </Accordions>
+            </div>
+          );
+        })}
+      </div>
+      <p
+        className="text-sm leading-relaxed text-muted-foreground"
+        hidden={true}
+        id={emptyMessageId}
+      >
+        No results match this filter.
+      </p>
+    </>
   );
 }
 
 function buildToc(
-  constructorGroups: {
-    anchor: string;
-    members: ApiEntity[];
-  }[],
-  methodGroups: {
-    anchor: string;
-    members: ApiEntity[];
-  }[],
-  propertyGroups: {
-    anchor: string;
-    members: ApiEntity[];
-  }[]
+  constructorGroups: MemberGroup[],
+  methodGroups: MemberGroup[],
+  propertyGroups: MemberGroup[]
 ): TOCItemType[] {
   const items: TOCItemType[] = [];
 
@@ -1000,8 +1031,16 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
 
         {constructorGroups.length > 0 ? (
           <section className="pt-0" id="constructors">
-            <h2>Constructors</h2>
+            <MemberSectionSearch
+              describedBy="constructors-member-filter-status"
+              emptyStateId="constructors-member-filter-empty"
+              inputId="constructors-member-filter"
+              sectionId="constructors-groups"
+              title="Constructors"
+              totalCount={countMembers(constructorGroups)}
+            />
             <MemberGroups
+              emptyMessageId="constructors-member-filter-empty"
               groups={constructorGroups}
               lookup={typeLookup}
               sectionId="constructors-groups"
@@ -1011,8 +1050,16 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
 
         {methodGroups.length > 0 ? (
           <section className="pt-0 mt-9" id="methods">
-            <h2>Methods</h2>
+            <MemberSectionSearch
+              describedBy="methods-member-filter-status"
+              emptyStateId="methods-member-filter-empty"
+              inputId="methods-member-filter"
+              sectionId="methods-groups"
+              title="Methods"
+              totalCount={countMembers(methodGroups)}
+            />
             <MemberGroups
+              emptyMessageId="methods-member-filter-empty"
               groups={methodGroups}
               lookup={typeLookup}
               sectionId="methods-groups"
@@ -1022,8 +1069,16 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
 
         {propertyGroups.length > 0 ? (
           <section className="pt-0 mt-9" id="properties">
-            <h2>Properties</h2>
+            <MemberSectionSearch
+              describedBy="properties-member-filter-status"
+              emptyStateId="properties-member-filter-empty"
+              inputId="properties-member-filter"
+              sectionId="properties-groups"
+              title="Properties"
+              totalCount={countMembers(propertyGroups)}
+            />
             <MemberGroups
+              emptyMessageId="properties-member-filter-empty"
               groups={propertyGroups}
               lookup={typeLookup}
               sectionId="properties-groups"
