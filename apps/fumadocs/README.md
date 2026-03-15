@@ -10,10 +10,20 @@ This app serves generated C# API docs with Meilisearch-backed natural language s
 bun run meilisearch
 ```
 
+If port `7700` is already taken, override the Docker bind port:
+
+```bash
+MEILI_PORT=7710 bun run meilisearch
+```
+
 Or with Docker directly:
 
 ```bash
 docker compose -f infra/meilisearch/docker-compose.yml up -d
+```
+
+```bash
+MEILI_PORT=7710 docker compose -f infra/meilisearch/docker-compose.yml up -d
 ```
 
 2. Copy environment defaults:
@@ -39,6 +49,10 @@ bun run api:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.j
 ```bash
 bun run start
 ```
+
+If you changed the Docker bind port, set `MEILI_HOST` in
+`apps/fumadocs/.env.local` to match it, for example
+`MEILI_HOST=http://127.0.0.1:7710`.
 
 At startup, the app automatically:
 

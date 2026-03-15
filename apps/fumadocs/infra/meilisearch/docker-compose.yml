@@ -4,7 +4,7 @@ services:
     container_name: api-meilisearch
     restart: unless-stopped
     ports:
-      - "7700:7700"
+      - "${MEILI_PORT:-7700}:7700"
     environment:
       MEILI_ENV: development
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
