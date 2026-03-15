@@ -1,10 +1,6 @@
 import { Callout } from "fumadocs-ui/components/callout";
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-} from "fumadocs-ui/layouts/docs/page";
+import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import type { Metadata } from "next";
 
 import {
   Table,
@@ -15,6 +11,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { loadApiEntities } from "@/features/api/utils/data";
+import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
+
+const apiReferenceDescription =
+  "Generated C# API reference with grouped type/member navigation and structured method documentation.";
+
+export const metadata: Metadata = {
+  description: apiReferenceDescription,
+  title: "API Reference",
+};
 
 export default async function ApiIndexPage() {
   const entities = await loadApiEntities();
@@ -31,20 +36,16 @@ export default async function ApiIndexPage() {
 
   return (
     <DocsPage
-      className="xl:layout:[--fd-toc-width:268px]"
-      full
-      tableOfContent={{ enabled: true }}
       toc={[
         { depth: 2, title: "Overview", url: "#overview" },
         { depth: 2, title: "Coverage", url: "#coverage" },
         { depth: 2, title: "Navigation", url: "#navigation" },
       ]}
     >
-      <DocsTitle>API Reference</DocsTitle>
-      <DocsDescription>
-        Generated C# API reference with grouped type/member navigation and
-        structured method documentation.
-      </DocsDescription>
+      <DocsPageHeader
+        description={apiReferenceDescription}
+        title="API Reference"
+      />
       <DocsBody>
         <section id="overview">
           <h2>Overview</h2>

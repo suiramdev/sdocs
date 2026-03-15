@@ -2,12 +2,7 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-} from "fumadocs-ui/layouts/docs/page";
+import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
 import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -15,7 +10,6 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -43,6 +37,7 @@ import type {
   ApiParameter,
 } from "@/features/api/utils/schemas";
 import type { SignatureToken } from "@/features/api/utils/signature-tokens";
+import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 
 interface ApiEntityPageProps {
   params: Promise<{
@@ -551,7 +546,7 @@ function ExamplesBlock({ examples }: { examples: ApiExample[] }) {
   }
 
   return (
-    <div className="grid gap-4">
+    <div>
       <p className="max-w-[68ch] text-sm leading-relaxed text-muted-foreground">
         Built-in examples define the default contract and should be read first.
       </p>
@@ -572,7 +567,7 @@ function ImplementationsBlock({
   }
 
   return (
-    <div className="grid gap-4">
+    <div>
       {hasBuiltInExamples ? (
         <p className="max-w-[68ch] text-sm leading-relaxed font-medium text-muted-foreground">
           Repository-derived implementations for comparison and real-world
@@ -620,7 +615,11 @@ function MemberHeader({
               Obsolete
             </Badge>
           ) : null}
-          <SignatureAnchorButton anchor={anchor} signature={title} />
+          <SignatureAnchorButton
+            anchor={anchor}
+            className="opacity-0 pointer-events-none transition-opacity group-hover/member:opacity-100 group-hover/member:pointer-events-auto group-focus-within/member:opacity-100 group-focus-within/member:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
+            signature={title}
+          />
         </span>
       </span>
     </h3>
@@ -657,8 +656,8 @@ function MemberReference({
   );
 
   return (
-    <Card className="p-5">
-      <header className="grid gap-2">
+    <article className="group/member">
+      <header>
         <MemberHeader
           anchor={anchor}
           isObsolete={entity.isObsolete}
@@ -679,15 +678,15 @@ function MemberReference({
       </header>
 
       {remarks.length > 0 ? (
-        <section className="mt-5">
+        <section>
           <AdvisoryCallout remarks={remarks} />
         </section>
       ) : null}
 
       {hasParameterSection ? (
-        <section aria-labelledby={`${anchor}-parameters`} className="mt-5">
+        <section aria-labelledby={`${anchor}-parameters`}>
           <h4
-            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             id={`${anchor}-parameters`}
           >
             Parameters
@@ -697,9 +696,9 @@ function MemberReference({
       ) : null}
 
       {hasReturnsSection ? (
-        <section aria-labelledby={`${anchor}-returns`} className="mt-5">
+        <section aria-labelledby={`${anchor}-returns`}>
           <h4
-            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             id={`${anchor}-returns`}
           >
             Returns
@@ -709,9 +708,9 @@ function MemberReference({
       ) : null}
 
       {entity.exceptions.length > 0 ? (
-        <section aria-labelledby={`${anchor}-exceptions`} className="mt-5">
+        <section aria-labelledby={`${anchor}-exceptions`}>
           <h4
-            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             id={`${anchor}-exceptions`}
           >
             Exceptions
@@ -721,9 +720,9 @@ function MemberReference({
       ) : null}
 
       {builtInExamples.length > 0 ? (
-        <section aria-labelledby={`${anchor}-example`} className="mt-5">
+        <section aria-labelledby={`${anchor}-example`}>
           <h4
-            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             id={`${anchor}-example`}
           >
             Example
@@ -733,9 +732,9 @@ function MemberReference({
       ) : null}
 
       {implementations.length > 0 ? (
-        <section aria-labelledby={`${anchor}-implementations`} className="mt-5">
+        <section aria-labelledby={`${anchor}-implementations`}>
           <h4
-            className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
             id={`${anchor}-implementations`}
           >
             Implementations
@@ -746,7 +745,7 @@ function MemberReference({
           />
         </section>
       ) : null}
-    </Card>
+    </article>
   );
 }
 
@@ -947,36 +946,32 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
   const selectedAnchor = buildEntityAnchor(selectedEntity);
 
   return (
-    <DocsPage
-      className="xl:layout:[--fd-toc-width:268px]"
-      full
-      tableOfContent={{ enabled: true }}
-      toc={toc}
-    >
-      <DocsTitle>
-        <span className="flex flex-wrap items-center gap-2">
-          <span>
-            <SignatureText
-              className="text-[clamp(1.05rem,0.95rem+0.55vw,1.34rem)] leading-tight"
-              getTokenHref={(token) =>
-                resolveSignatureTokenHref(token, typeLookup)
-              }
-              value={typeEntity.displaySignature}
-            />
+    <DocsPage toc={toc}>
+      <DocsPageHeader
+        description={summary.summary}
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>
+              <SignatureText
+                className="text-[1em] leading-tight"
+                getTokenHref={(token) =>
+                  resolveSignatureTokenHref(token, typeLookup)
+                }
+                value={typeEntity.displaySignature}
+              />
+            </span>
+            {typeEntity.isObsolete ? (
+              <Badge
+                className="border-destructive/40 text-destructive"
+                title={typeObsoleteNotice}
+              >
+                Obsolete
+              </Badge>
+            ) : null}
           </span>
-          {typeEntity.isObsolete ? (
-            <Badge
-              className="border-destructive/40 text-destructive"
-              title={typeObsoleteNotice}
-            >
-              Obsolete
-            </Badge>
-          ) : null}
-        </span>
-      </DocsTitle>
-      {summary.summary.length > 0 ? (
-        <DocsDescription>{summary.summary}</DocsDescription>
-      ) : null}
+        }
+        titleClassName="leading-tight"
+      />
       <DocsBody>
         {selectedEntity.id !== typeEntity.id ? (
           <Callout title="Info" type="info">
