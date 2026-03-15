@@ -1,14 +1,13 @@
 import {
   DocsBody,
-  DocsDescription,
   DocsPage,
-  DocsTitle,
 } from "fumadocs-ui/layouts/docs/page";
 import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { getMDXComponents } from "@/features/docs/components/mdx-components";
+import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 import {
   LLMCopyButton,
   ViewOptions,
@@ -27,17 +26,19 @@ export default async function Page(props: PageProps<"/docs/[...slug]">) {
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">
-        {page.data.description}
-      </DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b pb-6">
-        <LLMCopyButton markdownUrl={`${page.url}.mdx`} />
-        <ViewOptions
-          markdownUrl={`${page.url}.mdx`}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
-        />
-      </div>
+      <DocsPageHeader
+        actions={
+          <>
+            <LLMCopyButton markdownUrl={`${page.url}.mdx`} />
+            <ViewOptions
+              markdownUrl={`${page.url}.mdx`}
+              githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
+            />
+          </>
+        }
+        description={page.data.description}
+        title={page.data.title}
+      />
       <DocsBody>
         <MDX
           components={getMDXComponents({
