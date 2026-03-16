@@ -50,6 +50,18 @@ bun run api:generate --input /Users/nouchetm/Downloads/2026-03-02-20-41-10.zip.j
 bun run start
 ```
 
+If port `4000` is already taken, override the app port:
+
+```bash
+FUMADOCS_PORT=4400 bun run start
+```
+
+For development with hot reload:
+
+```bash
+FUMADOCS_PORT=4400 bun run dev
+```
+
 If you changed the Docker bind port, set `MEILI_HOST` in
 `apps/fumadocs/.env.local` to match it, for example
 `MEILI_HOST=http://127.0.0.1:7710`.
@@ -79,12 +91,6 @@ If you hit `EMFILE: too many open files, watch` while developing with a fully ge
 
 ```bash
 ulimit -n 65536
-```
-
-For development with hot reload:
-
-```bash
-bun run dev
 ```
 
 ## API Service Layer
@@ -126,6 +132,8 @@ If those ports are already used, override them:
 ```bash
 FUMADOCS_PORT=4400 MEILI_PORT=7710 docker compose up -d --build
 ```
+
+With that override, the app is available on `http://localhost:4400`.
 
 To manually rerun API indexing after deployment:
 
