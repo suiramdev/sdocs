@@ -1,4 +1,4 @@
-import { codeToTokensWithThemes } from "shiki";
+import { highlightText } from "@/features/code/utils/tree-sitter-highlight";
 
 const IDENTIFIER_TOKEN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 const SIGNATURE_TOKEN = /[A-Za-z_][A-Za-z0-9_]*|\s+|./gu;
@@ -269,9 +269,7 @@ const escapeHtml = (text: string): string =>
     .replaceAll('"', "&quot;");
 
 export const normalizeSignatureForDisplay = (signature: string): string =>
-  signature.replaceAll(CLR_BUILTIN_TYPE_PATTERN, (value) => {
-    return CLR_BUILTIN_TYPE_ALIASES[value] ?? value;
-  });
+  signature.replaceAll(CLR_BUILTIN_TYPE_PATTERN, (value) => CLR_BUILTIN_TYPE_ALIASES[value] ?? value);
 
 const getColorStyle = ({
   darkColor,
@@ -279,29 +277,23 @@ const getColorStyle = ({
 }: {
   darkColor: string;
   lightColor: string;
-}) => {
-  return `--signature-dark:${darkColor};--signature-light:${lightColor}`;
-};
+}) => `--syntax-dark:${darkColor};--syntax-light:${lightColor}`;
 
-const getShikiColorRanges = async (
+const getHighlightRanges = async (
   signature: string
-): Promise<Array<{ darkColor: string; end: number; lightColor: string }>> => {
+): Promise<{ darkColor: string; end: number; lightColor: string }[]> => {
   const normalizedSignature = normalizeSignatureForDisplay(signature);
-  const lines = await codeToTokensWithThemes(normalizedSignature, {
-    lang: "csharp",
-    themes: {
-      dark: "github-dark",
-      light: "github-light",
-    },
+  const spans = await highlightText({
+    isCSharpSignature: true,
+    language: "csharp",
+    source: normalizedSignature,
   });
 
-  return lines.flatMap((line) => {
-    return line.map((token) => ({
-      darkColor: token.variants.dark.color ?? SIGNATURE_THEME_COLORS.dark,
-      end: token.offset + token.content.length,
-      lightColor: token.variants.light.color ?? SIGNATURE_THEME_COLORS.light,
+  return spans.map((span) => ({
+      darkColor: span.darkColor ?? SIGNATURE_THEME_COLORS.dark,
+      end: span.end,
+      lightColor: span.lightColor ?? SIGNATURE_THEME_COLORS.light,
     }));
-  });
 };
 
 export const highlightSignatureTokens = async (
@@ -309,7 +301,7 @@ export const highlightSignatureTokens = async (
 ): Promise<HighlightedSignatureToken[]> => {
   const normalizedSignature = normalizeSignatureForDisplay(signature);
   const tokens = tokenizeSignature(normalizedSignature);
-  const colorRanges = await getShikiColorRanges(signature);
+  const colorRanges = await getHighlightRanges(signature);
   let offset = 0;
   let colorRangeIndex = 0;
 
@@ -328,7 +320,8 @@ export const highlightSignatureTokens = async (
       darkColor:
         colorRanges[colorRangeIndex]?.darkColor ?? SIGNATURE_THEME_COLORS.dark,
       lightColor:
-        colorRanges[colorRangeIndex]?.lightColor ?? SIGNATURE_THEME_COLORS.light,
+        colorRanges[colorRangeIndex]?.lightColor ??
+        SIGNATURE_THEME_COLORS.light,
     };
   });
 };

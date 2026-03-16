@@ -104,10 +104,34 @@
   --sidebar-ring: hsl(0 0% 55.1%);
 }
 
+.fd-docs-header {
+  top: var(--fd-docs-row-1);
+  height: var(--fd-header-height);
+}
+
+.fd-docs-sidebar {
+  top: var(--fd-docs-row-1);
+  height: calc(var(--fd-docs-height) - var(--fd-docs-row-1));
+}
+
+.fd-docs-toc {
+  top: var(--fd-docs-row-1);
+  height: calc(var(--fd-docs-height) - var(--fd-docs-row-1));
+  width: var(--fd-toc-width);
+}
+
 .signature-token {
-  color: var(--signature-light, currentColor);
+  color: var(--syntax-light, currentColor);
 }
 
 .dark .signature-token {
-  color: var(--signature-dark, var(--signature-light, currentColor));
+  color: var(--syntax-dark, var(--syntax-light, currentColor));
+}
+
+.shiki code span.code-token {
+  color: var(--syntax-light, currentColor) !important;
+}
+
+.dark .shiki code span.code-token {
+  color: var(--syntax-dark, var(--syntax-light, currentColor)) !important;
 }

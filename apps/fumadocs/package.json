@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "sh -c 'CHOKIDAR_USEPOLLING=true npx -y node@22 ./node_modules/next/dist/bin/next dev --turbopack --port=${FUMADOCS_PORT:-4000}'",
-    "start": "sh -c 'bun run api:bootstrap && next start --port=${FUMADOCS_PORT:-4000}'",
-    "types:check": "fumadocs-mdx && next typegen && tsc --noEmit -p tsconfig.typecheck.json",
-    "postinstall": "fumadocs-mdx",
+    "build": "bun run patch:fumadocs-ui && next build",
+    "dev": "sh -c 'bun run patch:fumadocs-ui && CHOKIDAR_USEPOLLING=true npx -y node@22 ./node_modules/next/dist/bin/next dev --turbopack --port=${FUMADOCS_PORT:-4000}'",
+    "start": "sh -c 'bun run patch:fumadocs-ui && bun run api:bootstrap && next start --port=${FUMADOCS_PORT:-4000}'",
+    "types:check": "bun run patch:fumadocs-ui && fumadocs-mdx && next typegen && tsc --noEmit -p tsconfig.typecheck.json",
+    "postinstall": "bun run patch:fumadocs-ui && fumadocs-mdx",
     "meilisearch": "docker compose -f infra/meilisearch/docker-compose.yml up -d",
     "meilisearch:stop": "docker compose -f infra/meilisearch/docker-compose.yml down",
+    "patch:fumadocs-ui": "bun run scripts/patch-fumadocs-ui.ts",
     "api:bootstrap": "bun run scripts/bootstrap-api-reference.ts",
     "api:bootstrap:index": "bun run api:bootstrap && bun run api:index",
     "api:generate": "bun run scripts/generate-api-docs.ts",
@@ -27,7 +28,12 @@
     "next": "16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwind-merge": "^3.5.0"
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.5.0",
+    "tree-sitter-bash": "^0.25.1",
+    "tree-sitter-c-sharp": "^0.23.1",
+    "tree-sitter-json": "^0.24.8",
+    "web-tree-sitter": "0.25.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
