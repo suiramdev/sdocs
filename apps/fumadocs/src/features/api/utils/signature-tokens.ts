@@ -1,3 +1,5 @@
+import { codeToTokensWithThemes } from "shiki";
+
 const IDENTIFIER_TOKEN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 const SIGNATURE_TOKEN = /[A-Za-z_][A-Za-z0-9_]*|\s+|./gu;
 const SIGNATURE_MODIFIERS = new Set([
@@ -77,6 +79,42 @@ export interface SignatureToken {
   kind: SignatureTokenKind;
   value: string;
 }
+
+export interface HighlightedSignatureToken extends SignatureToken {
+  darkColor: string;
+  lightColor: string;
+}
+
+const SIGNATURE_THEME_COLORS = {
+  dark: "#E1E4E8",
+  light: "#24292E",
+} as const;
+
+const CLR_BUILTIN_TYPE_ALIASES: Record<string, string> = {
+  "System.Boolean": "bool",
+  "System.Byte": "byte",
+  "System.Char": "char",
+  "System.Decimal": "decimal",
+  "System.Double": "double",
+  "System.Int16": "short",
+  "System.Int32": "int",
+  "System.Int64": "long",
+  "System.Object": "object",
+  "System.SByte": "sbyte",
+  "System.Single": "float",
+  "System.String": "string",
+  "System.UInt16": "ushort",
+  "System.UInt32": "uint",
+  "System.UInt64": "ulong",
+  "System.Void": "void",
+};
+
+const CLR_BUILTIN_TYPE_PATTERN = new RegExp(
+  `\\b(?:${Object.keys(CLR_BUILTIN_TYPE_ALIASES)
+    .map((typeName) => typeName.replaceAll(".", "\\."))
+    .join("|")})\\b`,
+  "gu"
+);
 
 function isIdentifierToken(value: string): boolean {
   return IDENTIFIER_TOKEN.test(value);
@@ -230,23 +268,81 @@ const escapeHtml = (text: string): string =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
+export const normalizeSignatureForDisplay = (signature: string): string =>
+  signature.replaceAll(CLR_BUILTIN_TYPE_PATTERN, (value) => {
+    return CLR_BUILTIN_TYPE_ALIASES[value] ?? value;
+  });
+
+const getColorStyle = ({
+  darkColor,
+  lightColor,
+}: {
+  darkColor: string;
+  lightColor: string;
+}) => {
+  return `--signature-dark:${darkColor};--signature-light:${lightColor}`;
+};
+
+const getShikiColorRanges = async (
+  signature: string
+): Promise<Array<{ darkColor: string; end: number; lightColor: string }>> => {
+  const normalizedSignature = normalizeSignatureForDisplay(signature);
+  const lines = await codeToTokensWithThemes(normalizedSignature, {
+    lang: "csharp",
+    themes: {
+      dark: "github-dark",
+      light: "github-light",
+    },
+  });
+
+  return lines.flatMap((line) => {
+    return line.map((token) => ({
+      darkColor: token.variants.dark.color ?? SIGNATURE_THEME_COLORS.dark,
+      end: token.offset + token.content.length,
+      lightColor: token.variants.light.color ?? SIGNATURE_THEME_COLORS.light,
+    }));
+  });
+};
+
+export const highlightSignatureTokens = async (
+  signature: string
+): Promise<HighlightedSignatureToken[]> => {
+  const normalizedSignature = normalizeSignatureForDisplay(signature);
+  const tokens = tokenizeSignature(normalizedSignature);
+  const colorRanges = await getShikiColorRanges(signature);
+  let offset = 0;
+  let colorRangeIndex = 0;
+
+  return tokens.map((token) => {
+    while (
+      colorRangeIndex < colorRanges.length - 1 &&
+      offset >= colorRanges[colorRangeIndex].end
+    ) {
+      colorRangeIndex += 1;
+    }
+
+    offset += token.value.length;
+
+    return {
+      ...token,
+      darkColor:
+        colorRanges[colorRangeIndex]?.darkColor ?? SIGNATURE_THEME_COLORS.dark,
+      lightColor:
+        colorRanges[colorRangeIndex]?.lightColor ?? SIGNATURE_THEME_COLORS.light,
+    };
+  });
+};
+
 /**
  * Renders a signature as HTML with Tailwind utility classes for search results.
  */
-export function signatureToHtml(displaySignature: string): string {
-  const tokens = tokenizeSignature(displaySignature);
-  const tokenClassNames: Record<SignatureTokenKind, string> = {
-    default: "text-foreground/90",
-    generic: "text-purple-700 dark:text-purple-300",
-    keyword: "text-indigo-700 dark:text-indigo-300",
-    member: "font-semibold text-foreground",
-    modifier: "text-violet-700 dark:text-violet-300",
-    parameter: "text-amber-700 dark:text-amber-300",
-    type: "text-teal-700 dark:text-teal-300",
-  };
+export async function signatureToHtml(
+  displaySignature: string
+): Promise<string> {
+  const tokens = await highlightSignatureTokens(displaySignature);
   const parts = tokens.map(
     (token) =>
-      `<span class="${tokenClassNames[token.kind]}">${escapeHtml(token.value)}</span>`
+      `<span class="signature-token" style="${getColorStyle(token)}">${escapeHtml(token.value)}</span>`
   );
   return `<span class="inline whitespace-pre-wrap break-words font-mono text-sm leading-6 tracking-tight">${parts.join("")}</span>`;
 }
