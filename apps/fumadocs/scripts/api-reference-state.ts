@@ -48,6 +48,11 @@ const generateScriptPath = path.join(
   "scripts",
   "generate-api-docs.ts"
 );
+const repositoryExamplesScriptPath = path.join(
+  projectRoot,
+  "scripts",
+  "repository-examples.ts"
+);
 const indexScriptPath = path.join(projectRoot, "scripts", "index-api-meili.ts");
 
 export const hashContent = (value: string): string =>
@@ -58,8 +63,13 @@ const getFileHash = async (filePath: string): Promise<string> => {
   return hashContent(content);
 };
 
-export const getGenerateScriptHash = (): Promise<string> =>
-  getFileHash(generateScriptPath);
+export const getGenerateScriptHash = async (): Promise<string> =>
+  hashContent(
+    JSON.stringify({
+      generateApiDocs: await getFileHash(generateScriptPath),
+      repositoryExamples: await getFileHash(repositoryExamplesScriptPath),
+    })
+  );
 
 export const getIndexScriptHash = (): Promise<string> =>
   getFileHash(indexScriptPath);
