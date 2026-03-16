@@ -3,5 +3,10 @@
     "maxExamplesPerMember": 5,
     "name": "Facepunch/sbox-scenestaging",
     "url": "https://github.com/Facepunch/sbox-scenestaging"
+  },
+  {
+    "maxExamplesPerMember": 5,
+    "name": "Facepunch/sbox-bombroyale",
+    "url": "https://github.com/Facepunch/sbox-bombroyale"
   }
 ]
