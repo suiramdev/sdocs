@@ -234,31 +234,41 @@ const findPackageDirectory = async (
 const treeSitterModulePromise = Promise.resolve(
   requireFromCurrentModule("web-tree-sitter") as TreeSitterModule
 );
-const dependencyStorePromise = (async () => {
-  let directory = CURRENT_DIRECTORY;
+let dependencyStorePromise: Promise<string> | null = null;
 
-  while (true) {
-    const candidate = join(directory, "node_modules", ".bun");
-
-    try {
-      await readdir(candidate);
-      return candidate;
-    } catch {
-      // Keep walking upward until we find the workspace dependency store.
-    }
-
-    const parentDirectory = dirname(directory);
-    if (parentDirectory === directory) {
-      throw new Error("Could not locate Bun dependency store.");
-    }
-
-    directory = parentDirectory;
+const getDependencyStore = (): Promise<string> => {
+  if (dependencyStorePromise) {
+    return dependencyStorePromise;
   }
-})();
+
+  dependencyStorePromise = (async () => {
+    let directory = CURRENT_DIRECTORY;
+
+    while (true) {
+      const candidate = join(directory, "node_modules", ".bun");
+
+      try {
+        await readdir(candidate);
+        return candidate;
+      } catch {
+        // Keep walking upward until we find the workspace dependency store.
+      }
+
+      const parentDirectory = dirname(directory);
+      if (parentDirectory === directory) {
+        throw new Error("Could not locate Bun dependency store.");
+      }
+
+      directory = parentDirectory;
+    }
+  })();
+
+  return dependencyStorePromise;
+};
 const resolvePackageDirectoryFromBunStore = async (
   packageName: TreeSitterPackageName
 ): Promise<string> => {
-  const dependencyStore = await dependencyStorePromise;
+  const dependencyStore = await getDependencyStore();
   const entries = await readdir(dependencyStore, {
     withFileTypes: true,
   });
