@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const appRootDir = path.resolve(moduleDir, "../../../..");
+const defaultFumadocsPort = process.env.FUMADOCS_PORT ?? "4000";
 
 export const apiConfig = {
   app: {
-    baseUrl: process.env.APP_BASE_URL ?? "http://localhost:4000",
+    baseUrl:
+      process.env.APP_BASE_URL ?? `http://localhost:${defaultFumadocsPort}`,
   },
   data: {
     entitiesDir: path.join(appRootDir, "data", "api", "entities"),

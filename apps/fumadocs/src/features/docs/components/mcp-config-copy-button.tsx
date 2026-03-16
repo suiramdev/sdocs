@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 const MCP_CONFIG = `{
   "mcpServers": {
     "sdocs": {
-      "url": "https://sdocs.suiram.dev/api/v1/mcp"
+      "url": "https://sdocs.suiram.dev/api/v1/mcp",
+      "type": "streamableHttp"
     }
   }
 }`;
