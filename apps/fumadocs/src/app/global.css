@@ -103,3 +103,11 @@
   --sidebar-border: hsl(0 0% 40% / 20%);
   --sidebar-ring: hsl(0 0% 55.1%);
 }
+
+.signature-token {
+  color: var(--signature-light, currentColor);
+}
+
+.dark .signature-token {
+  color: var(--signature-dark, var(--signature-light, currentColor));
+}

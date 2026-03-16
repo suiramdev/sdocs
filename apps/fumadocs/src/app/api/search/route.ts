@@ -28,7 +28,7 @@ const escapeHtml = (text: string): string =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-const buildSearchContent = (result: ApiSearchResult): string => {
+const buildSearchContent = async (result: ApiSearchResult): Promise<string> => {
   let obsoletePart = "";
   if (result.isObsolete === true) {
     const obsoleteMessage = result.obsoleteMessage?.trim() ?? "";
@@ -39,7 +39,7 @@ const buildSearchContent = (result: ApiSearchResult): string => {
     obsoletePart = `<span class="block pt-1"><span class="inline-flex items-center rounded-full border border-destructive/40 px-2 py-0.5 text-[0.72rem] font-semibold tracking-wide text-destructive uppercase"${obsoleteTitle}>Obsolete</span></span>`;
   }
 
-  const signaturePart = signatureToHtml(result.displaySignature);
+  const signaturePart = await signatureToHtml(result.displaySignature);
   const desc =
     (result.description?.trim().length ?? 0) > 0
       ? `<span class="mt-1 block text-xs leading-5 text-muted-foreground">${escapeHtml(result.description.trim())}</span>`
@@ -47,9 +47,11 @@ const buildSearchContent = (result: ApiSearchResult): string => {
   return signaturePart + obsoletePart + (desc ? " " + desc : "");
 };
 
-const toFumadocsResult = (result: ApiSearchResult): FumadocsSearchResult => ({
+const toFumadocsResult = async (
+  result: ApiSearchResult
+): Promise<FumadocsSearchResult> => ({
   breadcrumbs: [result.namespace, result.class, result.type],
-  content: buildSearchContent(result),
+  content: await buildSearchContent(result),
   id: result.id,
   type: "page",
   url: result.url,
@@ -88,7 +90,7 @@ const runFumadocsSearch = async (
     query: parsed.query,
   });
 
-  return result.results.map(toFumadocsResult);
+  return Promise.all(result.results.map(toFumadocsResult));
 };
 
 const handleSearchError = (error: unknown, message: string) => {

@@ -1,10 +1,10 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 
-import { tokenizeSignature } from "@/features/api/utils/signature-tokens";
-import type {
-  SignatureToken,
-  SignatureTokenKind,
+import {
+  highlightSignatureTokens,
 } from "@/features/api/utils/signature-tokens";
+import type { SignatureToken } from "@/features/api/utils/signature-tokens";
 import { cn } from "@/shared/utils/cn";
 
 interface SignatureTextProps {
@@ -13,22 +13,12 @@ interface SignatureTextProps {
   value: string;
 }
 
-const tokenClassNames: Record<SignatureTokenKind, string> = {
-  default: "text-foreground/90",
-  generic: "text-purple-700 dark:text-purple-300",
-  keyword: "text-indigo-700 dark:text-indigo-300",
-  member: "font-semibold text-foreground",
-  modifier: "text-violet-700 dark:text-violet-300",
-  parameter: "text-amber-700 dark:text-amber-300",
-  type: "text-teal-700 dark:text-teal-300",
-};
-
-export const SignatureText = ({
+export const SignatureText = async ({
   className,
   getTokenHref,
   value,
 }: SignatureTextProps) => {
-  const signatureTokens = tokenizeSignature(value);
+  const signatureTokens = await highlightSignatureTokens(value);
 
   return (
     <span
@@ -41,15 +31,19 @@ export const SignatureText = ({
       {signatureTokens.map((token, index) => {
         const key = `${token.value}-${index}`;
         const href = getTokenHref?.(token);
-        const tokenClassName = tokenClassNames[token.kind];
+        const tokenStyle = {
+          "--signature-dark": token.darkColor,
+          "--signature-light": token.lightColor,
+        } as CSSProperties;
 
         if (href) {
           return (
             <Link
-              className={cn(tokenClassName, "underline underline-offset-2")}
+              className="signature-token underline underline-offset-2"
               href={href}
               key={key}
               prefetch={false}
+              style={tokenStyle}
             >
               {token.value}
             </Link>
@@ -57,7 +51,7 @@ export const SignatureText = ({
         }
 
         return (
-          <span className={tokenClassName} key={key}>
+          <span className="signature-token" key={key} style={tokenStyle}>
             {token.value}
           </span>
         );
