@@ -19,6 +19,7 @@ const CURSOR_INSTALL_LINK =
   "cursor://anysphere.cursor-deeplink/mcp/install?name=sdocs&config=eyJzZG9jcyI6eyJ0eXBlIjoic3NlIiwidXJsIjoiaHR0cHM6Ly9zZG9jcy5zdWlyYW0uZGV2L2FwaS92MS9tY3AifX0=";
 const VSCODE_INSTALL_LINK =
   "vscode:mcp/install?%7B%22name%22%3A%22sdocs%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fsdocs.suiram.dev%2Fapi%2Fv1%2Fmcp%22%7D";
+const MCPB_INSTALL_LINK = "https://sdocs.suiram.dev/api/v1/mcpb";
 
 interface McpConfigCopyButtonProps {
   label?: string;
@@ -98,3 +99,12 @@ export const McpVscodeInstallButton = () => (
     Logo={VscodeLogo}
   />
 );
+
+export const McpMcpbInstallButton = () => (
+  <McpInstallButton
+    href={MCPB_INSTALL_LINK}
+    label="Download .mcpb"
+    Logo={Copy}
+  />
+);
+

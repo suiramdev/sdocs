@@ -5,6 +5,7 @@ import type { MDXComponents } from "mdx/types";
 
 import {
   McpCursorInstallButton,
+  McpMcpbInstallButton,
   McpVscodeInstallButton,
 } from "./mcp-config-copy-button";
 import { TreeSitterPre } from "./tree-sitter-pre";
@@ -15,6 +16,7 @@ export const getMDXComponents = (
   Accordion,
   Accordions,
   McpCursorInstallButton,
+  McpMcpbInstallButton,
   McpVscodeInstallButton,
   Tab,
   Tabs,
