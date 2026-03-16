@@ -7,6 +7,7 @@ import {
   McpCursorInstallButton,
   McpVscodeInstallButton,
 } from "./mcp-config-copy-button";
+import { TreeSitterPre } from "./tree-sitter-pre";
 
 export const getMDXComponents = (
   components?: MDXComponents
@@ -18,5 +19,6 @@ export const getMDXComponents = (
   Tab,
   Tabs,
   ...defaultMdxComponents,
+  pre: TreeSitterPre,
   ...components,
 });

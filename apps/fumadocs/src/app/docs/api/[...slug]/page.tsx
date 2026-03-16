@@ -1,7 +1,6 @@
 import type { TOCItemType } from "fumadocs-core/toc";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
-import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock";
 import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
 import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
@@ -21,6 +20,7 @@ import {
 import { MemberSectionSearch } from "@/features/api/components/member-section-search";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
+import { TreeSitterCodeBlock } from "@/features/code/components/tree-sitter-code-block";
 import {
   getEntitiesByClass,
   getEntityByUrl,
@@ -525,11 +525,7 @@ function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
         >
           <div className="grid gap-3 pt-1">
             <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
-              <DynamicCodeBlock
-                code={example.code}
-                codeblock={{ title: "Code" }}
-                lang="csharp"
-              />
+              <TreeSitterCodeBlock code={example.code} lang="csharp" title="Code" />
             </div>
           </div>
         </Accordion>
@@ -561,11 +557,7 @@ function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
         >
           <div className="grid gap-3 pt-1">
             <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
-              <DynamicCodeBlock
-                code={example.code}
-                codeblock={{ title: "Code" }}
-                lang="csharp"
-              />
+              <TreeSitterCodeBlock code={example.code} lang="csharp" title="Code" />
             </div>
             <SourceExampleLink example={example} />
           </div>

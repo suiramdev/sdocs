@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
-import {
-  highlightSignatureTokens,
-} from "@/features/api/utils/signature-tokens";
+import { highlightSignatureTokens } from "@/features/api/utils/signature-tokens";
 import type { SignatureToken } from "@/features/api/utils/signature-tokens";
 import { cn } from "@/shared/utils/cn";
 
@@ -32,8 +30,8 @@ export const SignatureText = async ({
         const key = `${token.value}-${index}`;
         const href = getTokenHref?.(token);
         const tokenStyle = {
-          "--signature-dark": token.darkColor,
-          "--signature-light": token.lightColor,
+          "--syntax-dark": token.darkColor,
+          "--syntax-light": token.lightColor,
         } as CSSProperties;
 
         if (href) {
