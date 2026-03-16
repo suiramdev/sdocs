@@ -1,11 +1,13 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const CURRENT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const requireFromCurrentModule = createRequire(import.meta.url);
-const WEB_TREE_SITTER_PACKAGE_NAME = "web-tree-sitter";
+const TREE_SITTER_ASSET_DIRECTORY = join(
+  process.cwd(),
+  "generated",
+  "tree-sitter-assets"
+);
 
 const C_SHARP_SIGNATURE_WRAPPER_PREFIX = "class SignatureWrapper { ";
 const C_SHARP_SIGNATURE_WRAPPER_SUFFIX = " }";
@@ -89,30 +91,40 @@ const TREE_SITTER_THEME_INDEX = new Map(
 );
 
 const TREE_SITTER_LANGUAGE_CONFIG = {
-  bash: {
-    packageName: "tree-sitter-bash",
-    wasmFile: "tree-sitter-bash.wasm",
-  },
-  csharp: {
-    packageName: "tree-sitter-c-sharp",
-    wasmFile: "tree-sitter-c_sharp.wasm",
-  },
-  json: {
-    packageName: "tree-sitter-json",
-    wasmFile: "tree-sitter-json.wasm",
-  },
+  bash: true,
+  csharp: true,
+  json: true,
 } as const;
 
-type TreeSitterPackageName =
-  | typeof WEB_TREE_SITTER_PACKAGE_NAME
-  | (typeof TREE_SITTER_LANGUAGE_CONFIG)[keyof typeof TREE_SITTER_LANGUAGE_CONFIG]["packageName"];
-
-const TREE_SITTER_PACKAGE_ENTRY_PATHS = {
-  "tree-sitter-bash": requireFromCurrentModule.resolve("tree-sitter-bash"),
-  "tree-sitter-c-sharp": requireFromCurrentModule.resolve("tree-sitter-c-sharp"),
-  "tree-sitter-json": requireFromCurrentModule.resolve("tree-sitter-json"),
-  "web-tree-sitter": requireFromCurrentModule.resolve("web-tree-sitter"),
-} as const satisfies Record<TreeSitterPackageName, string>;
+const TREE_SITTER_LANGUAGE_ASSET_PATHS = {
+  bash: {
+    queryPath: join(
+      TREE_SITTER_ASSET_DIRECTORY,
+      "tree-sitter-bash",
+      "queries",
+      "highlights.scm"
+    ),
+    wasmPath: join(TREE_SITTER_ASSET_DIRECTORY, "tree-sitter-bash.wasm"),
+  },
+  csharp: {
+    queryPath: join(
+      TREE_SITTER_ASSET_DIRECTORY,
+      "tree-sitter-c-sharp",
+      "queries",
+      "highlights.scm"
+    ),
+    wasmPath: join(TREE_SITTER_ASSET_DIRECTORY, "tree-sitter-c_sharp.wasm"),
+  },
+  json: {
+    queryPath: join(
+      TREE_SITTER_ASSET_DIRECTORY,
+      "tree-sitter-json",
+      "queries",
+      "highlights.scm"
+    ),
+    wasmPath: join(TREE_SITTER_ASSET_DIRECTORY, "tree-sitter-json.wasm"),
+  },
+} as const;
 
 const LANGUAGE_ALIASES = {
   bash: "bash",
@@ -201,117 +213,16 @@ interface TreeSitterModule {
   Query: new (language: TreeSitterLanguage, source: string) => TreeSitterQuery;
 }
 
-const findPackageDirectory = async (
-  packageName: string,
-  resolvedEntryPath: string
-): Promise<string | null> => {
-  let directory = dirname(resolvedEntryPath);
-
-  while (true) {
-    try {
-      const packageJson = JSON.parse(
-        await readFile(join(directory, "package.json"), "utf8")
-      ) as {
-        name?: string;
-      };
-
-      if (packageJson.name === packageName) {
-        return directory;
-      }
-    } catch {
-      // Keep walking upward until we reach the package root.
-    }
-
-    const parentDirectory = dirname(directory);
-    if (parentDirectory === directory) {
-      return null;
-    }
-
-    directory = parentDirectory;
-  }
-};
-
 const treeSitterModulePromise = Promise.resolve(
   requireFromCurrentModule("web-tree-sitter") as TreeSitterModule
 );
-let dependencyStorePromise: Promise<string> | null = null;
-
-const getDependencyStore = (): Promise<string> => {
-  if (dependencyStorePromise) {
-    return dependencyStorePromise;
-  }
-
-  dependencyStorePromise = (async () => {
-    let directory = CURRENT_DIRECTORY;
-
-    while (true) {
-      const candidate = join(directory, "node_modules", ".bun");
-
-      try {
-        await readdir(candidate);
-        return candidate;
-      } catch {
-        // Keep walking upward until we find the workspace dependency store.
-      }
-
-      const parentDirectory = dirname(directory);
-      if (parentDirectory === directory) {
-        throw new Error("Could not locate Bun dependency store.");
-      }
-
-      directory = parentDirectory;
-    }
-  })();
-
-  return dependencyStorePromise;
-};
-const resolvePackageDirectoryFromBunStore = async (
-  packageName: TreeSitterPackageName
-): Promise<string> => {
-  const dependencyStore = await getDependencyStore();
-  const entries = await readdir(dependencyStore, {
-    withFileTypes: true,
-  });
-  const directoryEntry = entries.find(
-    (entry) => entry.isDirectory() && entry.name.startsWith(`${packageName}@`)
-  );
-
-  if (!directoryEntry) {
-    throw new Error(`Could not resolve ${packageName}.`);
-  }
-
-  return join(dependencyStore, directoryEntry.name, "node_modules", packageName);
-};
-const resolvePackageDirectory = async (
-  packageName: TreeSitterPackageName
-): Promise<string> => {
-  try {
-    const resolvedEntryPath = TREE_SITTER_PACKAGE_ENTRY_PATHS[packageName];
-    const packageDirectory = await findPackageDirectory(
-      packageName,
-      resolvedEntryPath
-    );
-
-    if (packageDirectory) {
-      return packageDirectory;
-    }
-  } catch {
-    // Fall back to Bun's install layout when standard package resolution fails.
-  }
-
-  return resolvePackageDirectoryFromBunStore(packageName);
-};
-const treeSitterCoreWasmPathPromise = (async () => {
-  const packageDirectory = await resolvePackageDirectory(
-    WEB_TREE_SITTER_PACKAGE_NAME
-  );
-  return join(packageDirectory, "tree-sitter.wasm");
-})();
+const treeSitterCoreWasmPath = join(
+  TREE_SITTER_ASSET_DIRECTORY,
+  "web-tree-sitter",
+  "tree-sitter.wasm"
+);
 const parserReadyPromise = (async () => {
-  const [{ Parser }, treeSitterCoreWasmPath] = await Promise.all([
-    treeSitterModulePromise,
-    treeSitterCoreWasmPathPromise,
-  ]);
+  const { Parser } = await treeSitterModulePromise;
 
   await Parser.init({
     locateFile: (scriptName: string) =>
@@ -322,7 +233,6 @@ const languageAssetsCache = new Map<
   keyof typeof TREE_SITTER_LANGUAGE_CONFIG,
   Promise<LanguageAssets>
 >();
-const packageDirectoryCache = new Map<string, Promise<string>>();
 
 const normalizeCodeLanguage = (
   language: string | null | undefined
@@ -794,21 +704,10 @@ const loadLanguageAssets = async (
     await parserReadyPromise;
     const { Language, Query } = await treeSitterModulePromise;
 
-    const config = TREE_SITTER_LANGUAGE_CONFIG[language];
-    const packageDirectory = await (async () => {
-      const cachedDirectory = packageDirectoryCache.get(config.packageName);
-      if (cachedDirectory) {
-        return cachedDirectory;
-      }
-
-      const directoryPromise = resolvePackageDirectory(config.packageName);
-
-      packageDirectoryCache.set(config.packageName, directoryPromise);
-      return directoryPromise;
-    })();
+    const assetPaths = TREE_SITTER_LANGUAGE_ASSET_PATHS[language];
     const [treeSitterLanguage, querySource] = await Promise.all([
-      Language.load(join(packageDirectory, config.wasmFile)),
-      readFile(join(packageDirectory, "queries", "highlights.scm"), "utf8"),
+      Language.load(assetPaths.wasmPath),
+      readFile(assetPaths.queryPath, "utf8"),
     ]);
     return {
       language: treeSitterLanguage,
