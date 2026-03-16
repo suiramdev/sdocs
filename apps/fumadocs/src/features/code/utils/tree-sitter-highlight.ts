@@ -103,6 +103,17 @@ const TREE_SITTER_LANGUAGE_CONFIG = {
   },
 } as const;
 
+type TreeSitterPackageName =
+  | typeof WEB_TREE_SITTER_PACKAGE_NAME
+  | (typeof TREE_SITTER_LANGUAGE_CONFIG)[keyof typeof TREE_SITTER_LANGUAGE_CONFIG]["packageName"];
+
+const TREE_SITTER_PACKAGE_ENTRY_PATHS = {
+  "tree-sitter-bash": requireFromCurrentModule.resolve("tree-sitter-bash"),
+  "tree-sitter-c-sharp": requireFromCurrentModule.resolve("tree-sitter-c-sharp"),
+  "tree-sitter-json": requireFromCurrentModule.resolve("tree-sitter-json"),
+  "web-tree-sitter": requireFromCurrentModule.resolve("web-tree-sitter"),
+} as const satisfies Record<TreeSitterPackageName, string>;
+
 const LANGUAGE_ALIASES = {
   bash: "bash",
   "c#": "csharp",
@@ -190,8 +201,38 @@ interface TreeSitterModule {
   Query: new (language: TreeSitterLanguage, source: string) => TreeSitterQuery;
 }
 
+const findPackageDirectory = async (
+  packageName: string,
+  resolvedEntryPath: string
+): Promise<string | null> => {
+  let directory = dirname(resolvedEntryPath);
+
+  while (true) {
+    try {
+      const packageJson = JSON.parse(
+        await readFile(join(directory, "package.json"), "utf8")
+      ) as {
+        name?: string;
+      };
+
+      if (packageJson.name === packageName) {
+        return directory;
+      }
+    } catch {
+      // Keep walking upward until we reach the package root.
+    }
+
+    const parentDirectory = dirname(directory);
+    if (parentDirectory === directory) {
+      return null;
+    }
+
+    directory = parentDirectory;
+  }
+};
+
 const treeSitterModulePromise = Promise.resolve(
-  requireFromCurrentModule(WEB_TREE_SITTER_PACKAGE_NAME) as TreeSitterModule
+  requireFromCurrentModule("web-tree-sitter") as TreeSitterModule
 );
 const dependencyStorePromise = (async () => {
   let directory = CURRENT_DIRECTORY;
@@ -214,28 +255,47 @@ const dependencyStorePromise = (async () => {
     directory = parentDirectory;
   }
 })();
-const treeSitterCoreWasmPathPromise = (async () => {
+const resolvePackageDirectoryFromBunStore = async (
+  packageName: TreeSitterPackageName
+): Promise<string> => {
   const dependencyStore = await dependencyStorePromise;
   const entries = await readdir(dependencyStore, {
     withFileTypes: true,
   });
   const directoryEntry = entries.find(
-    (entry) =>
-      entry.isDirectory() &&
-      entry.name.startsWith(`${WEB_TREE_SITTER_PACKAGE_NAME}@`)
+    (entry) => entry.isDirectory() && entry.name.startsWith(`${packageName}@`)
   );
 
   if (!directoryEntry) {
-    throw new Error(`Could not resolve ${WEB_TREE_SITTER_PACKAGE_NAME}.`);
+    throw new Error(`Could not resolve ${packageName}.`);
   }
 
-  return join(
-    dependencyStore,
-    directoryEntry.name,
-    "node_modules",
-    WEB_TREE_SITTER_PACKAGE_NAME,
-    "tree-sitter.wasm"
+  return join(dependencyStore, directoryEntry.name, "node_modules", packageName);
+};
+const resolvePackageDirectory = async (
+  packageName: TreeSitterPackageName
+): Promise<string> => {
+  try {
+    const resolvedEntryPath = TREE_SITTER_PACKAGE_ENTRY_PATHS[packageName];
+    const packageDirectory = await findPackageDirectory(
+      packageName,
+      resolvedEntryPath
+    );
+
+    if (packageDirectory) {
+      return packageDirectory;
+    }
+  } catch {
+    // Fall back to Bun's install layout when standard package resolution fails.
+  }
+
+  return resolvePackageDirectoryFromBunStore(packageName);
+};
+const treeSitterCoreWasmPathPromise = (async () => {
+  const packageDirectory = await resolvePackageDirectory(
+    WEB_TREE_SITTER_PACKAGE_NAME
   );
+  return join(packageDirectory, "tree-sitter.wasm");
 })();
 const parserReadyPromise = (async () => {
   const [{ Parser }, treeSitterCoreWasmPath] = await Promise.all([
@@ -731,28 +791,7 @@ const loadLanguageAssets = async (
         return cachedDirectory;
       }
 
-      const directoryPromise = (async () => {
-        const dependencyStore = await dependencyStorePromise;
-        const entries = await readdir(dependencyStore, {
-          withFileTypes: true,
-        });
-        const directoryEntry = entries.find(
-          (entry) =>
-            entry.isDirectory() &&
-            entry.name.startsWith(`${config.packageName}@`)
-        );
-
-        if (!directoryEntry) {
-          throw new Error(`Could not resolve ${config.packageName}.`);
-        }
-
-        return join(
-          dependencyStore,
-          directoryEntry.name,
-          "node_modules",
-          config.packageName
-        );
-      })();
+      const directoryPromise = resolvePackageDirectory(config.packageName);
 
       packageDirectoryCache.set(config.packageName, directoryPromise);
       return directoryPromise;
