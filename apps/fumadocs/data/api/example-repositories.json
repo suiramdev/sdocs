@@ -8,5 +8,10 @@
     "maxExamplesPerMember": 5,
     "name": "Facepunch/sbox-bombroyale",
     "url": "https://github.com/Facepunch/sbox-bombroyale"
+  },
+  {
+    "maxExamplesPerMember": 5,
+    "name": "Facepunch/sbox-hc1",
+    "url": "https://github.com/Facepunch/sbox-hc1"
   }
 ]
