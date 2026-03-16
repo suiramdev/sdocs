@@ -141,4 +141,4 @@ To manually rerun API indexing after deployment:
 docker compose up --build fumadocs-indexer
 ```
 
-The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.
+The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. Regeneration is also triggered on redeploy when the repository example scraper inputs change, including updates to `data/api/example-repositories.json` and changes to the repository scraping scripts. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.

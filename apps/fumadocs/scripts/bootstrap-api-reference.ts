@@ -163,62 +163,114 @@ const runGeneration = async (
   process.stdout.write("API reference bootstrap completed.\n");
 };
 
-const shouldSkipGeneration = async (apiJsonUrl: string): Promise<boolean> => {
-  const state = await readApiReferenceState();
+interface GenerationDecision {
+  reason: string | null;
+  shouldSkip: boolean;
+}
+
+interface ExpectedGenerationState {
+  expectedCacheKey: string;
+  generatorHash: string;
+  repositoryExamplesFingerprint: string;
+  sourceVersion: string;
+}
+
+const getExpectedGenerationState = async (
+  apiJsonUrl: string
+): Promise<ExpectedGenerationState> => {
   const generatorHash = await getGenerateScriptHash();
   const repositoryExamplesFingerprint =
     await getExampleRepositoriesFingerprint();
   const sourceVersion = buildSourceVersion(apiJsonUrl);
-  const expectedCacheKey = buildGenerationCacheKey({
-    emitMdx: true,
+
+  return {
+    expectedCacheKey: buildGenerationCacheKey({
+      emitMdx: true,
+      generatorHash,
+      includeNonPublic: false,
+      repositoryExamplesFingerprint,
+      sourceVersion,
+    }),
     generatorHash,
-    includeNonPublic: false,
     repositoryExamplesFingerprint,
     sourceVersion,
-  });
+  };
+};
 
-  if (state?.generation?.cacheKey !== expectedCacheKey) {
-    return false;
+const getCacheMismatchReason = (
+  state: Awaited<ReturnType<typeof readApiReferenceState>>,
+  expectedState: ExpectedGenerationState
+): string => {
+  if (
+    state?.generation?.repositoryExamplesFingerprint !==
+    expectedState.repositoryExamplesFingerprint
+  ) {
+    return "repository example sources changed";
   }
 
-  if (state.source?.version !== sourceVersion) {
-    return false;
+  if (state?.generation?.generatorHash !== expectedState.generatorHash) {
+    return "API generation scripts changed";
   }
 
-  return generationOutputsExist(true);
+  return "API generation inputs changed";
+};
+
+const getGenerationDecision = async (
+  apiJsonUrl: string
+): Promise<GenerationDecision> => {
+  const state = await readApiReferenceState();
+  const expectedState = await getExpectedGenerationState(apiJsonUrl);
+
+  if (state?.generation?.cacheKey !== expectedState.expectedCacheKey) {
+    return {
+      reason: getCacheMismatchReason(state, expectedState),
+      shouldSkip: false,
+    };
+  }
+
+  if (state.source?.version !== expectedState.sourceVersion) {
+    return {
+      reason: "API source version changed",
+      shouldSkip: false,
+    };
+  }
+
+  if (!(await generationOutputsExist(true))) {
+    return {
+      reason: "generated API artifacts are missing",
+      shouldSkip: false,
+    };
+  }
+
+  return {
+    reason: null,
+    shouldSkip: true,
+  };
 };
 
 const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
   const currentState = await readApiReferenceState();
-  const generatorHash = await getGenerateScriptHash();
-  const repositoryExamplesFingerprint =
-    await getExampleRepositoriesFingerprint();
-  const sourceVersion = buildSourceVersion(apiJsonUrl);
+  const expectedState = await getExpectedGenerationState(apiJsonUrl);
   const entitiesContent = await readFile(entitiesFile, "utf8");
   const entities = JSON.parse(entitiesContent) as unknown[];
 
   await writeApiReferenceState({
     generation: {
-      cacheKey: buildGenerationCacheKey({
-        emitMdx: true,
-        generatorHash,
-        includeNonPublic: false,
-        repositoryExamplesFingerprint,
-        sourceVersion,
-      }),
+      cacheKey: expectedState.expectedCacheKey,
       emitMdx: true,
       entitiesHash: hashContent(entitiesContent),
       entityCount: entities.length,
       generatedAt: new Date().toISOString(),
-      generatorHash,
+      generatorHash: expectedState.generatorHash,
       includeNonPublic: false,
-      repositoryExamplesFingerprint,
+      repositoryExamplesFingerprint:
+        expectedState.repositoryExamplesFingerprint,
     },
     indexing: currentState?.indexing,
     schemaVersion: 1,
     source: {
       url: apiJsonUrl,
-      version: sourceVersion,
+      version: expectedState.sourceVersion,
     },
   });
 };
@@ -238,11 +290,19 @@ const withTemporaryInputFile = async (
 
 const main = async (): Promise<void> => {
   const apiJsonUrl = getApiJsonUrl();
-  if (await shouldSkipGeneration(apiJsonUrl)) {
+  const generationDecision = await getGenerationDecision(apiJsonUrl);
+
+  if (generationDecision.shouldSkip) {
     process.stdout.write(
       `API reference is already generated for ${buildSourceVersion(apiJsonUrl)}. Skipping regeneration.\n`
     );
     return;
+  }
+
+  if (generationDecision.reason) {
+    process.stdout.write(
+      `Regenerating API reference because ${generationDecision.reason}.\n`
+    );
   }
 
   await withTemporaryInputFile(async (downloadedJsonPath) => {
