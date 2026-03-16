@@ -29,6 +29,10 @@ const config = {
   },
   serverExternalPackages: [
     "@takumi-rs/image-response",
+    "tree-sitter-bash",
+    "tree-sitter-c-sharp",
+    "tree-sitter-json",
+    "web-tree-sitter",
   ],
 };
 
