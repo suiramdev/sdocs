@@ -103,13 +103,12 @@ ulimit -n 65536
 ## API Service Layer
 
 - `GET /api/search` for the site search dialog
-- `GET|POST|DELETE /api/mcp` redirects to the latest MCP API version
-- `GET /api/mcpb` redirects to the latest MCP bundle version
-- `GET /api/claude-desktop-config` redirects to the latest Claude Desktop config download
 - `GET /api/v1/tools`
 - `POST /api/v1/tools/:toolName`
 - `GET|POST /api/v1/search`
 - `GET|POST /api/v1/mcp`
+- `GET /api/v1/mcpb`
+- `GET /api/v1/claude-desktop-config`
 - `GET /api/v1/entities/:id`
 - `GET /api/v1/entities/:id/signature`
 

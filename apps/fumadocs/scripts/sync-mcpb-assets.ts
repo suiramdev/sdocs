@@ -100,7 +100,7 @@ const manifest = async () => ({
       args: [bundleEntrypointArgument],
       command: "node",
       env: {
-        SDOCS_MCP_URL: buildPublicUrl("/api/mcp"),
+        SDOCS_MCP_URL: buildPublicUrl("/api/v1/mcp"),
       },
     },
     type: "node",

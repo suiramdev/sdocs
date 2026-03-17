@@ -6,7 +6,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 type RemoteMessage = Parameters<StreamableHTTPClientTransport["send"]>[0];
 type LocalMessage = Parameters<StdioServerTransport["send"]>[0];
 
-const DEFAULT_REMOTE_URL = "http://localhost:4000/api/mcp";
+const DEFAULT_REMOTE_URL = "http://localhost:4000/api/v1/mcp";
 
 const formatError = (error: unknown): string => {
   if (error instanceof Error) {

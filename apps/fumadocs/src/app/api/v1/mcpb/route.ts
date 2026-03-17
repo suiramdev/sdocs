@@ -78,7 +78,7 @@ const buildManifest = async (origin: string) => ({
       args: [bundleEntrypointArgument],
       command: "node",
       env: {
-        SDOCS_MCP_URL: buildPublicUrl(origin, "/api/mcp"),
+        SDOCS_MCP_URL: buildPublicUrl(origin, "/api/v1/mcp"),
       },
     },
     type: "node",

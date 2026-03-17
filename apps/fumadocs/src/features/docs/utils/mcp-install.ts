@@ -29,7 +29,7 @@ const encodeBase64 = (value: string): string => {
   return btoa(binary);
 };
 
-export const SDOCS_MCP_URL = buildPublicUrl("/api/mcp");
+export const SDOCS_MCP_URL = buildPublicUrl("/api/v1/mcp");
 
 export const CLAUDE_DESKTOP_MCP_CONFIG = {
   mcpServers: {
@@ -46,10 +46,10 @@ export const CLAUDE_DESKTOP_MCP_CONFIG_JSON = `${JSON.stringify(
   2
 )}\n`;
 
-export const MCPB_INSTALL_LINK = buildPublicUrl("/api/mcpb");
+export const MCPB_INSTALL_LINK = buildPublicUrl("/api/v1/mcpb");
 
 export const CLAUDE_DESKTOP_CONFIG_DOWNLOAD_PATH = buildPublicUrl(
-  "/api/claude-desktop-config"
+  "/api/v1/claude-desktop-config"
 );
 
 const cursorInstallConfig = {
