@@ -6,7 +6,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 type RemoteMessage = Parameters<StreamableHTTPClientTransport["send"]>[0];
 type LocalMessage = Parameters<StdioServerTransport["send"]>[0];
 
-const DEFAULT_REMOTE_URL = "http://localhost:4000/api/v1/mcp";
+const DEFAULT_REMOTE_URL = "__SDOCS_MCP_URL__";
 
 const formatError = (error: unknown): string => {
   if (error instanceof Error) {
@@ -16,13 +16,10 @@ const formatError = (error: unknown): string => {
   return String(error);
 };
 
-const remoteUrl = new URL(process.env.SDOCS_MCP_URL ?? DEFAULT_REMOTE_URL);
-const localTransport = new StdioServerTransport();
-const remoteTransport = new StreamableHTTPClientTransport(remoteUrl);
-const keepProcessAlive = (): void => {
-  process.stdin.resume();
-};
-const keepAliveTimer = setInterval(keepProcessAlive, 60_000);
+let remoteUrl: URL;
+let localTransport: StdioServerTransport;
+let remoteTransport: StreamableHTTPClientTransport;
+let keepAliveTimer: ReturnType<typeof setInterval>;
 
 let shuttingDown = false;
 
@@ -34,7 +31,7 @@ const shutdown = async (exitCode: number): Promise<void> => {
   shuttingDown = true;
   clearInterval(keepAliveTimer);
 
-  await Promise.allSettled([localTransport.close(), remoteTransport.close()]);
+  await Promise.allSettled([localTransport?.close(), remoteTransport?.close()]);
 
   process.exit(exitCode);
 };
@@ -117,6 +114,13 @@ const wireLocalTransport = (): void => {
 };
 
 const main = async (): Promise<void> => {
+  remoteUrl = new URL(process.env.SDOCS_MCP_URL ?? DEFAULT_REMOTE_URL);
+  localTransport = new StdioServerTransport();
+  remoteTransport = new StreamableHTTPClientTransport(remoteUrl);
+  keepAliveTimer = setInterval(() => {
+    process.stdin.resume();
+  }, 60_000);
+
   logStartup();
   registerProcessHandlers();
   wireRemoteTransport();

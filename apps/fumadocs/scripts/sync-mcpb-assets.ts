@@ -21,13 +21,14 @@ const bundledServerPath = path.join(generatedServerDir, "index.js");
 const outputBundlePath = path.join(generatedDir, "sdocs.mcpb");
 const toolRegistryDir = path.join(appRoot, "data", "api", "tools");
 const defaultPublicAppBaseUrl = "http://localhost:4000";
+const remoteUrlPlaceholder = "__SDOCS_MCP_URL__";
 
 interface ToolDescriptor {
   description?: string;
   name?: string;
 }
 
-const bundleEntrypointArgument = String.raw`\${__dirname}/server/index.js`;
+const bundleEntrypointArgument = `\${__dirname}/server/index.js`;
 
 const normalizeBaseUrl = (value: string | undefined): string | undefined => {
   const trimmedValue = value?.trim();
@@ -46,6 +47,16 @@ const publicAppBaseUrl =
 
 const buildPublicUrl = (pathname: string): string =>
   new URL(pathname, `${publicAppBaseUrl}/`).toString();
+
+const injectRemoteUrl = (serverCode: string, remoteUrl: string): string => {
+  if (!serverCode.includes(remoteUrlPlaceholder)) {
+    throw new Error(
+      "Bundled MCPB proxy is missing the remote URL placeholder."
+    );
+  }
+
+  return serverCode.replaceAll(remoteUrlPlaceholder, remoteUrl);
+};
 
 const readToolDescriptors = async () => {
   const directoryEntries = await readdir(toolRegistryDir);
@@ -107,7 +118,7 @@ const manifest = async () => ({
   },
   support: buildPublicUrl("/docs/mcp"),
   tools: await readToolDescriptors(),
-  version: "1.0.0",
+  version: "1.0.1",
 });
 
 const buildBundledServer = async () => {
@@ -137,12 +148,15 @@ const buildBundledServer = async () => {
 };
 
 const writeBundle = async () => {
-  const serverCode = await readFile(bundledServerPath);
+  const serverCode = injectRemoteUrl(
+    await readFile(bundledServerPath, "utf8"),
+    buildPublicUrl("/api/v1/mcp")
+  );
   const manifestJson = `${JSON.stringify(await manifest(), null, 2)}\n`;
   const archive = zipSync(
     {
       "manifest.json": strToU8(manifestJson),
-      "server/index.js": new Uint8Array(serverCode),
+      "server/index.js": strToU8(serverCode),
     },
     { level: 9 }
   );

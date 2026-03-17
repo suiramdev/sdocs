@@ -15,7 +15,8 @@ const bundledServerPath = path.join(
   "index.js"
 );
 const toolRegistryDir = path.join(process.cwd(), "data", "api", "tools");
-const bundleEntrypointArgument = String.raw`\${__dirname}/server/index.js`;
+const bundleEntrypointArgument = `\${__dirname}/server/index.js`;
+const remoteUrlPlaceholder = "__SDOCS_MCP_URL__";
 
 interface ToolDescriptor {
   description?: string;
@@ -24,6 +25,16 @@ interface ToolDescriptor {
 
 const buildPublicUrl = (origin: string, pathname: string): string =>
   new URL(pathname, `${origin}/`).toString();
+
+const injectRemoteUrl = (serverCode: string, remoteUrl: string): string => {
+  if (!serverCode.includes(remoteUrlPlaceholder)) {
+    throw new Error(
+      "Bundled MCPB proxy is missing the remote URL placeholder."
+    );
+  }
+
+  return serverCode.replaceAll(remoteUrlPlaceholder, remoteUrl);
+};
 
 const readToolDescriptors = async () => {
   const directoryEntries = await readdir(toolRegistryDir);
@@ -85,12 +96,19 @@ const buildManifest = async (origin: string) => ({
   },
   support: buildPublicUrl(origin, "/docs/mcp"),
   tools: await readToolDescriptors(),
-  version: "1.0.0",
+  version: "1.0.1",
 });
 
 export const GET = async (request: Request) => {
   try {
-    const serverCode = await readFile(bundledServerPath);
+    const remoteMcpUrl = buildPublicUrl(
+      getPublicAppOrigin(request),
+      "/api/v1/mcp"
+    );
+    const serverCode = injectRemoteUrl(
+      await readFile(bundledServerPath, "utf8"),
+      remoteMcpUrl
+    );
     const manifestJson = `${JSON.stringify(
       await buildManifest(getPublicAppOrigin(request)),
       null,
@@ -99,7 +117,7 @@ export const GET = async (request: Request) => {
     const archive = zipSync(
       {
         "manifest.json": strToU8(manifestJson),
-        "server/index.js": new Uint8Array(serverCode),
+        "server/index.js": strToU8(serverCode),
       },
       { level: 9 }
     );
