@@ -5,11 +5,6 @@ description: Connect your preferred MCP-compatible development tool to the s&box
 
 Use MCP when your IDE or agent supports MCP servers.
 
-<Callout title="In development" type="warning">
-  This feature is still in development and may not work yet, or may behave
-  differently than intended.
-</Callout>
-
 ## 1) Configure your preferred tool
 
 <Tabs
@@ -82,12 +77,23 @@ Use MCP when your IDE or agent supports MCP servers.
       >
         This installs `sdocs` as a Claude Desktop extension.
 
+        It requires `Node.js 18+` on your machine. The `.mcpb` does not run the
+        hosted MCP server directly inside Claude Desktop. Instead, it installs a
+        small local Node.js proxy that forwards Claude Desktop MCP traffic to
+        the hosted `sdocs` server over HTTP.
+
+        Use this when you want the packaged Claude Desktop install flow. If you
+        want Claude Desktop to connect directly to the hosted MCP endpoint
+        without the local Node.js proxy, use the Custom Connector option below
+        instead.
+
         <McpMcpbInstallButton />
 
         1. Download the `.mcpb` bundle.
-        2. Open it with Claude Desktop.
-        3. Approve the install prompt.
-        4. Restart Claude Desktop if the tools do not appear immediately.
+        2. Make sure `Node.js 18+` is installed locally.
+        3. Open the bundle with Claude Desktop.
+        4. Approve the install prompt.
+        5. Restart Claude Desktop if the tools do not appear immediately.
       </Accordion>
 
       <Accordion
