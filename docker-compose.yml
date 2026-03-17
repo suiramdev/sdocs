@@ -25,6 +25,9 @@ services:
     build:
       context: .
       dockerfile: apps/fumadocs/Dockerfile
+      args:
+        APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+        NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
     restart: unless-stopped
     depends_on:
       meilisearch:
@@ -76,6 +79,9 @@ services:
     build:
       context: .
       dockerfile: apps/fumadocs/Dockerfile
+      args:
+        APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+        NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
     restart: "no"
     depends_on:
       fumadocs:

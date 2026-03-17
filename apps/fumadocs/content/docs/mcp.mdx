@@ -5,59 +5,148 @@ description: Connect your preferred MCP-compatible development tool to the s&box
 
 Use MCP when your IDE or agent supports MCP servers.
 
-<Callout title="In development" type="warning">
-  This feature is still in development and may not work yet, or may behave
-  differently than intended.
-</Callout>
-
 ## 1) Configure your preferred tool
 
-<Tabs items={["Visual Studio Code", "Cursor", "Other MCP tools"]}>
+<Tabs
+  items={[
+    "Visual Studio Code",
+    "Cursor",
+    "Claude Desktop",
+    "Other MCP tools",
+  ]}
+>
   <Tab>
-    Install with one click from Visual Studio Code:
+    Choose one of the following setup options:
 
-    <McpVscodeInstallButton />
+    <Accordions defaultValue="vscode-one-click" type="single">
+      <Accordion
+        title="Option 1: Install with the VS Code deeplink"
+        value="vscode-one-click"
+      >
+        <McpVscodeInstallButton />
 
-    Or paste this in your Visual Studio Code MCP settings:
+        1. Click the install button above.
+        2. Approve the VS Code prompt to add the server.
+        3. Reload VS Code if the MCP tools do not appear immediately.
+      </Accordion>
 
-    ```jsonc
-    {
-      "servers": {
-        "sdocs": {
-          "url": "https://sdocs.suiram.dev/api/v1/mcp",
-          "type": "http"
-        }
-      }
-    }
-    ```
+      <Accordion
+        title="Option 2: Paste the config manually"
+        value="vscode-manual"
+      >
+        Add this to your Visual Studio Code MCP settings:
+
+        <McpVscodeConfigSnippet />
+      </Accordion>
+    </Accordions>
 
   </Tab>
   <Tab>
-    Install with one click:
+    Choose one of the following setup options:
 
-    <McpCursorInstallButton />
+    <Accordions defaultValue="cursor-one-click" type="single">
+      <Accordion
+        title="Option 1: Install with the Cursor deeplink"
+        value="cursor-one-click"
+      >
+        <McpCursorInstallButton />
 
-    Or paste this in your Cursor MCP settings:
+        1. Click the install button above.
+        2. Approve the Cursor prompt to add the server.
+        3. Restart Cursor if the MCP tools do not appear immediately.
+      </Accordion>
 
-    ```jsonc
-    {
-      "mcpServers": {
-        "sdocs": {
-          "url": "https://sdocs.suiram.dev/api/v1/mcp",
-          "type": "streamableHttp"
-        }
-      }
-    }
-    ```
+      <Accordion
+        title="Option 2: Paste the config manually"
+        value="cursor-manual"
+      >
+        Add this to your Cursor MCP settings:
+
+        <McpCursorConfigSnippet />
+      </Accordion>
+    </Accordions>
 
   </Tab>
   <Tab>
-    In your tool's MCP settings (Windsurf, Cline, Zed, Claude Desktop, and
-    similar), register an HTTP MCP server that points to:
+    Choose one of the following setup options:
 
-    ```text
-    https://sdocs.suiram.dev/api/v1/mcp
-    ```
+    <Accordions defaultValue="claude-mcpb" type="single">
+      <Accordion
+        title="Option 1: Download the .mcpb bundle"
+        value="claude-mcpb"
+      >
+        This installs `sdocs` as a Claude Desktop extension.
+
+        It requires `Node.js 18+` on your machine. The `.mcpb` does not run the
+        hosted MCP server directly inside Claude Desktop. Instead, it installs a
+        small local Node.js proxy that forwards Claude Desktop MCP traffic to
+        the hosted `sdocs` server over HTTP.
+
+        Use this when you want the packaged Claude Desktop install flow. If you
+        want Claude Desktop to connect directly to the hosted MCP endpoint
+        without the local Node.js proxy, use the Custom Connector option below
+        instead.
+
+        <McpMcpbInstallButton />
+
+        1. Download the `.mcpb` bundle.
+        2. Make sure `Node.js 18+` is installed locally.
+        3. Open the bundle with Claude Desktop.
+        4. Approve the install prompt.
+        5. Restart Claude Desktop if the tools do not appear immediately.
+      </Accordion>
+
+      <Accordion
+        title="Option 2: Add Custom Connector (Claude Pro)"
+        value="claude-custom-connector"
+      >
+        Anthropic's "Add Custom Connector" flow is currently limited to Claude
+        Pro plans and higher.
+
+        <McpRemoteUrlSnippet />
+
+        1. Open Claude Desktop.
+        2. Go to `Settings > Connectors`.
+        3. Click `Add custom connector`.
+        4. Paste the `sdocs` MCP URL above.
+        5. Save and enable the connector in the conversation.
+      </Accordion>
+    </Accordions>
+
+  </Tab>
+  <Tab>
+    Choose one of the following setup options:
+
+    <Accordions defaultValue="other-remote-http" type="single">
+      <Accordion
+        title="Option 1: Register the hosted MCP URL directly"
+        value="other-remote-http"
+      >
+        Use this when your IDE or agent supports adding a remote MCP server by
+        URL.
+
+        <McpRemoteUrlSnippet />
+
+        1. Open your tool's MCP or connectors settings.
+        2. Add a new MCP server or connector.
+        3. Choose the remote HTTP or streamable HTTP transport when prompted.
+        4. Paste the `sdocs` MCP URL above.
+        5. Save the configuration and restart the tool if required.
+      </Accordion>
+
+      <Accordion
+        title="Option 2: Paste a JSON config snippet"
+        value="other-json-config"
+      >
+        Some IDEs expect a JSON config instead of a single URL. Use this as a
+        starting point and adjust the key name to match your tool:
+
+        <McpOtherToolConfigSnippet />
+
+        If your IDE uses a different transport label such as
+        `streamableHttp`, keep the same URL and switch only the transport name.
+      </Accordion>
+    </Accordions>
 
   </Tab>
 </Tabs>

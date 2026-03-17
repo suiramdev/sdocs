@@ -1,24 +1,17 @@
 "use client";
 
 import { useCopyButton } from "fumadocs-ui/utils/use-copy-button";
-import { Check, Copy } from "lucide-react";
-import type { ReactElement, SVGProps } from "react";
+import { Check, Copy, Download } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 
 import { Button } from "@/components/ui/button";
-
-const MCP_CONFIG = `{
-  "mcpServers": {
-    "sdocs": {
-      "url": "https://sdocs.suiram.dev/api/v1/mcp",
-      "type": "streamableHttp"
-    }
-  }
-}`;
-
-const CURSOR_INSTALL_LINK =
-  "cursor://anysphere.cursor-deeplink/mcp/install?name=sdocs&config=eyJzZG9jcyI6eyJ0eXBlIjoic3NlIiwidXJsIjoiaHR0cHM6Ly9zZG9jcy5zdWlyYW0uZGV2L2FwaS92MS9tY3AifX0=";
-const VSCODE_INSTALL_LINK =
-  "vscode:mcp/install?%7B%22name%22%3A%22sdocs%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fsdocs.suiram.dev%2Fapi%2Fv1%2Fmcp%22%7D";
+import {
+  CLAUDE_DESKTOP_CONFIG_DOWNLOAD_PATH,
+  CLAUDE_DESKTOP_MCP_CONFIG_JSON,
+  CURSOR_INSTALL_LINK,
+  MCPB_INSTALL_LINK,
+  VSCODE_INSTALL_LINK,
+} from "@/features/docs/utils/mcp-install";
 
 interface McpConfigCopyButtonProps {
   label?: string;
@@ -27,7 +20,7 @@ interface McpConfigCopyButtonProps {
 interface McpInstallButtonProps {
   href: string;
   label: string;
-  Logo: (props: SVGProps<SVGSVGElement>) => ReactElement;
+  Logo: ComponentType<SVGProps<SVGSVGElement>>;
 }
 
 const CursorLogo = (props: SVGProps<SVGSVGElement>) => (
@@ -67,7 +60,7 @@ const McpInstallButton = ({ href, label, Logo }: McpInstallButtonProps) => (
 
 export const McpConfigCopyButton = ({ label }: McpConfigCopyButtonProps) => {
   const [checked, onClick] = useCopyButton(() =>
-    navigator.clipboard.writeText(MCP_CONFIG)
+    navigator.clipboard.writeText(CLAUDE_DESKTOP_MCP_CONFIG_JSON)
   );
 
   return (
@@ -78,7 +71,7 @@ export const McpConfigCopyButton = ({ label }: McpConfigCopyButtonProps) => {
       variant="secondary"
     >
       {checked ? <Check /> : <Copy />}
-      {label ?? "Copy MCP config"}
+      {label ?? "Copy Claude Desktop config"}
     </Button>
   );
 };
@@ -96,5 +89,21 @@ export const McpVscodeInstallButton = () => (
     href={VSCODE_INSTALL_LINK}
     label="Install in VS Code"
     Logo={VscodeLogo}
+  />
+);
+
+export const McpClaudeDesktopConfigDownloadButton = () => (
+  <McpInstallButton
+    href={CLAUDE_DESKTOP_CONFIG_DOWNLOAD_PATH}
+    label="Download Claude config"
+    Logo={Download}
+  />
+);
+
+export const McpMcpbInstallButton = () => (
+  <McpInstallButton
+    href={MCPB_INSTALL_LINK}
+    label="Download .mcpb"
+    Logo={Download}
   />
 );

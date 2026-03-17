@@ -24,7 +24,8 @@ const extractTextContent = (value: ReactNode): string => {
   return "";
 };
 
-const extractLanguage = (className: string | undefined) => className?.match(/language-([^\s]+)/u)?.[1];
+const extractLanguage = (className: string | undefined) =>
+  className?.match(/language-([^\s]+)/u)?.[1];
 
 export const TreeSitterPre = ({
   children,

@@ -9,7 +9,11 @@ RUN bun install --ignore-scripts
 
 FROM oven/bun:1.3.5 AS build
 WORKDIR /app
+ARG APP_BASE_URL
+ARG NEXT_PUBLIC_APP_BASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV APP_BASE_URL=$APP_BASE_URL
+ENV NEXT_PUBLIC_APP_BASE_URL=$NEXT_PUBLIC_APP_BASE_URL
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/fumadocs/ ./

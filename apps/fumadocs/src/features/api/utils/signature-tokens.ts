@@ -269,7 +269,10 @@ const escapeHtml = (text: string): string =>
     .replaceAll('"', "&quot;");
 
 export const normalizeSignatureForDisplay = (signature: string): string =>
-  signature.replaceAll(CLR_BUILTIN_TYPE_PATTERN, (value) => CLR_BUILTIN_TYPE_ALIASES[value] ?? value);
+  signature.replaceAll(
+    CLR_BUILTIN_TYPE_PATTERN,
+    (value) => CLR_BUILTIN_TYPE_ALIASES[value] ?? value
+  );
 
 const getColorStyle = ({
   darkColor,
@@ -290,10 +293,10 @@ const getHighlightRanges = async (
   });
 
   return spans.map((span) => ({
-      darkColor: span.darkColor ?? SIGNATURE_THEME_COLORS.dark,
-      end: span.end,
-      lightColor: span.lightColor ?? SIGNATURE_THEME_COLORS.light,
-    }));
+    darkColor: span.darkColor ?? SIGNATURE_THEME_COLORS.dark,
+    end: span.end,
+    lightColor: span.lightColor ?? SIGNATURE_THEME_COLORS.light,
+  }));
 };
 
 export const highlightSignatureTokens = async (

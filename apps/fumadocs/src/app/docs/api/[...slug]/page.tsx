@@ -20,7 +20,6 @@ import {
 import { MemberSectionSearch } from "@/features/api/components/member-section-search";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
-import { TreeSitterCodeBlock } from "@/features/code/components/tree-sitter-code-block";
 import {
   getEntitiesByClass,
   getEntityByUrl,
@@ -38,6 +37,7 @@ import type {
   ApiParameter,
 } from "@/features/api/utils/schemas";
 import type { SignatureToken } from "@/features/api/utils/signature-tokens";
+import { TreeSitterCodeBlock } from "@/features/code/components/tree-sitter-code-block";
 import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 
 interface ApiEntityPageProps {
@@ -347,7 +347,7 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
 
   const isWarning = WARNING_HINT.test(remarks);
   const isPerformance = PERFORMANCE_HINT.test(remarks);
-  const title = isWarning ? "Warning" : isPerformance ? "Performance" : "Note";
+  const title = isWarning ? "Warning" : (isPerformance ? "Performance" : "Note");
 
   return (
     <Callout title={title} type={isWarning ? "warning" : "info"}>
@@ -525,7 +525,11 @@ function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
         >
           <div className="grid gap-3 pt-1">
             <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
-              <TreeSitterCodeBlock code={example.code} lang="csharp" title="Code" />
+              <TreeSitterCodeBlock
+                code={example.code}
+                lang="csharp"
+                title="Code"
+              />
             </div>
           </div>
         </Accordion>
@@ -557,7 +561,11 @@ function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
         >
           <div className="grid gap-3 pt-1">
             <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
-              <TreeSitterCodeBlock code={example.code} lang="csharp" title="Code" />
+              <TreeSitterCodeBlock
+                code={example.code}
+                lang="csharp"
+                title="Code"
+              />
             </div>
             <SourceExampleLink example={example} />
           </div>
