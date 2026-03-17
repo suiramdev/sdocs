@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { strToU8, zipSync } from "fflate";
 
+import { getPublicAppOrigin } from "@/app/api/utils/public-origin";
+
 export const runtime = "nodejs";
 
 const bundledServerPath = path.join(
@@ -13,7 +15,7 @@ const bundledServerPath = path.join(
   "index.js"
 );
 const toolRegistryDir = path.join(process.cwd(), "data", "api", "tools");
-const bundleEntrypointArgument = "${__dirname}/server/index.js";
+const bundleEntrypointArgument = String.raw`\${__dirname}/server/index.js`;
 
 interface ToolDescriptor {
   description?: string;
@@ -90,7 +92,7 @@ export const GET = async (request: Request) => {
   try {
     const serverCode = await readFile(bundledServerPath);
     const manifestJson = `${JSON.stringify(
-      await buildManifest(new URL(request.url).origin),
+      await buildManifest(getPublicAppOrigin(request)),
       null,
       2
     )}\n`;
