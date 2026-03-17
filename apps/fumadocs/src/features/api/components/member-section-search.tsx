@@ -11,6 +11,56 @@ interface MemberSectionSearchProps {
   title: string;
 }
 
+const getElementByIdSelector = (id: string): string => `#${CSS.escape(id)}`;
+
+const getVisibleMemberCount = (
+  group: HTMLElement,
+  normalizedValue: string
+): number => {
+  const memberItems = group.querySelectorAll<HTMLElement>("[data-member-item]");
+  let visibleMemberCount = 0;
+
+  for (const memberItem of memberItems) {
+    const searchableValue = memberItem.dataset.memberSearch ?? "";
+    const isVisible =
+      normalizedValue.length === 0 || searchableValue.includes(normalizedValue);
+
+    memberItem.hidden = !isVisible;
+    if (isVisible) {
+      visibleMemberCount += 1;
+    }
+  }
+
+  group.hidden = visibleMemberCount === 0;
+  return visibleMemberCount;
+};
+
+const updateEmptyState = (
+  emptyState: HTMLElement | null,
+  normalizedValue: string,
+  nextVisibleCount: number
+) => {
+  if (!emptyState) {
+    return;
+  }
+
+  emptyState.hidden = !(normalizedValue.length > 0 && nextVisibleCount === 0);
+};
+
+const getNextVisibleCount = (
+  root: HTMLElement,
+  normalizedValue: string
+): number => {
+  const groups = root.querySelectorAll<HTMLElement>("[data-member-group]");
+  let nextVisibleCount = 0;
+
+  for (const group of groups) {
+    nextVisibleCount += getVisibleMemberCount(group, normalizedValue);
+  }
+
+  return nextVisibleCount;
+};
+
 export const MemberSectionSearch = ({
   describedBy,
   emptyStateId,
@@ -25,44 +75,20 @@ export const MemberSectionSearch = ({
   const lowerCaseTitle = title.toLocaleLowerCase();
 
   const applyFilter = useEffectEvent((nextValue: string) => {
-    const root = document.querySelector(`#${sectionId}`);
-    const emptyState = document.querySelector(`#${emptyStateId}`);
+    const root = document.querySelector<HTMLElement>(
+      getElementByIdSelector(sectionId)
+    );
+    const emptyState = document.querySelector<HTMLElement>(
+      getElementByIdSelector(emptyStateId)
+    );
     const normalizedValue = nextValue.trim().toLocaleLowerCase();
 
     if (!root) {
       return;
     }
 
-    const groups = root.querySelectorAll<HTMLElement>("[data-member-group]");
-    let nextVisibleCount = 0;
-
-    for (const group of groups) {
-      const memberItems =
-        group.querySelectorAll<HTMLElement>("[data-member-item]");
-      let visibleMemberCount = 0;
-
-      for (const memberItem of memberItems) {
-        const searchableValue = memberItem.dataset.memberSearch ?? "";
-        const isVisible =
-          normalizedValue.length === 0 ||
-          searchableValue.includes(normalizedValue);
-
-        memberItem.hidden = !isVisible;
-        if (isVisible) {
-          visibleMemberCount += 1;
-        }
-      }
-
-      group.hidden = visibleMemberCount === 0;
-      nextVisibleCount += visibleMemberCount;
-    }
-
-    if (emptyState) {
-      emptyState.hidden = !(
-        normalizedValue.length > 0 && nextVisibleCount === 0
-      );
-    }
-
+    const nextVisibleCount = getNextVisibleCount(root, normalizedValue);
+    updateEmptyState(emptyState, normalizedValue, nextVisibleCount);
     setVisibleCount(nextVisibleCount);
   });
 
