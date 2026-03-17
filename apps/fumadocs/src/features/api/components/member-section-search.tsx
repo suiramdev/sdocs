@@ -25,8 +25,8 @@ export const MemberSectionSearch = ({
   const lowerCaseTitle = title.toLocaleLowerCase();
 
   const applyFilter = useEffectEvent((nextValue: string) => {
-    const root = document.getElementById(sectionId);
-    const emptyState = document.getElementById(emptyStateId);
+    const root = document.querySelector(`#${sectionId}`);
+    const emptyState = document.querySelector(`#${emptyStateId}`);
     const normalizedValue = nextValue.trim().toLocaleLowerCase();
 
     if (!root) {

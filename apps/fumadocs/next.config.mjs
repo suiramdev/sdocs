@@ -4,6 +4,12 @@ const withMDX = createMDX();
 
 /** @type {import('next').NextConfig} */
 const config = {
+  outputFileTracingIncludes: {
+    "/api/v1/mcpb/route": [
+      "./data/api/tools/*.json",
+      "./generated/mcpb/server/index.js",
+    ],
+  },
   reactStrictMode: true,
   redirects() {
     return [

@@ -66,6 +66,10 @@ If you changed the Docker bind port, set `MEILI_HOST` in
 `apps/fumadocs/.env.local` to match it, for example
 `MEILI_HOST=http://127.0.0.1:7710`.
 
+For MCP install links and downloadable config files, also set
+`NEXT_PUBLIC_APP_BASE_URL` to the public origin that users should connect to.
+For local development that is usually `http://localhost:4000`.
+
 At startup, the app automatically:
 
 - Downloads the API dump from `API_JSON_URL`
@@ -96,6 +100,9 @@ ulimit -n 65536
 ## API Service Layer
 
 - `GET /api/search` for the site search dialog
+- `GET|POST|DELETE /api/mcp` redirects to the latest MCP API version
+- `GET /api/mcpb` redirects to the latest MCP bundle version
+- `GET /api/claude-desktop-config` redirects to the latest Claude Desktop config download
 - `GET /api/v1/tools`
 - `POST /api/v1/tools/:toolName`
 - `GET|POST /api/v1/search`
