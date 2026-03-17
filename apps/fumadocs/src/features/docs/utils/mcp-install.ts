@@ -12,6 +12,7 @@ const normalizeBaseUrl = (value: string | undefined): string | undefined => {
 
 const publicAppBaseUrl =
   normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_BASE_URL) ??
+  normalizeBaseUrl(process.env.APP_BASE_URL) ??
   DEFAULT_PUBLIC_APP_BASE_URL;
 
 const buildPublicUrl = (pathname: string): string =>

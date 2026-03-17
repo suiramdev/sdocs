@@ -66,9 +66,12 @@ If you changed the Docker bind port, set `MEILI_HOST` in
 `apps/fumadocs/.env.local` to match it, for example
 `MEILI_HOST=http://127.0.0.1:7710`.
 
-For MCP install links and downloadable config files, also set
+For MCP install links and downloadable config files, set
 `NEXT_PUBLIC_APP_BASE_URL` to the public origin that users should connect to.
-For local development that is usually `http://localhost:4000`.
+The docs helper also falls back to `APP_BASE_URL` if the public variable is not
+set, but Docker builds should pass both values so `next build` bakes the
+correct URLs into generated docs. For local development that is usually
+`http://localhost:4000`.
 
 At startup, the app automatically:
 
