@@ -25,7 +25,13 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { trackUmamiEvent } from "@/features/analytics/utils/umami";
 
 type NonActionSearchItem = Exclude<SearchItemType, { type: "action" }>;
-type SearchGroupKey = "class" | "enum" | "method" | "property" | "other";
+type SearchGroupKey =
+  | "class"
+  | "enum"
+  | "guide"
+  | "method"
+  | "property"
+  | "other";
 
 const emptyTags: NonNullable<DefaultSearchDialogProps["tags"]> = [];
 const emptyLinks: NonNullable<DefaultSearchDialogProps["links"]> = [];
@@ -33,6 +39,7 @@ const minimumTrackedSearchLength = 2;
 const maxTrackedQueryLength = 120;
 
 const searchGroupOrder = [
+  "guide",
   "class",
   "enum",
   "method",
@@ -43,34 +50,50 @@ const searchGroupOrder = [
 const searchGroupLabels: Record<Exclude<SearchGroupKey, "other">, string> = {
   class: "CLASS",
   enum: "ENUMS",
+  guide: "GUIDES",
   method: "METHODS",
   property: "PROPERTIES",
 };
 
 const isKnownSearchGroupKey = (
   value: string
-): value is Exclude<SearchGroupKey, "other"> =>
+): value is Exclude<SearchGroupKey, "guide" | "other"> =>
   value === "class" ||
   value === "enum" ||
   value === "method" ||
   value === "property";
+
+const isGuideSearchResult = (item: SearchItemType): boolean =>
+  item.type !== "action" &&
+  "url" in item &&
+  typeof item.url === "string" &&
+  item.url.startsWith("/docs") &&
+  !item.url.startsWith("/docs/api");
+
+const getEntitySearchGroupKey = (
+  item: NonActionSearchItem
+): Exclude<SearchGroupKey, "guide" | "other"> | null => {
+  const entityType = item.breadcrumbs?.at(-1);
+  if (typeof entityType !== "string") {
+    return null;
+  }
+
+  const normalizedEntityType = entityType.toLowerCase();
+  return isKnownSearchGroupKey(normalizedEntityType)
+    ? normalizedEntityType
+    : null;
+};
 
 const getSearchGroupKey = (item: SearchItemType): SearchGroupKey => {
   if (item.type === "action") {
     return "other";
   }
 
-  const entityType = item.breadcrumbs?.at(-1);
-  if (typeof entityType !== "string") {
-    return "other";
+  if (isGuideSearchResult(item)) {
+    return "guide";
   }
 
-  const normalizedEntityType = entityType.toLowerCase();
-  if (isKnownSearchGroupKey(normalizedEntityType)) {
-    return normalizedEntityType;
-  }
-
-  return "other";
+  return getEntitySearchGroupKey(item) ?? "other";
 };
 
 const createGroupedEntries = (): Map<SearchGroupKey, SearchItemType[]> => {
