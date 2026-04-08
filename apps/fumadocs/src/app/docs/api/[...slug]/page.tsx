@@ -37,8 +37,10 @@ import type {
   ApiParameter,
 } from "@/features/api/utils/schemas";
 import type { SignatureToken } from "@/features/api/utils/signature-tokens";
+import { getRelatedGuidesForEntity } from "@/features/api/v1/services/guide-relations";
 import { TreeSitterCodeBlock } from "@/features/code/components/tree-sitter-code-block";
 import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
+import { RelatedGuidesSection } from "@/features/docs/components/reference-sections";
 
 interface ApiEntityPageProps {
   params: Promise<{
@@ -975,6 +977,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
       : "";
   const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const selectedAnchor = buildEntityAnchor(selectedEntity);
+  const relatedGuides = await getRelatedGuidesForEntity(typeEntity, 6);
 
   return (
     <DocsPage toc={toc}>
@@ -1028,6 +1031,8 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         {summary.remarks.length > 0 ? (
           <AdvisoryCallout remarks={summary.remarks} />
         ) : null}
+
+        <RelatedGuidesSection guides={relatedGuides} />
 
         {constructorGroups.length > 0 ? (
           <section className="pt-0" id="constructors">
