@@ -94,6 +94,12 @@ const EMPTY_ALIAS_SCORE: AliasScore = {
   matchedAliases: [],
   score: 0,
 };
+const EMPTY_GUIDE_RELATION_INDEX: GuideRelationIndex = {
+  guideNames: [],
+  relatedGuidesByEntityId: new Map(),
+  relatedSymbolsByGuideName: new Map(),
+  typeEntityIdByClass: new Map(),
+};
 
 const normalizeLookup = (value: string): string => value.trim().toLowerCase();
 
@@ -180,41 +186,52 @@ const prepareGuideDocument = (guide: GuideDocument): PreparedGuideDocument => ({
 const buildGuideDocument = async (
   url: string
 ): Promise<GuideDocument | null> => {
-  const page = await getOfficialDocPage(
-    toGuideSlugs(guideResourceNameFromUrl(url))
-  );
-  if (!page) {
+  try {
+    const page = await getOfficialDocPage(
+      toGuideSlugs(guideResourceNameFromUrl(url))
+    );
+    if (!page) {
+      return null;
+    }
+
+    const resourceName = guideResourceNameFromUrl(page.url);
+    return {
+      breadcrumbs: page.breadcrumbs,
+      description: page.description,
+      githubUrl: page.githubUrl,
+      markdown: page.markdown,
+      resourceName,
+      resourceUri: guideResourceUri(resourceName),
+      title: page.title,
+      url: page.url,
+    };
+  } catch {
     return null;
   }
-
-  const resourceName = guideResourceNameFromUrl(page.url);
-  return {
-    breadcrumbs: page.breadcrumbs,
-    description: page.description,
-    githubUrl: page.githubUrl,
-    markdown: page.markdown,
-    resourceName,
-    resourceUri: guideResourceUri(resourceName),
-    title: page.title,
-    url: page.url,
-  };
 };
 
 const getAllGuideDocuments = async (): Promise<PreparedGuideDocument[]> => {
-  const tree = await getOfficialDocsSectionTree();
+  const tree = await getOfficialDocsSectionTree().catch(() => null);
+  if (!tree) {
+    return [];
+  }
+
   const urls = new Set<string>();
   collectGuidePageUrls(tree, urls);
 
-  const guides = await Promise.all(
+  const guides = await Promise.allSettled(
     [...urls].map(async (url) => {
       const guide = await buildGuideDocument(url);
       return guide ? prepareGuideDocument(guide) : null;
     })
   );
 
-  return guides.filter(
-    (guide): guide is PreparedGuideDocument => guide !== null
-  );
+  return guides
+    .filter(
+      (guide): guide is PromiseFulfilledResult<PreparedGuideDocument | null> =>
+        guide.status === "fulfilled"
+    )
+    .flatMap((guide) => (guide.value ? [guide.value] : []));
 };
 
 const limitMatchedAliases = (aliases: string[]): string[] =>
@@ -406,6 +423,13 @@ const buildTypeEntityIdByClass = (
   return typeEntityIdByClass;
 };
 
+const buildFallbackGuideRelationIndex = (
+  entities: ApiEntity[]
+): GuideRelationIndex => ({
+  ...EMPTY_GUIDE_RELATION_INDEX,
+  typeEntityIdByClass: buildTypeEntityIdByClass(entities),
+});
+
 const getTopGuideRelations = (
   guides: PreparedGuideDocument[],
   entity: ApiEntity
@@ -460,16 +484,41 @@ const buildGuideRelationIndex = async (): Promise<GuideRelationIndex> => {
   };
 };
 
+const buildGuideRelationIndexSafe = async (): Promise<GuideRelationIndex> => {
+  const entities = await loadApiEntities();
+
+  try {
+    return await buildGuideRelationIndex();
+  } catch {
+    return buildFallbackGuideRelationIndex(entities);
+  }
+};
+
+const buildCachedGuideRelationIndex = async (
+  sha: string
+): Promise<GuideRelationIndex> => {
+  try {
+    const promise = buildGuideRelationIndexSafe();
+    guideRelationIndexCache.set(sha, promise);
+    return await promise;
+  } catch {
+    guideRelationIndexCache.delete(sha);
+    return EMPTY_GUIDE_RELATION_INDEX;
+  }
+};
+
 const getGuideRelationIndex = async (): Promise<GuideRelationIndex> => {
-  const sha = await getLatestOfficialDocsSha();
+  const sha = await getLatestOfficialDocsSha().catch(() => null);
+  if (!sha) {
+    return EMPTY_GUIDE_RELATION_INDEX;
+  }
+
   const cached = guideRelationIndexCache.get(sha);
   if (cached) {
     return cached;
   }
 
-  const promise = buildGuideRelationIndex();
-  guideRelationIndexCache.set(sha, promise);
-  return promise;
+  return buildCachedGuideRelationIndex(sha);
 };
 
 const mergeRelatedGuides = (

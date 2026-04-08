@@ -18,6 +18,8 @@ import remarkRehype from "remark-rehype";
 import { visit } from "unist-util-visit";
 
 import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
+import { ReferencedApiSymbolsSection } from "@/features/docs/components/reference-sections";
+import { getGuideRelatedSymbols } from "@/features/api/v1/services/guide-relations";
 import { getMDXComponents } from "@/features/docs/components/mdx-components";
 import {
   LLMCopyButton,
@@ -25,6 +27,7 @@ import {
 } from "@/features/docs/components/page-actions";
 import {
   getOfficialDocPage,
+  OFFICIAL_DOCS_FOLDER_URL,
   resolveOfficialDocsLink,
 } from "@/features/official-docs/utils/source";
 import type { OfficialDocPage } from "@/features/official-docs/utils/source";
@@ -571,6 +574,14 @@ const getRawMarkdownUrl = (page: OfficialDocPage): string => {
     : "/api/official-docs/raw";
 };
 
+const getGuideResourceName = (page: OfficialDocPage): string => {
+  const relativePath = page.url
+    .slice(OFFICIAL_DOCS_FOLDER_URL.length)
+    .replace(/^\/+/u, "");
+
+  return relativePath.length > 0 ? relativePath : "index";
+};
+
 export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
   const params = await props.params;
   const page = await getOfficialDocPage(params.slug ?? []);
@@ -579,6 +590,9 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
   }
 
   const description = await renderOfficialDocsDescription(page);
+  const relatedSymbols = (
+    await getGuideRelatedSymbols(getGuideResourceName(page))
+  ).slice(0, 8);
 
   return (
     <DocsPage toc={page.toc}>
@@ -595,7 +609,10 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
         description={description}
         title={page.title}
       />
-      <DocsBody>{await renderOfficialDocsMarkdown(page)}</DocsBody>
+      <DocsBody>
+        {await renderOfficialDocsMarkdown(page)}
+        <ReferencedApiSymbolsSection symbols={relatedSymbols} />
+      </DocsBody>
     </DocsPage>
   );
 }
