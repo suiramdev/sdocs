@@ -44,4 +44,7 @@ COPY --from=build /app ./
 
 EXPOSE 4000
 
+HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 \
+  CMD bun -e 'fetch(`http://127.0.0.1:${process.env.PORT ?? "4000"}/api/health`).then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))'
+
 CMD ["bun", "run", "start"]
