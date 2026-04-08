@@ -1,7 +1,13 @@
 import type { SortedResult } from "fumadocs-core/search";
 import { createFromSource } from "fumadocs-core/search/server";
+import type { Nodes } from "hast";
+import { toString as hastToString } from "hast-util-to-string";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import rehypeRaw from "rehype-raw";
+import { remark } from "remark";
+import remarkGfm from "remark-gfm";
+import remarkRehype from "remark-rehype";
 import { z } from "zod";
 
 import type { ApiSearchResult } from "@/features/api/utils/schemas";
@@ -13,6 +19,11 @@ import { getOfficialDocsSearch } from "@/features/official-docs/utils/source";
 export const runtime = "nodejs";
 
 const localDocsSearch = createFromSource(source);
+const searchDisplayTextProcessor = remark()
+  .use(remarkGfm)
+  .use(remarkRehype, { allowDangerousHtml: true })
+  .use(rehypeRaw);
+const whitespacePattern = /\s+/g;
 
 const defaultSearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -28,12 +39,56 @@ interface FumadocsSearchResult {
   url: string;
 }
 
+type SearchContentHighlight = NonNullable<
+  FumadocsSearchResult["contentWithHighlights"]
+>[number];
+
 const escapeHtml = (text: string): string =>
   text
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+
+const normalizeSearchDisplayText = async (value: string): Promise<string> => {
+  const tree = await searchDisplayTextProcessor.run(
+    searchDisplayTextProcessor.parse(value)
+  );
+
+  return hastToString(tree as Nodes)
+    .replaceAll(whitespacePattern, " ")
+    .trim();
+};
+
+const normalizeSearchHighlights = async (
+  highlights: SortedResult<string>["contentWithHighlights"]
+): Promise<SortedResult<string>["contentWithHighlights"]> => {
+  if (!highlights) {
+    return undefined;
+  }
+
+  const normalizedHighlights = await Promise.all(
+    highlights.map(async (highlight) => {
+      const content = await normalizeSearchDisplayText(
+        String(highlight.content)
+      );
+      if (content.length === 0) {
+        return null;
+      }
+
+      return {
+        ...highlight,
+        content,
+      };
+    })
+  );
+
+  const filteredHighlights = normalizedHighlights.filter(
+    (highlight): highlight is SearchContentHighlight => highlight !== null
+  );
+
+  return filteredHighlights.length > 0 ? filteredHighlights : undefined;
+};
 
 const buildSearchContent = async (result: ApiSearchResult): Promise<string> => {
   let obsoletePart = "";
@@ -64,16 +119,23 @@ const toFumadocsResult = async (
   url: result.url,
 });
 
-const toDocsSearchResult = (
+const toDocsSearchResult = async (
   result: SortedResult<string>
-): FumadocsSearchResult => ({
-  breadcrumbs: result.breadcrumbs,
-  content: result.content,
-  contentWithHighlights: result.contentWithHighlights,
-  id: result.id,
-  type: result.type,
-  url: result.url,
-});
+): Promise<FumadocsSearchResult> => {
+  const [content, contentWithHighlights] = await Promise.all([
+    normalizeSearchDisplayText(result.content),
+    normalizeSearchHighlights(result.contentWithHighlights),
+  ]);
+
+  return {
+    breadcrumbs: result.breadcrumbs,
+    content,
+    contentWithHighlights,
+    id: result.id,
+    type: result.type,
+    url: result.url,
+  };
+};
 
 const dedupeSearchResults = (
   results: FumadocsSearchResult[]
@@ -130,10 +192,15 @@ const runFumadocsSearch = async (
     officialDocsSearch.search(parsed.query),
     Promise.all(apiSearchResult.results.map(toFumadocsResult)),
   ]);
+  const [normalizedLocalDocsResults, normalizedOfficialDocsResults] =
+    await Promise.all([
+      Promise.all(localDocsResults.map(toDocsSearchResult)),
+      Promise.all(officialDocsResults.map(toDocsSearchResult)),
+    ]);
 
   return dedupeSearchResults([
-    ...localDocsResults.map(toDocsSearchResult),
-    ...officialDocsResults.map(toDocsSearchResult),
+    ...normalizedLocalDocsResults,
+    ...normalizedOfficialDocsResults,
     ...apiResults,
   ]).slice(0, parsed.limit);
 };
