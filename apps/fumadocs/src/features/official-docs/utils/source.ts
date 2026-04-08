@@ -342,7 +342,7 @@ const requestText = async (url: string): Promise<string> => {
   return response.text();
 };
 
-const getLatestOfficialDocsSha = async (): Promise<string> => {
+export const getLatestOfficialDocsSha = async (): Promise<string> => {
   const now = Date.now();
   if (latestHeadCache && now - latestHeadCache.checkedAt < HEAD_CACHE_TTL_MS) {
     return latestHeadCache.sha;

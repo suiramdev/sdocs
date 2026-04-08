@@ -26,6 +26,7 @@ export const entityIdSchema = z.object({
 export const toolNameSchema = z.enum([
   "get_examples",
   "get_method_details",
+  "get_related_guides",
   "get_symbol",
   "get_type_members",
   "list_namespaces",
@@ -76,6 +77,12 @@ export const getMethodDetailsToolInputSchema = z.object({
   namespace: optionalString,
   symbol: z.string().trim().min(1),
   typeName: optionalString,
+});
+
+export const getRelatedGuidesToolInputSchema = z.object({
+  kind: z.enum(apiEntityKinds).optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  symbol: z.string().trim().min(1),
 });
 
 export const getExamplesToolInputSchema = z.object({

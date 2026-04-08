@@ -4,9 +4,11 @@ import {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import {
+  completeGuideDocumentationResourceNames,
   completeMemberResourceNames,
   completeNamespaceResourceNames,
   completeTypeResourceNames,
+  readDocumentationGuideResource,
   readDocumentationMemberResource,
   readDocumentationNamespaceResource,
   readDocumentationSchemaResource,
@@ -41,7 +43,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     },
     {
       instructions:
-        "You are a documentation agent for the s&box API. Always start with search_docs. When the user names a type, call resolve_symbol before inspecting it. Use get_symbol for type metadata, get_type_members for member discovery, get_method_details for exact overloads, get_examples for code samples, and list_namespaces to explore the API tree. When you already know the canonical namespace, type, or member, read the matching docs:// resource to load the full structured documentation page. Do not answer from memory when a tool or resource can verify the symbol.",
+        "You are a documentation agent for the s&box API. Always start with search_docs. When the user names a type, call resolve_symbol before inspecting it. Use get_symbol for type metadata, get_type_members for member discovery, get_method_details for exact overloads, get_examples for code samples, get_related_guides for broader usage context, and list_namespaces to explore the API tree. When you already know the canonical namespace, type, member, or guide path, read the matching docs:// resource to load the full structured documentation page. Follow related guide links from type and member resources when the user needs conceptual guidance, editor workflows, or broader method usage patterns. Do not answer from memory when a tool or resource can verify the symbol.",
     }
   );
 
@@ -108,6 +110,26 @@ export const createApiReferenceMcpServer = (): McpServer => {
     async (_uri, variables) =>
       toDocumentationResourceResult(
         await readDocumentationTypeResource(String(variables.full_name ?? ""))
+      )
+  );
+
+  server.registerResource(
+    "guide-documentation",
+    new ResourceTemplate("docs://guide/{path}", {
+      complete: {
+        path: completeGuideDocumentationResourceNames,
+      },
+      list: undefined,
+    }),
+    {
+      description:
+        "Official guide pages related to the indexed s&box API documentation.",
+      mimeType: "application/json",
+      title: "Guide Documentation",
+    },
+    async (_uri, variables) =>
+      toDocumentationResourceResult(
+        await readDocumentationGuideResource(String(variables.path ?? "index"))
       )
   );
 

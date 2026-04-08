@@ -4,6 +4,7 @@ import type { ToolName } from "@/features/api/v1/domain/schemas";
 import {
   getExamplesToolInputSchema,
   getMethodDetailsToolInputSchema,
+  getRelatedGuidesToolInputSchema,
   getSymbolToolInputSchema,
   getTypeMembersToolInputSchema,
   listNamespacesToolInputSchema,
@@ -13,6 +14,7 @@ import {
 import {
   getApiReferenceExamples,
   getApiReferenceMethodDetails,
+  getApiReferenceRelatedGuides,
   getApiReferenceSymbol,
   getApiReferenceTypeMembers,
   listApiReferenceNamespaces,
@@ -206,6 +208,38 @@ const getExamplesInputSchema: JsonSchema = {
   type: "object",
 };
 
+const getRelatedGuidesInputSchema: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    kind: {
+      description: "Optional expected symbol kind.",
+      enum: [
+        "class",
+        "struct",
+        "interface",
+        "enum",
+        "constructor",
+        "method",
+        "property",
+      ],
+      type: "string",
+    },
+    limit: {
+      description: "Maximum number of related guides to return.",
+      maximum: 20,
+      minimum: 1,
+      type: "integer",
+    },
+    symbol: {
+      description:
+        "Exact symbol id, fully-qualified type name, or fully-qualified member signature.",
+      type: "string",
+    },
+  },
+  required: ["symbol"],
+  type: "object",
+};
+
 const listNamespacesInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
@@ -245,6 +279,17 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
     inputSchema: getMethodDetailsInputSchema,
     name: "get_method_details",
     schema: getMethodDetailsToolInputSchema,
+  },
+  get_related_guides: {
+    description:
+      "Fetch related official guides for a symbol so the agent can read broader conceptual and workflow documentation.",
+    execute: async (input) => {
+      const parsed = getRelatedGuidesToolInputSchema.parse(input);
+      return await getApiReferenceRelatedGuides(parsed);
+    },
+    inputSchema: getRelatedGuidesInputSchema,
+    name: "get_related_guides",
+    schema: getRelatedGuidesToolInputSchema,
   },
   get_symbol: {
     description:
@@ -309,6 +354,7 @@ const toolRuntime = Object.freeze([
   toolRuntimeByName.get_symbol,
   toolRuntimeByName.get_type_members,
   toolRuntimeByName.get_method_details,
+  toolRuntimeByName.get_related_guides,
   toolRuntimeByName.get_examples,
   toolRuntimeByName.list_namespaces,
 ]);
