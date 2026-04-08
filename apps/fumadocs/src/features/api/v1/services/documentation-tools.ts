@@ -13,6 +13,8 @@ import type {
 import { searchApiService } from "@/features/api/utils/service";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
 
+import { getRelatedGuidesForEntity } from "./guide-relations";
+
 const TYPE_KINDS = new Set<ApiEntityKind>([
   "class",
   "struct",
@@ -1020,9 +1022,11 @@ export const resolveDocumentationSymbol = async (input: ResolveSymbolInput) => {
 export const getDocumentationSymbol = async (input: GetSymbolInput) => {
   const entity = await resolveSymbolEntity(input);
   const details = toSymbolDetails(entity);
+  const relatedGuides = await getRelatedGuidesForEntity(entity);
 
   if (!isTypeEntity(entity)) {
     return {
+      relatedGuides,
       symbol: details,
     };
   }
@@ -1031,6 +1035,7 @@ export const getDocumentationSymbol = async (input: GetSymbolInput) => {
 
   return {
     memberCounts: getTypeCounts(members),
+    relatedGuides,
     symbol: details,
   };
 };
@@ -1073,9 +1078,35 @@ export const getDocumentationMethodDetails = async (
   input: GetMethodDetailsInput
 ) => {
   const methodEntity = await resolveMethodEntity(input);
+  const relatedGuides = await getRelatedGuidesForEntity(methodEntity);
 
   return {
     method: toSymbolDetails(methodEntity),
+    relatedGuides,
+  };
+};
+
+export const getDocumentationRelatedGuides = async (
+  input: GetSymbolInput & { limit?: number }
+) => {
+  const entity = await resolveSymbolEntity(input);
+  const guides = await getRelatedGuidesForEntity(entity, input.limit ?? 8);
+
+  return {
+    guides,
+    returned: guides.length,
+    symbol: toSymbolRef(entity),
+    workflow: {
+      nextSteps: [
+        "Read the related docs://guide/{path} resources for broader usage context.",
+        "Return to get_method_details or get_symbol when you need exact API contracts.",
+      ],
+      recommendedResource:
+        guides[0]?.resourceUri ??
+        (TYPE_KINDS.has(entity.entityKind)
+          ? `docs://type/${encodeURIComponent(entity.class)}`
+          : `docs://member/${encodeURIComponent(entity.signature)}`),
+    },
   };
 };
 

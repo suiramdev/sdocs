@@ -1,6 +1,7 @@
 import { getEntityById, loadApiEntities } from "@/features/api/utils/data";
 import type { ApiEntity, ApiExample } from "@/features/api/utils/schemas";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
+import { getOfficialDocPage } from "@/features/official-docs/utils/source";
 
 import {
   getDocumentationExamples,
@@ -9,8 +10,19 @@ import {
   getDocumentationTypeMembers,
   listDocumentationNamespaces,
 } from "./documentation-tools";
+import {
+  completeGuideResourceNames,
+  getGuideRelatedSymbols,
+  getRelatedGuidesForEntity,
+} from "./guide-relations";
+import type { RelatedGuide, RelatedGuideSymbol } from "./guide-relations";
 
-type DocumentationResourceKind = "member" | "namespace" | "schema" | "type";
+type DocumentationResourceKind =
+  | "guide"
+  | "member"
+  | "namespace"
+  | "schema"
+  | "type";
 type DocumentationMemberKind = "constructor" | "event" | "method" | "property";
 type DocumentationTypeMemberKind = Exclude<DocumentationMemberKind, "event">;
 type DocumentationTypeKind = "class" | "enum" | "interface" | "struct";
@@ -87,6 +99,7 @@ interface TypeResourceDocument {
     returnType: string | null;
     summary: string;
   }[];
+  relatedGuides: RelatedGuide[];
   symbol: {
     declaration: {
       displaySignature: string;
@@ -145,6 +158,21 @@ interface MemberResourceDocument {
     returnsDescription: string;
     summary: string;
   };
+  relatedGuides: RelatedGuide[];
+}
+
+interface GuideResourceDocument {
+  guide: {
+    breadcrumbs: string[];
+    description?: string;
+    docsUrl: string;
+    githubUrl: string;
+    markdown: string;
+    resourceUri: string;
+    title: string;
+  };
+  links: ResourceLink[];
+  relatedSymbols: RelatedGuideSymbol[];
 }
 
 interface ResourceCatalog {
@@ -154,6 +182,7 @@ interface ResourceCatalog {
 }
 
 const RESOURCE_SCHEMA_URI = "docs://schema";
+const GUIDE_RESOURCE_INDEX_NAME = "index";
 const ROOT_NAMESPACE_KEY = "root";
 const ROOT_NAMESPACE_NAME = "Root";
 const ROOT_NAMESPACE_URI = `docs://namespace/${ROOT_NAMESPACE_KEY}`;
@@ -190,6 +219,8 @@ const typeUri = (fullName: string): string =>
 
 const memberUri = (fullName: string): string =>
   `docs://member/${encodeResourceSegment(fullName)}`;
+
+const guideUri = (path: string): string => `docs://guide/${path}`;
 
 const toJsonResourceContents = (
   uri: string,
@@ -367,6 +398,24 @@ const buildMemberResourceLinks = (input: {
     : []),
 ];
 
+const toGuideResourceName = (rawPath: string): string => {
+  const decoded = decodeResourceSegment(rawPath).trim();
+  return decoded.length > 0 ? decoded : GUIDE_RESOURCE_INDEX_NAME;
+};
+
+const guideSlugsFromResourceName = (resourceName: string): string[] =>
+  resourceName === GUIDE_RESOURCE_INDEX_NAME
+    ? []
+    : resourceName.split("/").filter((segment) => segment.length > 0);
+
+const toGuideLinks = (guides: RelatedGuide[]): ResourceLink[] =>
+  guides.map((guide) => ({
+    docsUrl: guide.url,
+    rel: "guide",
+    title: guide.title,
+    uri: guide.resourceUri,
+  }));
+
 const buildSchemaResource = (): ResourceEnvelope<ResourceSchemaDocument> => ({
   data: {
     notes: [
@@ -413,16 +462,30 @@ const buildSchemaResource = (): ResourceEnvelope<ResourceSchemaDocument> => ({
           "exact signature",
           "parameters and return docs",
           "examples",
-          "links to the declaring type and namespace",
+          "links to the declaring type, namespace, and related guides",
         ],
         uriTemplate: "docs://member/{full_name}",
         whenToUse:
           "Use after get_type_members or get_method_details when the exact member is known.",
       },
+      {
+        description:
+          "Official guide page with markdown content and API symbol backlinks.",
+        kind: "guide",
+        returns: [
+          "guide title and description",
+          "guide markdown content",
+          "related API symbols",
+          "resource links to related symbols",
+        ],
+        uriTemplate: "docs://guide/{path}",
+        whenToUse:
+          "Use after following a related guide link from a type/member resource or get_related_guides.",
+      },
     ],
     workflow: {
       nextStep:
-        "Load a docs:// resource after tool-based discovery to retrieve the canonical structured page.",
+        "Load a docs:// resource after tool-based discovery to retrieve the canonical structured page or a related guide with broader usage context.",
       startWith: "search_docs",
     },
   },
@@ -460,6 +523,10 @@ export const completeMemberResourceNames = async (
   const catalog = await getResourceCatalog();
   return toCompletionMatches(catalog.memberNames, prefix);
 };
+
+export const completeGuideDocumentationResourceNames = async (
+  prefix: string
+): Promise<string[]> => await completeGuideResourceNames(prefix);
 
 export const readDocumentationSchemaResource = () => buildSchemaResource();
 
@@ -548,6 +615,7 @@ export const readDocumentationTypeResource = async (
     limit: Number.MAX_SAFE_INTEGER,
     symbol: symbolResult.symbol.fullName,
   });
+  const relatedGuides = await getRelatedGuidesForEntity(entity);
 
   return {
     data: {
@@ -559,6 +627,7 @@ export const readDocumentationTypeResource = async (
           title: symbolResult.symbol.namespace,
           uri: namespaceUri(symbolResult.symbol.namespace),
         },
+        ...toGuideLinks(relatedGuides),
         ...membersResult.members.map((member) => ({
           docsUrl: member.url,
           rel: "member",
@@ -582,6 +651,7 @@ export const readDocumentationTypeResource = async (
           returnType: member.returnType,
           summary: member.summary,
         })),
+      relatedGuides,
       symbol: {
         declaration: symbolResult.symbol.declaration,
         description: getEntityDescription(entity),
@@ -627,6 +697,7 @@ export const readDocumentationMemberResource = async (
     limit: Number.MAX_SAFE_INTEGER,
     symbol: symbolResult.symbol.fullName,
   });
+  const relatedGuides = await getRelatedGuidesForEntity(entity);
 
   return {
     data: {
@@ -639,10 +710,13 @@ export const readDocumentationMemberResource = async (
           ...example,
         })),
       ],
-      links: buildMemberResourceLinks({
-        declaringType: symbolResult.symbol.declaringType,
-        namespace: symbolResult.symbol.namespace,
-      }),
+      links: [
+        ...buildMemberResourceLinks({
+          declaringType: symbolResult.symbol.declaringType,
+          namespace: symbolResult.symbol.namespace,
+        }),
+        ...toGuideLinks(relatedGuides),
+      ],
       member: {
         declaration: memberDetails.declaration,
         description: getEntityDescription(entity),
@@ -660,6 +734,7 @@ export const readDocumentationMemberResource = async (
         returnsDescription: memberDetails.returnsDescription,
         summary: memberDetails.summary,
       },
+      relatedGuides,
     },
     resource: {
       description:
@@ -673,8 +748,57 @@ export const readDocumentationMemberResource = async (
   };
 };
 
+export const readDocumentationGuideResource = async (
+  rawPath: string
+): Promise<ResourceEnvelope<GuideResourceDocument>> => {
+  const resourceName = toGuideResourceName(rawPath);
+  const page = await getOfficialDocPage(
+    guideSlugsFromResourceName(resourceName)
+  );
+  if (!page) {
+    throw new ApiV1Error({
+      code: "NOT_FOUND",
+      details: { path: resourceName },
+      message: "Guide not found.",
+      status: 404,
+    });
+  }
+
+  const relatedSymbols = await getGuideRelatedSymbols(resourceName);
+
+  return {
+    data: {
+      guide: {
+        breadcrumbs: page.breadcrumbs,
+        description: page.description,
+        docsUrl: page.url,
+        githubUrl: page.githubUrl,
+        markdown: page.markdown,
+        resourceUri: guideUri(resourceName),
+        title: page.title,
+      },
+      links: relatedSymbols.map((symbol) => ({
+        docsUrl: symbol.docsUrl,
+        rel: "symbol",
+        title: symbol.fullName,
+        uri: symbol.resourceUri,
+      })),
+      relatedSymbols,
+    },
+    resource: {
+      description: "Official guide page related to the indexed s&box API.",
+      docsUrl: page.url,
+      kind: "guide",
+      mimeType: JSON_MIME_TYPE,
+      title: page.title,
+      uri: guideUri(resourceName),
+    },
+  };
+};
+
 export const toDocumentationResourceResult = (
   resource:
+    | ResourceEnvelope<GuideResourceDocument>
     | ResourceEnvelope<MemberResourceDocument>
     | ResourceEnvelope<NamespaceResourceDocument>
     | ResourceEnvelope<ResourceSchemaDocument>

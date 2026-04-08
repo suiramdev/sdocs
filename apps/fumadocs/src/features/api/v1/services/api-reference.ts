@@ -8,6 +8,7 @@ import type { SearchDocsToolInput } from "@/features/api/v1/domain/schemas";
 import {
   getDocumentationExamples,
   getDocumentationMethodDetails,
+  getDocumentationRelatedGuides,
   getDocumentationSymbol,
   getDocumentationTypeMembers,
   listDocumentationNamespaces,
@@ -77,6 +78,19 @@ export const getApiReferenceMethodDetails = (input: {
   symbol: string;
   typeName?: string;
 }) => getDocumentationMethodDetails(input);
+
+export const getApiReferenceRelatedGuides = (input: {
+  kind?:
+    | "class"
+    | "constructor"
+    | "enum"
+    | "interface"
+    | "method"
+    | "property"
+    | "struct";
+  limit?: number;
+  symbol: string;
+}) => getDocumentationRelatedGuides(input);
 
 export const getApiReferenceExamples = (input: {
   includeRelated?: boolean;
