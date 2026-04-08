@@ -151,3 +151,9 @@ docker compose up --build fumadocs-indexer
 ```
 
 The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. Regeneration is also triggered on redeploy when the repository example scraper inputs change, including updates to `data/api/example-repositories.json` and changes to the repository scraping scripts. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.
+
+For platform deployments such as Dokploy, prefer the dedicated health endpoint
+`/api/health` instead of `/`. The home page redirects to `/docs/get-started`,
+while `/api/health` returns a plain `200 OK` JSON response and avoids false
+negatives in health probes. The runtime also honors `PORT` when the platform
+injects it.

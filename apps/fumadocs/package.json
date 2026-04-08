@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && next build",
-    "dev": "sh -c 'bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && CHOKIDAR_USEPOLLING=true npx -y node@22 ./node_modules/next/dist/bin/next dev --turbopack --port=${FUMADOCS_PORT:-4000}'",
-    "start": "sh -c 'bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && bun run api:bootstrap && next start --port=${FUMADOCS_PORT:-4000}'",
+    "dev": "sh -c 'bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && CHOKIDAR_USEPOLLING=true npx -y node@22 ./node_modules/next/dist/bin/next dev --port=${PORT:-${FUMADOCS_PORT:-4000}}'",
+    "start": "sh -c 'bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && bun run api:bootstrap && next start --port=${PORT:-${FUMADOCS_PORT:-4000}}'",
     "types:check": "bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && fumadocs-mdx && next typegen && tsc --noEmit -p tsconfig.typecheck.json",
     "postinstall": "bun run sync:mcpb-assets && bun run sync:tree-sitter-assets && bun run patch:fumadocs-ui && fumadocs-mdx",
     "meilisearch": "docker compose -f infra/meilisearch/docker-compose.yml up -d",

@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const appRootDir = path.resolve(moduleDir, "../../../..");
-const defaultFumadocsPort = process.env.FUMADOCS_PORT ?? "4000";
+const defaultFumadocsPort =
+  process.env.PORT ?? process.env.FUMADOCS_PORT ?? "4000";
 
 export const apiConfig = {
   app: {
