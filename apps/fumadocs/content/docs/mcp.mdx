@@ -178,12 +178,34 @@ In practice, an agent will usually:
 2. Call `resolve_symbol` if a short name like `Component` or `Scene` is ambiguous
 3. Call `get_symbol` or `get_type_members` to inspect a resolved type
 4. Call `get_method_details` to inspect one exact overload
-5. Call `get_examples` when sample code is needed
-6. Call `list_namespaces` when exploring the API tree from the top down
+5. Call `get_related_guides` when broader usage context is needed
+6. Call `get_examples` when sample code is needed
+7. Call `list_namespaces` when exploring the API tree from the top down
 
 This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
 of as raw page text.
+
+## API Docs and Guides
+
+The MCP server exposes two connected documentation layers:
+
+- Generated API docs for namespaces, types, and members
+- Official Guides fetched live from the s&box docs repository
+
+The relationship is built at runtime. The server scans the upstream guide
+markdown, looks for symbol mentions in headings, prose, inline code, and code
+blocks, and then scores which guide pages are most relevant to each API symbol.
+
+That gives agents two useful directions:
+
+1. From an API symbol like `Sandbox.Component.OnUpdate()`, they can follow
+   related Guides for conceptual context, editor workflows, and practical usage
+   patterns.
+2. From a Guide page, they can inspect the related API symbols that the guide
+   discusses and then open the canonical type or member pages.
+
+Use the API docs for exact contracts. Use Guides for surrounding context.
 
 ## Tool Reference
 
@@ -340,6 +362,33 @@ Example use:
 - Get examples for a method override
 - Fall back to type-level examples when a member has no dedicated sample
 
+### `get_related_guides`
+
+Use this when the agent already knows the symbol but needs broader context than
+the generated API page provides.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component.OnUpdate()",
+  "limit": 5
+}
+```
+
+Typical output:
+
+- Related Guide pages ranked for that symbol
+- Match metadata showing whether the match is direct or inherited from the
+  declaring type
+- Resource URIs such as `docs://guide/scene/components`
+
+Example use:
+
+- Read workflow and editor guidance related to a method
+- Move from `Sandbox.Component` or `Sandbox.Component.OnUpdate()` to the most
+  relevant Guides before answering in prose
+
 ### `list_namespaces`
 
 Use this to explore the API hierarchy from the top down.
@@ -380,6 +429,7 @@ Available resource patterns:
 - `docs://namespace/{name}`
 - `docs://type/{full_name}`
 - `docs://member/{full_name}`
+- `docs://guide/{path}`
 
 Examples:
 
@@ -387,6 +437,7 @@ Examples:
 docs://namespace/Sandbox
 docs://type/Sandbox.Component
 docs://member/Sandbox.Component.OnUpdate
+docs://guide/scene/components
 ```
 
 Resources return structured JSON-style documentation pages. Depending on the
@@ -396,13 +447,16 @@ resource, this can include:
 - Exact signatures and declarations
 - Parameters, return types, and return documentation
 - Examples
-- Child namespaces, member listings, and related resource links
+- Child namespaces, member listings, related guide links, and related API
+  symbol links
 
 Typical usage:
 
 1. Use `search_docs` or `resolve_symbol` to identify the canonical symbol
-2. Read the matching `docs://type/...` or `docs://member/...` resource
-3. Use the structured resource payload as the canonical page for that API element
+2. Read the matching `docs://type/...`, `docs://member/...`, or
+   `docs://guide/...` resource
+3. Use the structured resource payload as the canonical page for that API
+   element or guide
 
 ## How Agents Use It
 
@@ -413,8 +467,15 @@ behaved agent will usually:
 2. Use `resolve_symbol` if it needs to confirm `Component` means `Sandbox.Component`
 3. Use `get_symbol` to inspect the type summary
 4. Use `get_type_members` to find lifecycle members such as `OnUpdate`
-5. Read `docs://member/Sandbox.Component.OnUpdate` to load the canonical member page
-6. Use `get_method_details` or `get_examples` when it needs an extra focused lookup
+5. Use `get_related_guides` to find the most relevant Guide pages for
+   `Sandbox.Component` or `Sandbox.Component.OnUpdate()`
+6. Read `docs://member/Sandbox.Component.OnUpdate` for the canonical API
+   contract
+7. Read a related `docs://guide/...` resource for broader workflow and usage
+   context
+8. Use `get_method_details` or `get_examples` when it needs an extra focused
+   lookup
 
 That is the intended MCP interaction model: search broadly, inspect the right
-symbol, then read exact member details or the canonical resource page.
+symbol, then combine exact API pages with related Guides when the answer needs
+more than just signatures.
