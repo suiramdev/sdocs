@@ -38,12 +38,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          'bun -e ''fetch("http://127.0.0.1:4000/").then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))''',
+          'bun -e ''fetch(`http://127.0.0.1:${process.env.PORT ?? "4000"}/api/health`).then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))''',
         ]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 12
-      start_period: 10s
+      start_period: 120s
     volumes:
       - fumadocs_api_generated:/app/content/api-generated
       - fumadocs_api_entities:/app/data/api/entities
