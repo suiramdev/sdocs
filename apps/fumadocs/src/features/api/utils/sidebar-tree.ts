@@ -2,6 +2,11 @@ import type { Folder, Root } from "fumadocs-core/page-tree";
 
 import { loadApiEntities } from "@/features/api/utils/data";
 import type { ApiEntity } from "@/features/api/utils/schemas";
+import {
+  getOfficialDocsSectionTree,
+  OFFICIAL_DOCS_FOLDER_NAME,
+  OFFICIAL_DOCS_FOLDER_URL,
+} from "@/features/official-docs/utils/source";
 
 type MethodEntity = ApiEntity & { type: "method" };
 type PropertyEntity = ApiEntity & { type: "property" };
@@ -25,6 +30,7 @@ const GET_STARTED_URL = "/docs/get-started";
 const API_FOLDER_NAME = "API Reference";
 
 let cachedApiFolder: Folder | null = null;
+let cachedOfficialDocsFolder: Folder | null = null;
 
 const isMethodEntity = (entity: ApiEntity): entity is MethodEntity =>
   entity.type === "method";
@@ -180,9 +186,23 @@ const getApiReferenceFolder = async (): Promise<Folder> => {
   return cachedApiFolder;
 };
 
+const getOfficialDocsFolder = async (): Promise<Folder> => {
+  if (cachedOfficialDocsFolder) {
+    return cachedOfficialDocsFolder;
+  }
+
+  cachedOfficialDocsFolder = await getOfficialDocsSectionTree();
+  return cachedOfficialDocsFolder;
+};
+
 const isApiFolder = (node: Root["children"][number]): boolean =>
   node.type === "folder" &&
   (node.index?.url === API_ROOT_URL || node.name === API_FOLDER_NAME);
+
+const isOfficialDocsFolder = (node: Root["children"][number]): boolean =>
+  node.type === "folder" &&
+  (node.index?.url === OFFICIAL_DOCS_FOLDER_URL ||
+    node.name === OFFICIAL_DOCS_FOLDER_NAME);
 
 const isGetStartedPage = (node: Root["children"][number]): boolean => {
   if (node.type === "page") {
@@ -196,17 +216,20 @@ const isGetStartedPage = (node: Root["children"][number]): boolean => {
   return false;
 };
 
-export const mergeApiMethodsTree = async (baseTree: Root): Promise<Root> => {
+export const mergeDocsTree = async (baseTree: Root): Promise<Root> => {
+  const officialDocsFolder = await getOfficialDocsFolder();
   const apiFolder = await getApiReferenceFolder();
 
-  const nonApiNodes = baseTree.children.filter((node) => !isApiFolder(node));
+  const nonManagedNodes = baseTree.children.filter(
+    (node) => !isApiFolder(node) && !isOfficialDocsFolder(node)
+  );
   const reorderedNonApiNodes = [
-    ...nonApiNodes.filter(isGetStartedPage),
-    ...nonApiNodes.filter((node) => !isGetStartedPage(node)),
+    ...nonManagedNodes.filter(isGetStartedPage),
+    ...nonManagedNodes.filter((node) => !isGetStartedPage(node)),
   ];
 
   return {
     ...baseTree,
-    children: [...reorderedNonApiNodes, apiFolder],
+    children: [...reorderedNonApiNodes, officialDocsFolder, apiFolder],
   };
 };
