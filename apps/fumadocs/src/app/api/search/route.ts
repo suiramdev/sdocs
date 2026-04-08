@@ -1,3 +1,5 @@
+import type { SortedResult } from "fumadocs-core/search";
+import { createFromSource } from "fumadocs-core/search/server";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -5,8 +7,12 @@ import { z } from "zod";
 import type { ApiSearchResult } from "@/features/api/utils/schemas";
 import { searchApiService } from "@/features/api/utils/service";
 import { signatureToHtml } from "@/features/api/utils/signature-tokens";
+import { source } from "@/features/docs/utils/source";
+import { getOfficialDocsSearch } from "@/features/official-docs/utils/source";
 
 export const runtime = "nodejs";
+
+const localDocsSearch = createFromSource(source);
 
 const defaultSearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -14,10 +20,11 @@ const defaultSearchQuerySchema = z.object({
 });
 
 interface FumadocsSearchResult {
-  breadcrumbs: string[];
+  breadcrumbs?: string[];
   content: string;
+  contentWithHighlights?: SortedResult["contentWithHighlights"];
   id: string;
-  type: "page";
+  type: "heading" | "page" | "text";
   url: string;
 }
 
@@ -57,6 +64,31 @@ const toFumadocsResult = async (
   url: result.url,
 });
 
+const toDocsSearchResult = (
+  result: SortedResult<string>
+): FumadocsSearchResult => ({
+  breadcrumbs: result.breadcrumbs,
+  content: result.content,
+  contentWithHighlights: result.contentWithHighlights,
+  id: result.id,
+  type: result.type,
+  url: result.url,
+});
+
+const dedupeSearchResults = (
+  results: FumadocsSearchResult[]
+): FumadocsSearchResult[] => {
+  const dedupedResults = new Map<string, FumadocsSearchResult>();
+  for (const result of results) {
+    const key = `${result.type}:${result.url}:${result.id}`;
+    if (!dedupedResults.has(key)) {
+      dedupedResults.set(key, result);
+    }
+  }
+
+  return [...dedupedResults.values()];
+};
+
 const invalidRequestResponse = (message: string, error: z.ZodError) =>
   NextResponse.json(
     {
@@ -85,12 +117,25 @@ const runFumadocsSearch = async (
     limit: request.nextUrl.searchParams.get("limit") ?? undefined,
     query: request.nextUrl.searchParams.get("query") ?? "",
   });
-  const result = await searchApiService({
-    limit: parsed.limit,
-    query: parsed.query,
-  });
+  const [localDocsResults, officialDocsSearch, apiSearchResult] =
+    await Promise.all([
+      localDocsSearch.search(parsed.query),
+      getOfficialDocsSearch(),
+      searchApiService({
+        limit: parsed.limit,
+        query: parsed.query,
+      }),
+    ]);
+  const [officialDocsResults, apiResults] = await Promise.all([
+    officialDocsSearch.search(parsed.query),
+    Promise.all(apiSearchResult.results.map(toFumadocsResult)),
+  ]);
 
-  return Promise.all(result.results.map(toFumadocsResult));
+  return dedupeSearchResults([
+    ...localDocsResults.map(toDocsSearchResult),
+    ...officialDocsResults.map(toDocsSearchResult),
+    ...apiResults,
+  ]).slice(0, parsed.limit);
 };
 
 const handleSearchError = (error: unknown, message: string) => {
