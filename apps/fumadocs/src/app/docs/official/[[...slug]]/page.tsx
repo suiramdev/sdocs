@@ -542,12 +542,14 @@ const unwrapDescriptionParagraph = (description: ReactNode): ReactNode => {
     return description;
   }
 
+  const { children } = description.props as { children?: ReactNode };
+
   if (description.type === Fragment) {
-    return unwrapDescriptionParagraph(description.props.children);
+    return unwrapDescriptionParagraph(children);
   }
 
   if (description.type === "p") {
-    return description.props.children;
+    return children;
   }
 
   return description;
