@@ -116,6 +116,11 @@ const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/u;
 const MARKDOWN_EXTENSION_PATTERN = /\.md$/u;
 const ROOT_TOC_PATH = `${DOCS_ROOT}/toc.yml`;
 const ROOT_INDEX_PATH = `${DOCS_ROOT}/index.md`;
+const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/gu;
+const HEADING_LINE_PATTERN = /^#{1,6}\s+.*$/gmu;
+const IMAGE_ONLY_LINE_PATTERN = /^!\[[^\]]*\]\([^)]+\)\s*$/gmu;
+const THEMATIC_BREAK_PATTERN = /^\s*([-*_])(?:\s*\1){2,}\s*$/gmu;
+const ADMONITION_FENCE_PATTERN = /^:{3,}.*$/gmu;
 const DESCRIPTION_ADMONITION_OPEN_PATTERN =
   /^:{3,}[a-z]+(?:\s+\[([^\]]+)\])?\s*/gmu;
 const DESCRIPTION_ADMONITION_CLOSE_PATTERN = /^:{3,}\s*$/gmu;
@@ -472,12 +477,47 @@ const resolveTocHref = (directoryPath: string, href: string): string => {
 const filterPresentNodes = (nodes: (Node | null)[]): Node[] =>
   nodes.filter((node): node is Node => node !== null);
 
-const createOfficialFolderNode = (
+const normalizeMeaningfulBodyText = (value: string): string =>
+  value
+    .replaceAll(HTML_COMMENT_PATTERN, "")
+    .replaceAll(HEADING_LINE_PATTERN, "")
+    .replaceAll(IMAGE_ONLY_LINE_PATTERN, "")
+    .replaceAll(THEMATIC_BREAK_PATTERN, "")
+    .replaceAll(ADMONITION_FENCE_PATTERN, "")
+    .replaceAll(/\[([^\]]+)\]\([^)]+\)/gu, "$1")
+    .replaceAll(/[`*_~]/gu, "")
+    .replaceAll(/\s+/gu, "")
+    .trim();
+
+const hasMeaningfulBodyContent = (markdown: string): boolean =>
+  normalizeMeaningfulBodyText(markdown).length > 0;
+
+const hasMeaningfulIndexPage = async (
+  repoPath: string,
+  sha: string
+): Promise<boolean> => {
+  const rawMarkdown = await getOfficialDocRaw(repoPath, sha);
+  const { content, data } = parseFrontmatter(rawMarkdown);
+  const fallbackTitle =
+    extractFirstHeading(content) ??
+    humanizeSegment(
+      toSiteSlugs(repoPath).at(-1) ??
+        repoPath.split("/").at(-1)?.replace(MARKDOWN_EXTENSION_PATTERN, "") ??
+        "Official Docs"
+    );
+  const title = data.title?.trim() || fallbackTitle;
+  const markdown = stripLeadingTitleHeading(content, title);
+
+  return hasMeaningfulBodyContent(markdown);
+};
+
+const createOfficialFolderNode = async (
   childItems: Node[],
   indexPath: string,
   item: TocEntry,
+  sha: string,
   tree: ReadonlyMap<string, GitHubTreeEntry>
-): Folder => {
+): Promise<Folder> => {
   const folder: Folder = {
     children: childItems,
     collapsible: true,
@@ -486,7 +526,7 @@ const createOfficialFolderNode = (
     type: "folder",
   };
 
-  if (tree.has(indexPath)) {
+  if (tree.has(indexPath) && (await hasMeaningfulIndexPage(indexPath, sha))) {
     folder.index = {
       name: item.name,
       type: "page",
@@ -537,6 +577,7 @@ const buildOfficialDocTreeNode = async (
       filterPresentNodes(childNodes),
       indexPath,
       item,
+      sha,
       tree
     );
   }

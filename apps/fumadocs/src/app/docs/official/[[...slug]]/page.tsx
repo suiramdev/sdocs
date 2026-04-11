@@ -9,6 +9,7 @@ import type { MDXComponents } from "mdx/types";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Fragment, isValidElement } from "react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import * as JsxRuntime from "react/jsx-runtime";
 import rehypeRaw from "rehype-raw";
@@ -17,14 +18,14 @@ import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
 import { visit } from "unist-util-visit";
 
-import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
-import { ReferencedApiSymbolsSection } from "@/features/docs/components/reference-sections";
 import { getGuideRelatedSymbols } from "@/features/api/v1/services/guide-relations";
+import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 import { getMDXComponents } from "@/features/docs/components/mdx-components";
 import {
   LLMCopyButton,
   ViewOptions,
 } from "@/features/docs/components/page-actions";
+import { ReferencedApiSymbolsSection } from "@/features/docs/components/reference-sections";
 import {
   getOfficialDocPage,
   OFFICIAL_DOCS_FOLDER_URL,
@@ -536,6 +537,22 @@ const renderOfficialDocsMarkdown = async (
   });
 };
 
+const unwrapDescriptionParagraph = (description: ReactNode): ReactNode => {
+  if (!isValidElement(description)) {
+    return description;
+  }
+
+  if (description.type === Fragment) {
+    return unwrapDescriptionParagraph(description.props.children);
+  }
+
+  if (description.type === "p") {
+    return description.props.children;
+  }
+
+  return description;
+};
+
 const renderOfficialDocsDescription = async (
   page: OfficialDocPage
 ): Promise<ReactNode | undefined> => {
@@ -559,7 +576,7 @@ const renderOfficialDocsDescription = async (
     normalizeOfficialDocsAdmonitions(page.descriptionSource)
   );
 
-  return renderedDescription.result as ReactNode;
+  return unwrapDescriptionParagraph(renderedDescription.result as ReactNode);
 };
 
 const getRawMarkdownUrl = (page: OfficialDocPage): string => {
@@ -590,9 +607,10 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
   }
 
   const description = await renderOfficialDocsDescription(page);
-  const relatedSymbols = (
-    await getGuideRelatedSymbols(getGuideResourceName(page))
-  ).slice(0, 8);
+  const allRelatedSymbols = await getGuideRelatedSymbols(
+    getGuideResourceName(page)
+  );
+  const relatedSymbols = allRelatedSymbols.slice(0, 8);
 
   return (
     <DocsPage toc={page.toc}>
