@@ -186,6 +186,42 @@ This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
 of as raw page text.
 
+## Transport and Payload Format
+
+The remote MCP endpoint uses standard MCP JSON-RPC over Streamable HTTP. That
+means installation snippets, request envelopes, tool arguments, and discovery
+metadata still use JSON where MCP clients expect it.
+
+Tool result `text` fields and `docs://` resource bodies are encoded as compact
+TOON to reduce model-facing token usage while preserving the same structured
+data model. Resource contents are advertised with `mimeType: text/toon`.
+
+Compact MCP payloads remove empty fields, avoid repeated raw metadata, and use
+short readable keys such as `sig`, `uri`, `params`, `returns`, and `guides`.
+Tools default to compact responses. Pass `detail: "full"` in a tool request only
+when you need the larger raw field set.
+
+For example, `resolve_symbol` returns TOON text like this:
+
+```toon
+matches[2]:
+  - match: exact_name
+    id: "T:Sandbox.Component"
+    kind: class
+    name: Sandbox.Component
+    score: 110
+    sig: public abstract class Sandbox.Component
+    summary: "A GameObject can have many components, which are the building blocks of the game."
+  - match: prefix_name
+    id: "T:Editor.ComponentEditorWidget"
+    kind: class
+    name: Editor.ComponentEditorWidget
+    score: 88
+    sig: "public abstract class Editor.ComponentEditorWidget : Editor.Widget"
+query: Component
+returned: 2
+```
+
 ## API Docs and Guides
 
 The MCP server exposes two connected documentation layers:
@@ -209,6 +245,21 @@ Use the API docs for exact contracts. Use Guides for surrounding context.
 
 ## Tool Reference
 
+Tool responses are returned as TOON text to reduce token usage while preserving
+the same structured data model. The examples below show tool arguments as JSON
+because MCP clients send tool arguments through JSON-RPC.
+
+Every tool accepts an optional `detail` field:
+
+```json
+{
+  "detail": "full"
+}
+```
+
+Omit it for compact responses. Use `detail: "full"` only when the compact result
+does not include a field you need.
+
 ### `search_docs`
 
 Use this first. It performs keyword or semantic search across the indexed s&box
@@ -225,7 +276,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Ranked results
 - Each result includes a structured symbol summary
@@ -251,7 +302,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Matching types only
 - Fully-qualified names such as `Sandbox.Component`
@@ -275,7 +326,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Namespace and declaring type
 - Symbol kind such as class, struct, enum, method, or property
@@ -301,7 +352,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Member list for the target type
 - Constructors, methods, or properties
@@ -325,7 +376,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Exact method signature
 - Parameters with names, types, and documentation
@@ -351,7 +402,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Direct examples for the symbol when available
 - Optionally related examples from the declaring type
@@ -376,7 +427,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Related Guide pages ranked for that symbol
 - Match metadata showing whether the match is direct or inherited from the
@@ -402,7 +453,7 @@ Typical input:
 }
 ```
 
-Typical output:
+Typical TOON output includes:
 
 - Child namespaces
 - Types defined in the namespace
@@ -440,8 +491,9 @@ docs://member/Sandbox.Component.OnUpdate
 docs://guide/scene/components
 ```
 
-Resources return structured JSON-style documentation pages. Depending on the
-resource, this can include:
+Resources return compact TOON documentation pages. Resource wrappers omit
+transport-only metadata such as the resource MIME type and repeated URI.
+Depending on the resource, the payload can include:
 
 - Summary and description
 - Exact signatures and declarations
@@ -455,7 +507,7 @@ Typical usage:
 1. Use `search_docs` or `resolve_symbol` to identify the canonical symbol
 2. Read the matching `docs://type/...`, `docs://member/...`, or
    `docs://guide/...` resource
-3. Use the structured resource payload as the canonical page for that API
+3. Use the TOON resource payload as the canonical page for that API
    element or guide
 
 ## How Agents Use It

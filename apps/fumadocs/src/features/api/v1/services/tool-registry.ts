@@ -24,6 +24,13 @@ import {
 
 type JsonSchema = Record<string, unknown>;
 
+const detailModeInputProperty = {
+  description:
+    "MCP response detail level. Defaults to compact; use full for a larger payload with more raw fields.",
+  enum: ["compact", "full"],
+  type: "string",
+} as const;
+
 interface ToolDefinition {
   description: string;
   inputSchema: JsonSchema;
@@ -38,6 +45,7 @@ interface ToolRuntimeDefinition extends ToolDefinition {
 const searchDocsInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     includeObsolete: {
       description: "Include obsolete API symbols in the results.",
       type: "boolean",
@@ -87,6 +95,7 @@ const searchDocsInputSchema: JsonSchema = {
 const resolveSymbolInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     kind: {
       description: "Restrict resolution to a specific type kind.",
       enum: ["class", "struct", "interface", "enum"],
@@ -114,6 +123,7 @@ const resolveSymbolInputSchema: JsonSchema = {
 const getSymbolInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     kind: {
       description: "Optional expected symbol kind.",
       enum: [
@@ -140,6 +150,7 @@ const getSymbolInputSchema: JsonSchema = {
 const getTypeMembersInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     includeObsolete: {
       description: "Include obsolete members in the result set.",
       type: "boolean",
@@ -167,6 +178,7 @@ const getTypeMembersInputSchema: JsonSchema = {
 const getMethodDetailsInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     namespace: {
       description: "Optional exact namespace filter for disambiguation.",
       type: "string",
@@ -188,6 +200,7 @@ const getMethodDetailsInputSchema: JsonSchema = {
 const getExamplesInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     includeRelated: {
       description:
         "When true, also return examples from the declaring type when the symbol has no direct examples.",
@@ -211,6 +224,7 @@ const getExamplesInputSchema: JsonSchema = {
 const getRelatedGuidesInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     kind: {
       description: "Optional expected symbol kind.",
       enum: [
@@ -243,6 +257,7 @@ const getRelatedGuidesInputSchema: JsonSchema = {
 const listNamespacesInputSchema: JsonSchema = {
   additionalProperties: false,
   properties: {
+    detail: detailModeInputProperty,
     limit: {
       description: "Maximum number of child namespaces and types to return.",
       maximum: 100,

@@ -16,6 +16,8 @@ import {
   getRelatedGuidesForEntity,
 } from "./guide-relations";
 import type { RelatedGuide, RelatedGuideSymbol } from "./guide-relations";
+import { compactMcpResource } from "./mcp-compact";
+import { encodeMcpContent, MCP_TOON_MIME_TYPE } from "./mcp-format";
 
 type DocumentationResourceKind =
   | "guide"
@@ -40,7 +42,7 @@ interface ResourceEnvelope<TData> {
     description: string;
     docsUrl: string | null;
     kind: DocumentationResourceKind;
-    mimeType: "application/json";
+    mimeType: typeof MCP_TOON_MIME_TYPE;
     title: string;
     uri: string;
   };
@@ -186,7 +188,6 @@ const GUIDE_RESOURCE_INDEX_NAME = "index";
 const ROOT_NAMESPACE_KEY = "root";
 const ROOT_NAMESPACE_NAME = "Root";
 const ROOT_NAMESPACE_URI = `docs://namespace/${ROOT_NAMESPACE_KEY}`;
-const JSON_MIME_TYPE = "application/json" as const;
 const RESOURCE_COMPLETION_LIMIT = 50;
 const EMPTY_MEMBER_COUNTS: Record<DocumentationTypeMemberKind, number> = {
   constructor: 0,
@@ -222,13 +223,13 @@ const memberUri = (fullName: string): string =>
 
 const guideUri = (path: string): string => `docs://guide/${path}`;
 
-const toJsonResourceContents = (
+const toToonResourceContents = (
   uri: string,
   payload: unknown
 ): {
   contents: [
     {
-      mimeType: "application/json";
+      mimeType: typeof MCP_TOON_MIME_TYPE;
       text: string;
       uri: string;
     },
@@ -236,8 +237,8 @@ const toJsonResourceContents = (
 } => ({
   contents: [
     {
-      mimeType: JSON_MIME_TYPE,
-      text: JSON.stringify(payload, null, 2),
+      mimeType: MCP_TOON_MIME_TYPE,
+      text: encodeMcpContent(compactMcpResource(payload)),
       uri,
     },
   ],
@@ -494,7 +495,7 @@ const buildSchemaResource = (): ResourceEnvelope<ResourceSchemaDocument> => ({
       "Schema and usage guide for the s&box documentation MCP resources.",
     docsUrl: null,
     kind: "schema",
-    mimeType: JSON_MIME_TYPE,
+    mimeType: MCP_TOON_MIME_TYPE,
     title: "s&box Documentation Resource Schema",
     uri: RESOURCE_SCHEMA_URI,
   },
@@ -582,7 +583,7 @@ export const readDocumentationNamespaceResource = async (
         "Structured namespace page from the indexed s&box API documentation.",
       docsUrl: null,
       kind: "namespace",
-      mimeType: JSON_MIME_TYPE,
+      mimeType: MCP_TOON_MIME_TYPE,
       title: `${title} namespace`,
       uri: namespaceUri(fullName),
     },
@@ -672,7 +673,7 @@ export const readDocumentationTypeResource = async (
         "Canonical type page from the indexed s&box API documentation.",
       docsUrl: symbolResult.symbol.url,
       kind: "type",
-      mimeType: JSON_MIME_TYPE,
+      mimeType: MCP_TOON_MIME_TYPE,
       title: symbolResult.symbol.fullName,
       uri: typeUri(symbolResult.symbol.fullName),
     },
@@ -741,7 +742,7 @@ export const readDocumentationMemberResource = async (
         "Canonical member page from the indexed s&box API documentation.",
       docsUrl: memberDetails.url,
       kind: "member",
-      mimeType: JSON_MIME_TYPE,
+      mimeType: MCP_TOON_MIME_TYPE,
       title: memberDetails.fullName,
       uri: memberUri(memberDetails.fullName),
     },
@@ -789,7 +790,7 @@ export const readDocumentationGuideResource = async (
       description: "Official guide page related to the indexed s&box API.",
       docsUrl: page.url,
       kind: "guide",
-      mimeType: JSON_MIME_TYPE,
+      mimeType: MCP_TOON_MIME_TYPE,
       title: page.title,
       uri: guideUri(resourceName),
     },
@@ -803,4 +804,4 @@ export const toDocumentationResourceResult = (
     | ResourceEnvelope<NamespaceResourceDocument>
     | ResourceEnvelope<ResourceSchemaDocument>
     | ResourceEnvelope<TypeResourceDocument>
-) => toJsonResourceContents(resource.resource.uri, resource);
+) => toToonResourceContents(resource.resource.uri, resource);
