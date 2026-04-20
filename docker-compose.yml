@@ -1,6 +1,6 @@
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.11
+    image: getmeili/meilisearch:v1.42.1
     restart: unless-stopped
     ports:
       - "${MEILI_PORT:-7700}:7700"

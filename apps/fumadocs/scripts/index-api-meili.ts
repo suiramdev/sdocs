@@ -470,9 +470,9 @@ const indexDocuments = async (
 };
 
 const importMeiliSearchClient = async (runtimeConfig: IndexRuntimeConfig) => {
-  const { MeiliSearch } = await import("meilisearch");
+  const { Meilisearch } = await import("meilisearch");
 
-  return new MeiliSearch({
+  return new Meilisearch({
     apiKey: runtimeConfig.apiKey,
     host: runtimeConfig.host,
   });
