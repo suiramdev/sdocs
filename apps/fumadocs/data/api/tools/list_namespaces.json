@@ -5,6 +5,11 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "detail": {
+        "type": "string",
+        "enum": ["compact", "full"],
+        "description": "MCP response detail level. Defaults to compact; use full for a larger payload."
+      },
       "namespace": {
         "type": "string",
         "description": "Optional namespace to inspect. Omit to list the root."

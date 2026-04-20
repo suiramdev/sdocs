@@ -15,25 +15,17 @@ import {
   readDocumentationTypeResource,
   toDocumentationResourceResult,
 } from "@/features/api/v1/services/documentation-resources";
+import { compactMcpToolResult } from "@/features/api/v1/services/mcp-compact";
+import {
+  encodeMcpContent,
+  MCP_TOON_MIME_TYPE,
+} from "@/features/api/v1/services/mcp-format";
 import { listAgentToolRuntime } from "@/features/api/v1/services/tool-registry";
 
 const SERVER_NAME = "sdocs-api-reference";
 const SERVER_VERSION = "2.1.0";
 const RESOURCE_SCHEMA_URI = "docs://schema";
 const ROOT_NAMESPACE_URI = "docs://namespace/root";
-
-const toToolTextContent = (payload: unknown): string =>
-  JSON.stringify(payload, null, 2);
-
-const toStructuredContent = (payload: unknown): Record<string, unknown> => {
-  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
-  }
-
-  return {
-    value: payload,
-  };
-};
 
 export const createApiReferenceMcpServer = (): McpServer => {
   const server = new McpServer(
@@ -43,7 +35,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     },
     {
       instructions:
-        "You are a documentation agent for the s&box API. Always start with search_docs. When the user names a type, call resolve_symbol before inspecting it. Use get_symbol for type metadata, get_type_members for member discovery, get_method_details for exact overloads, get_examples for code samples, get_related_guides for broader usage context, and list_namespaces to explore the API tree. When you already know the canonical namespace, type, member, or guide path, read the matching docs:// resource to load the full structured documentation page. Follow related guide links from type and member resources when the user needs conceptual guidance, editor workflows, or broader method usage patterns. Do not answer from memory when a tool or resource can verify the symbol.",
+        'You are a documentation agent for the s&box API. Tool and resource text content is compact TOON to reduce token usage; parse it as the same data model as JSON. Tools default to compact result shapes with empty fields removed and concise, readable keys. Pass detail: "full" only when you need the larger raw field set. Always start with search_docs. When the user names a type, call resolve_symbol before inspecting it. Use get_symbol for type metadata, get_type_members for member discovery, get_method_details for exact overloads, get_examples for code samples, get_related_guides for broader usage context, and list_namespaces to explore the API tree. When you already know the canonical namespace, type, member, or guide path, read the matching docs:// resource to load the full structured documentation page. Follow related guide links from type and member resources when the user needs conceptual guidance, editor workflows, or broader method usage patterns. Do not answer from memory when a tool or resource can verify the symbol.',
     }
   );
 
@@ -53,7 +45,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     {
       description:
         "Schema and URI guide for the s&box documentation MCP resources.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Documentation Resource Schema",
     },
     () => toDocumentationResourceResult(readDocumentationSchemaResource())
@@ -64,7 +56,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     ROOT_NAMESPACE_URI,
     {
       description: "Root namespace listing for the indexed s&box API.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Root Namespace",
     },
     async () =>
@@ -84,7 +76,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     {
       description:
         "Canonical namespace pages from the indexed s&box API documentation.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Namespace Documentation",
     },
     async (_uri, variables) =>
@@ -104,7 +96,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     {
       description:
         "Canonical type pages for classes, structs, interfaces, and enums.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Type Documentation",
     },
     async (_uri, variables) =>
@@ -124,7 +116,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     {
       description:
         "Official guide pages related to the indexed s&box API documentation.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Guide Documentation",
     },
     async (_uri, variables) =>
@@ -144,7 +136,7 @@ export const createApiReferenceMcpServer = (): McpServer => {
     {
       description:
         "Canonical member pages for methods, constructors, and properties.",
-      mimeType: "application/json",
+      mimeType: MCP_TOON_MIME_TYPE,
       title: "Member Documentation",
     },
     async (_uri, variables) =>
@@ -162,16 +154,15 @@ export const createApiReferenceMcpServer = (): McpServer => {
       },
       async (input: unknown) => {
         const result = await tool.execute(input);
-        const structuredContent = toStructuredContent(result);
+        const content = compactMcpToolResult(tool.name, result, input);
 
         return {
           content: [
             {
-              text: toToolTextContent(result),
+              text: encodeMcpContent(content),
               type: "text" as const,
             },
           ],
-          structuredContent,
         };
       }
     );
