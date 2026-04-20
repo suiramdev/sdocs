@@ -7,6 +7,7 @@ import {
 } from "@/features/api/utils/schemas";
 
 const optionalString = z.string().trim().min(1).optional();
+const mcpDetailModeSchema = z.enum(["compact", "full"]).optional();
 
 const optionalBooleanQuery = z
   .string()
@@ -45,6 +46,7 @@ export const searchDocsQuerySchema = z.object({
 });
 
 export const searchDocsToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   includeObsolete: z.boolean().optional(),
   kind: z.enum(apiEntityKinds).optional(),
   limit: z.number().int().min(1).max(20).optional(),
@@ -55,6 +57,7 @@ export const searchDocsToolInputSchema = z.object({
 });
 
 export const resolveSymbolToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   kind: z.enum(apiTypeEntityKinds).optional(),
   limit: z.number().int().min(1).max(20).optional(),
   name: z.string().trim().min(1),
@@ -62,11 +65,13 @@ export const resolveSymbolToolInputSchema = z.object({
 });
 
 export const getSymbolToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   kind: z.enum(apiEntityKinds).optional(),
   symbol: z.string().trim().min(1),
 });
 
 export const getTypeMembersToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   includeObsolete: z.boolean().optional(),
   kind: z.enum(apiMemberEntityKinds).optional(),
   limit: z.number().int().min(1).max(200).optional(),
@@ -74,24 +79,28 @@ export const getTypeMembersToolInputSchema = z.object({
 });
 
 export const getMethodDetailsToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   namespace: optionalString,
   symbol: z.string().trim().min(1),
   typeName: optionalString,
 });
 
 export const getRelatedGuidesToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   kind: z.enum(apiEntityKinds).optional(),
   limit: z.number().int().min(1).max(20).optional(),
   symbol: z.string().trim().min(1),
 });
 
 export const getExamplesToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   includeRelated: z.boolean().optional(),
   limit: z.number().int().min(1).max(20).optional(),
   symbol: z.string().trim().min(1),
 });
 
 export const listNamespacesToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   limit: z.number().int().min(1).max(100).optional(),
   namespace: optionalString,
 });
