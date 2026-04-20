@@ -1,3 +1,5 @@
+import type { SearchParams } from "meilisearch";
+
 import { apiConfig } from "@/features/api/utils/config";
 import { loadApiEntities } from "@/features/api/utils/data";
 import type {
@@ -86,8 +88,8 @@ const buildFilter = (request: ApiSearchRequest): string[] => {
 };
 
 const searchWithMeilisearch = async (request: ApiSearchRequest) => {
-  const { MeiliSearch } = await import("meilisearch");
-  const client = new MeiliSearch({
+  const { Meilisearch } = await import("meilisearch");
+  const client = new Meilisearch({
     apiKey: apiConfig.meilisearch.apiKey,
     host: apiConfig.meilisearch.host,
   });
@@ -103,7 +105,7 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
       }
     : undefined;
 
-  const searchResponse = await index.search(request.query, {
+  const searchOptions = {
     attributesToHighlight: ["displaySignature", "description", "name"],
     attributesToRetrieve: [
       "id",
@@ -120,10 +122,12 @@ const searchWithMeilisearch = async (request: ApiSearchRequest) => {
       "obsoleteMessage",
     ],
     filter: buildFilter(request),
-    hybrid: hybridConfig,
     limit: request.limit,
     showRankingScore: true,
-  } as never);
+    ...(hybridConfig ? { hybrid: hybridConfig } : {}),
+  } satisfies SearchParams;
+
+  const searchResponse = await index.search(request.query, searchOptions);
 
   const total =
     (
