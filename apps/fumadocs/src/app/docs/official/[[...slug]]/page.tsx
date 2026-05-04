@@ -601,6 +601,31 @@ const getGuideResourceName = (page: OfficialDocPage): string => {
   return relativePath.length > 0 ? relativePath : "index";
 };
 
+const OfficialDocsMetadata = ({ page }: { page: OfficialDocPage }) => {
+  if (!page.createdAt && !page.updatedAt) {
+    return null;
+  }
+
+  return (
+    <footer className="mt-10 border-t pt-4 text-fd-muted-foreground text-xs">
+      <div className="flex flex-col gap-1">
+        {page.createdAt ? (
+          <div className="flex items-center gap-1.5">
+            <span>Created at:</span>
+            <time dateTime={page.createdAt}>{page.createdAt}</time>
+          </div>
+        ) : null}
+        {page.updatedAt ? (
+          <div className="flex items-center gap-1.5">
+            <span>Updated at:</span>
+            <time dateTime={page.updatedAt}>{page.updatedAt}</time>
+          </div>
+        ) : null}
+      </div>
+    </footer>
+  );
+};
+
 export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
   const params = await props.params;
   const page = await getOfficialDocPage(params.slug ?? []);
@@ -628,10 +653,12 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
         }
         description={description}
         title={page.title}
+        titleIcon={page.icon}
       />
       <DocsBody>
         {await renderOfficialDocsMarkdown(page)}
         <ReferencedApiSymbolsSection symbols={relatedSymbols} />
+        <OfficialDocsMetadata page={page} />
       </DocsBody>
     </DocsPage>
   );
