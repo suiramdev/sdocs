@@ -118,8 +118,8 @@ ulimit -n 65536
 - Entities: `data/api/entities/latest.json`
 
 The documentation toolchain is exposed as a standardized SDK-style toolset:
-`search_docs`, `resolve_symbol`, `get_symbol`, `get_type_members`,
-`get_method_details`, `get_examples`, and `list_namespaces`.
+`search_docs` for discovery across guides and API symbols, then `read_doc` for
+iterative deep reads on returned handles and references.
 
 ## Docker Deployment
 

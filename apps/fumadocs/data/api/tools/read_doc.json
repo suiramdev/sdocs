@@ -1,0 +1,32 @@
+{
+  "name": "read_doc",
+  "description": "Read any handle returned by search_docs or a previous read_doc reference. Returns the document, references, and tips for which references to read next.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "detail": {
+        "type": "string",
+        "enum": ["compact", "full"],
+        "description": "MCP response detail level. Defaults to compact; use full for a larger payload."
+      },
+      "target": {
+        "type": "string",
+        "description": "A docs://guide/..., docs://type/..., docs://member/..., URL, symbol id, or exact API symbol."
+      },
+      "includeContent": {
+        "type": "boolean",
+        "description": "Include guide markdown excerpts when reading guide pages. Defaults to true."
+      },
+      "includeReferences": {
+        "type": "boolean",
+        "description": "Include immediate references discovered from the target. Defaults to true."
+      }
+    },
+    "required": ["target"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/read_doc"
+  }
+}
