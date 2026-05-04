@@ -25,6 +25,7 @@ const keyAliases: Record<string, string> = {
   memberCounts: "counts",
   obsoleteMessage: "obsoleteReason",
   parameters: "params",
+  reason: "why",
   relatedExamples: "related",
   relatedGuides: "guides",
   relatedSymbols: "symbols",
@@ -212,6 +213,18 @@ const compactGuide = (value: unknown): JsonRecord => {
   }) as JsonRecord;
 };
 
+const compactWorkflow = (value: unknown): JsonRecord => {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return compactValue({
+    next: readArray(value, "nextTools"),
+    policy: value.policy,
+    resource: readString(value, "resource"),
+  }) as JsonRecord;
+};
+
 const compactExample = (value: unknown): JsonRecord => {
   if (!isRecord(value)) {
     return {};
@@ -226,15 +239,6 @@ const compactExample = (value: unknown): JsonRecord => {
     sourceKind: readString(value, "sourceKind"),
     start: readNumber(value, "lineStart"),
     symbol: compactSymbolRef(value.symbol),
-  }) as JsonRecord;
-};
-
-const compactSearchResult = (value: unknown): JsonRecord => {
-  const symbol = readRecord(value, "symbol");
-
-  return compactValue({
-    score: isRecord(value) ? readNumber(value, "score") : undefined,
-    ...compactSymbolRef(symbol),
   }) as JsonRecord;
 };
 
@@ -262,20 +266,6 @@ const compactNamespace = (value: unknown): JsonRecord => {
   }) as JsonRecord;
 };
 
-const compactSearchDocsResult = (result: unknown): unknown => {
-  if (!isRecord(result)) {
-    return compactValue(result);
-  }
-
-  return compactValue({
-    query: readString(result, "query"),
-    results: readArray(result, "results").map(compactSearchResult),
-    returned: readNumber(result, "returned"),
-    source: readString(result, "source"),
-    total: readNumber(result, "total"),
-  });
-};
-
 const compactResolveSymbolResult = (result: unknown): unknown => {
   if (!isRecord(result)) {
     return compactValue(result);
@@ -297,6 +287,34 @@ const compactGetSymbolResult = (result: unknown): unknown => {
     counts: result.memberCounts,
     guideCount: readArray(result, "relatedGuides").length,
     symbol: compactSymbolDetails(result.symbol),
+    workflow: compactWorkflow(result.workflow),
+  });
+};
+
+const compactExplainSymbolContextResult = (result: unknown): unknown => {
+  if (!isRecord(result)) {
+    return compactValue(result);
+  }
+
+  const context = readRecord(result, "context");
+
+  return compactValue({
+    context: {
+      counts: context?.memberCounts,
+      guideCount: context ? readNumber(context, "guideCount") : undefined,
+      guides: context ? readArray(context, "guides").map(compactGuide) : [],
+      members: context
+        ? readArray(context, "members").map((member) =>
+            compactSymbolRef(member)
+          )
+        : [],
+      returnedMembers: context
+        ? readNumber(context, "returnedMembers")
+        : undefined,
+      totalMembers: context ? readNumber(context, "totalMembers") : undefined,
+    },
+    symbol: compactSymbolDetails(result.symbol),
+    workflow: compactWorkflow(result.workflow),
   });
 };
 
@@ -312,6 +330,7 @@ const compactGetTypeMembersResult = (result: unknown): unknown => {
     ),
     returned: readNumber(result, "returned"),
     type: compactSymbolRef(result.type),
+    workflow: compactWorkflow(result.workflow),
   });
 };
 
@@ -323,6 +342,7 @@ const compactGetMethodDetailsResult = (result: unknown): unknown => {
   return compactValue({
     guideCount: readArray(result, "relatedGuides").length,
     method: compactSymbolDetails(result.method),
+    workflow: compactWorkflow(result.workflow),
   });
 };
 
@@ -365,14 +385,19 @@ const compactListNamespacesResult = (result: unknown): unknown => {
 };
 
 const toolResultCompactors: Record<ToolName, (result: unknown) => unknown> = {
+  expand_documentation: compactValue,
+  explain_symbol_context: compactExplainSymbolContextResult,
   get_examples: compactGetExamplesResult,
   get_method_details: compactGetMethodDetailsResult,
   get_related_guides: compactGetRelatedGuidesResult,
   get_symbol: compactGetSymbolResult,
   get_type_members: compactGetTypeMembersResult,
   list_namespaces: compactListNamespacesResult,
+  read_doc: compactValue,
+  read_documentation: compactValue,
   resolve_symbol: compactResolveSymbolResult,
-  search_docs: compactSearchDocsResult,
+  search_docs: compactValue,
+  search_documentation: compactValue,
 };
 
 export const compactMcpToolResult = (

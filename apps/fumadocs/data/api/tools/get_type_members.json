@@ -1,6 +1,6 @@
 {
   "name": "get_type_members",
-  "description": "List constructors, methods, and properties for a type.",
+  "description": "List constructors, methods, and properties for classes, structs, and interfaces. Do not use for enum values; use explain_symbol_context and get_related_guides for enum usage context.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,

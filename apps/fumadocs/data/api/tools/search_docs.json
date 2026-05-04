@@ -1,6 +1,6 @@
 {
   "name": "search_docs",
-  "description": "Search the indexed s&box API documentation and return ranked SDK-style symbols.",
+  "description": "Search official guides and all API symbols at once, including classes, enums, methods, constructors, and properties. Start here.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -12,42 +12,21 @@
       },
       "query": {
         "type": "string",
-        "description": "Keyword or natural-language documentation query."
+        "description": "Keyword, symbol name, or natural-language documentation question."
       },
       "limit": {
         "type": "integer",
         "minimum": 1,
         "maximum": 20,
-        "description": "Maximum number of results."
+        "description": "Maximum number of mixed documentation results."
       },
-      "namespace": {
-        "type": "string",
-        "description": "Optional exact namespace filter."
-      },
-      "typeName": {
-        "type": "string",
-        "description": "Optional declaring type filter."
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "class",
-          "struct",
-          "interface",
-          "enum",
-          "constructor",
-          "method",
-          "property"
-        ],
-        "description": "Optional symbol kind filter."
-      },
-      "includeObsolete": {
+      "includeGuides": {
         "type": "boolean",
-        "description": "Include obsolete symbols."
+        "description": "Include official guide pages."
       },
-      "useHybrid": {
+      "includeSymbols": {
         "type": "boolean",
-        "description": "Enable hybrid semantic and keyword ranking when available."
+        "description": "Include API symbols."
       }
     },
     "required": ["query"]
