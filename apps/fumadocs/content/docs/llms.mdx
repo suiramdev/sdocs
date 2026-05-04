@@ -1,0 +1,67 @@
+---
+title: LLM Text
+description: Set up agents that cannot use MCP by pointing them at the LLM-readable markdown documentation files.
+---
+
+Use `llms.txt` when your IDE, chat client, or coding agent can read web pages
+but cannot connect to the `sdocs` MCP server.
+
+The site exposes three LLM-readable entry points:
+
+- `/llms.txt`: curated index that follows the llms.txt proposal
+- `/llms.mdx/docs/...`: markdown mirrors for individual guide and API pages
+- `/llms-full.txt`: complete guide and API corpus for large-context agents
+
+## Recommended setup
+
+Add the public `sdocs` URL as documentation context in your agent. Replace
+`<docs-origin>` with the origin where this documentation site is deployed:
+
+```text
+<docs-origin>/llms.txt
+```
+
+If you are running the docs locally, use your local site origin instead:
+
+```text
+http://localhost:4000/llms.txt
+```
+
+Then ask your agent to read `/llms.txt` first and fetch linked markdown pages
+as needed. This keeps context usage lower than pasting the full documentation
+corpus into every conversation.
+
+## Large context setup
+
+Use `/llms-full.txt` only when your tool supports large context windows and can
+handle a full generated API reference in one request:
+
+```text
+<docs-origin>/llms-full.txt
+```
+
+This is useful for one-shot documentation ingestion, but most coding tasks
+should start from `/llms.txt` and pull only relevant API pages.
+
+## Prompt template
+
+Use this as a system or project instruction for non-MCP agents:
+
+```text
+For s&box documentation, read <docs-origin>/llms.txt first.
+Use the linked /llms.mdx/docs/... markdown pages as primary sources.
+Prefer targeted API type pages over /llms-full.txt unless broad context is required.
+When citing API details, include the type or member name from the markdown page.
+```
+
+## Choosing between MCP and llms.txt
+
+MCP is still the best option when your tool supports it because it can search,
+resolve symbols, inspect members, and return structured API metadata.
+
+Use `llms.txt` when your tool only supports URL-based documentation context,
+custom instructions, or manual web fetches.
+
+The format follows the [llms.txt proposal](https://llmstxt.org/): a markdown
+file at `/llms.txt` with a short project summary and curated file lists for
+agents to fetch at inference time.

@@ -14,5 +14,12 @@ types, inspecting members, and reading exact method details.
 Get started here:
 
 - **Connect via MCP**: [MCP](./mcp)
+- **Connect via llms.txt**: [LLM Text](./llms)
 
-Once connected, your agent can follow a standard SDK workflow: search the docs, resolve the exact type, inspect members, and then answer using the exact indexed API metadata.
+Once connected through MCP, your agent can follow a standard SDK workflow:
+search the docs, resolve the exact type, inspect members, and then answer using
+the exact indexed API metadata.
+
+If your agent does not support MCP, point it at `/llms.txt`. It can use that
+index to fetch clean markdown versions of the guide and generated API reference
+pages.
