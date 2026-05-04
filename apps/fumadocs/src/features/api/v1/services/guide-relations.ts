@@ -103,6 +103,32 @@ const EMPTY_GUIDE_RELATION_INDEX: GuideRelationIndex = {
 
 const normalizeLookup = (value: string): string => value.trim().toLowerCase();
 
+const stripCallableSuffix = (value: string): string =>
+  value.endsWith("()") ? value.slice(0, -2) : value;
+
+const getDottedIdentifierAliases = (token: string): string[] => {
+  const segments = stripCallableSuffix(token).split(".");
+  const aliases: string[] = [];
+  for (let endIndex = 1; endIndex < segments.length; endIndex += 1) {
+    aliases.push(segments.slice(0, endIndex).join("."));
+  }
+
+  for (let startIndex = 1; startIndex < segments.length - 1; startIndex += 1) {
+    aliases.push(segments.slice(startIndex).join("."));
+  }
+
+  return aliases.filter((alias) => alias.length >= MIN_TOKEN_LENGTH);
+};
+
+const appendDottedIdentifierAliases = (
+  tokens: Set<string>,
+  token: string
+): void => {
+  for (const alias of getDottedIdentifierAliases(token)) {
+    tokens.add(alias);
+  }
+};
+
 const getSimpleTypeName = (fullName: string): string =>
   fullName.split(".").at(-1) ?? fullName;
 
@@ -156,12 +182,21 @@ const collectGuidePageUrls = (node: Folder | Node, urls: Set<string>): void => {
   }
 };
 
-const extractIdentifierTokens = (value: string): ReadonlySet<string> =>
-  new Set(
-    [...value.matchAll(IDENTIFIER_TOKEN_PATTERN)]
-      .map((match) => normalizeLookup(match[0] ?? ""))
-      .filter((token) => token.length >= MIN_TOKEN_LENGTH)
-  );
+const extractIdentifierTokens = (value: string): ReadonlySet<string> => {
+  const tokens = new Set<string>();
+
+  for (const match of value.matchAll(IDENTIFIER_TOKEN_PATTERN)) {
+    const token = normalizeLookup(match[0] ?? "");
+    if (token.length < MIN_TOKEN_LENGTH) {
+      continue;
+    }
+
+    tokens.add(token);
+    appendDottedIdentifierAliases(tokens, token);
+  }
+
+  return tokens;
+};
 
 const extractCodeTokens = (markdown: string): ReadonlySet<string> => {
   const inlineSegments = [...markdown.matchAll(INLINE_CODE_PATTERN)].map(
@@ -282,7 +317,7 @@ const scoreSimpleTypeMention = (
   if (guide.codeTokens.has(normalizeLookup(simpleTypeName))) {
     return {
       matchedAliases: [simpleTypeName],
-      score: 6,
+      score: 14,
     };
   }
 
@@ -361,10 +396,7 @@ const scoreGuideForEntity = (
 ): GuideRelation | null => {
   const score = TYPE_ENTITY_KINDS.has(entity.entityKind)
     ? scoreTypeMentions(guide, entity)
-    : combineAliasScores(
-        scoreTypeMentions(guide, entity),
-        scoreMemberSpecificMentions(guide, entity)
-      );
+    : scoreMemberSpecificMentions(guide, entity);
 
   return toGuideRelation(guide, score);
 };

@@ -1,6 +1,6 @@
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.11
+    image: getmeili/meilisearch:v1.42.1
     container_name: api-meilisearch
     restart: unless-stopped
     ports:

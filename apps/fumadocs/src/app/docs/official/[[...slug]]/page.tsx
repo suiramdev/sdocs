@@ -19,6 +19,7 @@ import remarkRehype from "remark-rehype";
 import { visit } from "unist-util-visit";
 
 import { getGuideRelatedSymbols } from "@/features/api/v1/services/guide-relations";
+import type { RelatedGuideSymbol } from "@/features/api/v1/services/guide-relations";
 import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 import { getMDXComponents } from "@/features/docs/components/mdx-components";
 import {
@@ -80,6 +81,7 @@ const OFFICIAL_DOCS_ADMONITION_TYPE_MAP = {
 const ADMONITION_OPEN_PATTERN = /^(:{3,})([a-z]+)(?:\s+(.*))?$/;
 const ADMONITION_CLOSE_PATTERN = /^(:{3,})$/;
 const NORMALIZED_ADMONITION_PATTERN = /^\[!([A-Z]+)(?:\|([^\]]+))?\]\s*$/;
+const TYPE_SYMBOL_KINDS = new Set(["class", "enum", "interface", "struct"]);
 
 const buildExternalRel = (rel: string | undefined): string => {
   const tokens = new Set([
@@ -142,6 +144,106 @@ const OfficialDocsImage = ({
     {...props}
   />
 );
+
+const normalizeCodeReference = (value: string): string =>
+  value.trim().replace(/\(\)$/u, "").toLowerCase();
+
+const getCodeText = (children: ReactNode): string | null =>
+  typeof children === "string" || typeof children === "number"
+    ? String(children)
+    : null;
+
+const getSimpleSymbolName = (symbol: RelatedGuideSymbol): string =>
+  symbol.fullName.split(".").at(-1) ?? symbol.fullName;
+
+const getSymbolCodeAliases = (symbol: RelatedGuideSymbol): string[] => [
+  symbol.fullName,
+  getSimpleSymbolName(symbol),
+  ...symbol.matchedAliases,
+];
+
+const getAliasMatchScore = (
+  normalizedCodeReference: string,
+  normalizedAlias: string,
+  symbol: RelatedGuideSymbol
+): number => {
+  if (normalizedCodeReference === normalizedAlias) {
+    return 40;
+  }
+
+  if (normalizedCodeReference.startsWith(`${normalizedAlias}.`)) {
+    return TYPE_SYMBOL_KINDS.has(symbol.kind) ? 35 : 20;
+  }
+
+  return 0;
+};
+
+const getSymbolAliasMatchScore = (
+  normalizedCodeReference: string,
+  symbol: RelatedGuideSymbol
+): number => {
+  let bestScore = 0;
+
+  for (const alias of getSymbolCodeAliases(symbol)) {
+    const normalizedAlias = normalizeCodeReference(alias);
+    const aliasScore = getAliasMatchScore(
+      normalizedCodeReference,
+      normalizedAlias,
+      symbol
+    );
+    bestScore = Math.max(bestScore, aliasScore);
+  }
+
+  return bestScore;
+};
+
+const getSymbolCodeReferenceScore = (
+  codeReference: string,
+  symbol: RelatedGuideSymbol
+): number => {
+  const normalizedCodeReference = normalizeCodeReference(codeReference);
+  const aliasScore = getSymbolAliasMatchScore(normalizedCodeReference, symbol);
+
+  return aliasScore === 0 ? 0 : aliasScore + symbol.matchScore;
+};
+
+const findApiSymbolForCodeReference = (
+  codeReference: string,
+  symbols: RelatedGuideSymbol[]
+): RelatedGuideSymbol | null =>
+  symbols
+    .map((symbol) => ({
+      score: getSymbolCodeReferenceScore(codeReference, symbol),
+      symbol,
+    }))
+    .filter((match) => match.score > 0)
+    .toSorted((left, right) => right.score - left.score)
+    .at(0)?.symbol ?? null;
+
+const createOfficialDocsCode =
+  (symbols: RelatedGuideSymbol[]) =>
+  ({ children, className, ...props }: ComponentPropsWithoutRef<"code">) => {
+    const codeReference = getCodeText(children);
+    const symbol = codeReference
+      ? findApiSymbolForCodeReference(codeReference, symbols)
+      : null;
+
+    if (!symbol || className) {
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+
+    return (
+      <Link className="no-underline" href={symbol.docsUrl}>
+        <code className={className} {...props}>
+          {children}
+        </code>
+      </Link>
+    );
+  };
 
 const OfficialDocsCallout = ({
   children,
@@ -516,7 +618,8 @@ const createOfficialDocsAdmonitionPlugin =
   };
 
 const renderOfficialDocsMarkdown = async (
-  page: OfficialDocPage
+  page: OfficialDocPage,
+  relatedSymbols: RelatedGuideSymbol[]
 ): Promise<ReactNode> => {
   const renderer = createMarkdownRenderer({
     rehypePlugins: [createHeadingIdPlugin()],
@@ -532,6 +635,7 @@ const renderOfficialDocsMarkdown = async (
     components: getMDXComponents({
       OfficialDocsCallout,
       a: OfficialDocsAnchor,
+      code: createOfficialDocsCode(relatedSymbols),
       img: OfficialDocsImage,
     }),
   });
@@ -601,6 +705,31 @@ const getGuideResourceName = (page: OfficialDocPage): string => {
   return relativePath.length > 0 ? relativePath : "index";
 };
 
+const OfficialDocsMetadata = ({ page }: { page: OfficialDocPage }) => {
+  if (!page.createdAt && !page.updatedAt) {
+    return null;
+  }
+
+  return (
+    <footer className="mt-10 border-t pt-4 text-fd-muted-foreground text-xs">
+      <div className="flex flex-col gap-1">
+        {page.createdAt ? (
+          <div className="flex items-center gap-1.5">
+            <span>Created at:</span>
+            <time dateTime={page.createdAt}>{page.createdAt}</time>
+          </div>
+        ) : null}
+        {page.updatedAt ? (
+          <div className="flex items-center gap-1.5">
+            <span>Updated at:</span>
+            <time dateTime={page.updatedAt}>{page.updatedAt}</time>
+          </div>
+        ) : null}
+      </div>
+    </footer>
+  );
+};
+
 export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
   const params = await props.params;
   const page = await getOfficialDocPage(params.slug ?? []);
@@ -608,10 +737,10 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
     notFound();
   }
 
-  const description = await renderOfficialDocsDescription(page);
   const allRelatedSymbols = await getGuideRelatedSymbols(
     getGuideResourceName(page)
   );
+  const description = await renderOfficialDocsDescription(page);
   const relatedSymbols = allRelatedSymbols.slice(0, 8);
 
   return (
@@ -628,10 +757,12 @@ export default async function OfficialDocsPage(props: OfficialDocsPageProps) {
         }
         description={description}
         title={page.title}
+        titleIcon={page.icon}
       />
       <DocsBody>
-        {await renderOfficialDocsMarkdown(page)}
+        {await renderOfficialDocsMarkdown(page, allRelatedSymbols)}
         <ReferencedApiSymbolsSection symbols={relatedSymbols} />
+        <OfficialDocsMetadata page={page} />
       </DocsBody>
     </DocsPage>
   );

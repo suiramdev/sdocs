@@ -1,18 +1,10 @@
-import { source } from "@/features/docs/utils/source";
+import { getLLMSIndex } from "@/features/docs/utils/llms";
 
 export const revalidate = false;
 
-export const GET = () => {
-  const lines: string[] = [
-    "# s&box Documentation",
-    "",
-    ...source
-      .getPages()
-      .map(
-        (page) =>
-          `- [${page.data.title}](${page.url}): ${page.data.description}`
-      ),
-  ];
-
-  return new Response(lines.join("\n"));
-};
+export const GET = async (request: Request): Promise<Response> =>
+  new Response(await getLLMSIndex(request), {
+    headers: {
+      "Content-Type": "text/markdown; charset=utf-8",
+    },
+  });

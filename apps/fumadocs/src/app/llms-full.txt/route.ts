@@ -1,10 +1,10 @@
-import { getLLMText, source } from "@/features/docs/utils/source";
+import { getFullLLMText } from "@/features/docs/utils/llms";
 
 export const revalidate = false;
 
-export async function GET() {
-  const scan = source.getPages().map(getLLMText);
-  const scanned = await Promise.all(scan);
-
-  return new Response(scanned.join("\n\n"));
-}
+export const GET = async (): Promise<Response> =>
+  new Response(await getFullLLMText(), {
+    headers: {
+      "Content-Type": "text/markdown; charset=utf-8",
+    },
+  });
