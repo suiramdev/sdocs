@@ -74,7 +74,7 @@ export interface OfficialDocPage {
   description?: string;
   descriptionSource?: string;
   githubUrl: string;
-  icon?: string;
+  icon?: ReactNode;
   markdown: string;
   rawMarkdown: string;
   repoPath: string;
@@ -129,6 +129,7 @@ const ADMONITION_FENCE_PATTERN = /^:{3,}.*$/gmu;
 const DESCRIPTION_ADMONITION_OPEN_PATTERN =
   /^:{3,}[a-z]+(?:\s+\[([^\]]+)\])?\s*/gmu;
 const DESCRIPTION_ADMONITION_CLOSE_PATTERN = /^:{3,}\s*$/gmu;
+const MATERIAL_ICON_NAME_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/u;
 
 const buildGitHubApiUrl = (pathname: string): string =>
   `${GITHUB_API_BASE_URL}/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}${pathname}`;
@@ -534,6 +535,28 @@ const getOfficialDocIcon = async (
   return data.icon?.trim() || undefined;
 };
 
+const renderOfficialDocIcon = (
+  icon: string | undefined,
+  className: string
+): ReactNode | undefined => {
+  if (!icon) {
+    return undefined;
+  }
+
+  const isMaterialIcon = MATERIAL_ICON_NAME_PATTERN.test(icon);
+
+  return createElement(
+    "span",
+    {
+      "aria-hidden": true,
+      className: isMaterialIcon
+        ? `material-icons official-doc-material-icon ${className}`
+        : className,
+    },
+    icon
+  );
+};
+
 const getOfficialDocSidebarIcon = async (
   repoPath: string,
   sha: string
@@ -543,14 +566,7 @@ const getOfficialDocSidebarIcon = async (
     return undefined;
   }
 
-  return createElement(
-    "span",
-    {
-      "aria-hidden": true,
-      className: "me-0.5 inline-block shrink-0",
-    },
-    icon
-  );
+  return renderOfficialDocIcon(icon, "me-0.5 inline-block shrink-0");
 };
 
 const createOfficialFolderNode = async (
@@ -802,7 +818,7 @@ const buildOfficialDocPage = async (
     description: buildOfficialDocDescription(data, markdown),
     descriptionSource: getOfficialDocDescriptionSource(data, markdown),
     githubUrl: buildGitHubBlobUrl(repoPath),
-    icon: data.icon?.trim() || undefined,
+    icon: renderOfficialDocIcon(data.icon?.trim(), "inline-block shrink-0"),
     markdown,
     rawMarkdown,
     repoPath,

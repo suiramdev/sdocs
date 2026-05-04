@@ -261,12 +261,16 @@ const getIndexStats = async (
 
 const getVectorStoreFeatureKey = (
   features: ExperimentalFeaturesResponse
-): VectorStoreFeatureKey => {
+): VectorStoreFeatureKey | null => {
   if (typeof features.vectorStoreSetting === "boolean") {
     return "vectorStoreSetting";
   }
 
-  return "vectorStore";
+  if (typeof features.vectorStore === "boolean") {
+    return "vectorStore";
+  }
+
+  return null;
 };
 
 const enableVectorStoreExperimentalFeature = async (
@@ -274,6 +278,10 @@ const enableVectorStoreExperimentalFeature = async (
 ): Promise<void> => {
   const features = await getExperimentalFeatures(runtimeConfig);
   const vectorStoreFeatureKey = getVectorStoreFeatureKey(features);
+  if (!vectorStoreFeatureKey) {
+    return;
+  }
+
   if (features[vectorStoreFeatureKey] === true) {
     return;
   }
