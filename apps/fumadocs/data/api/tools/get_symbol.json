@@ -1,6 +1,6 @@
 {
   "name": "get_symbol",
-  "description": "Get structured metadata for a resolved API symbol.",
+  "description": "Get structured metadata for a resolved API symbol. Follow guideCount and workflow.next when broader context exists.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,

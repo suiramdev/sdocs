@@ -176,11 +176,14 @@ In practice, an agent will usually:
 
 1. Call `search_docs` to find the most relevant symbols for a question
 2. Call `resolve_symbol` if a short name like `Component` or `Scene` is ambiguous
-3. Call `get_symbol` or `get_type_members` to inspect a resolved type
-4. Call `get_method_details` to inspect one exact overload
-5. Call `get_related_guides` when broader usage context is needed
-6. Call `get_examples` when sample code is needed
-7. Call `list_namespaces` when exploring the API tree from the top down
+3. Call `explain_symbol_context` for compact symbol metadata, guide handles,
+   member handles, and next-tool hints
+4. Follow `workflow.next` from compact outputs when deeper context is needed
+5. Call `get_symbol` or `get_type_members` for focused API inspection
+6. Call `get_method_details` to inspect one exact overload
+7. Call `get_related_guides` when broader usage context is recommended
+8. Call `get_examples` when sample code is needed
+9. Call `list_namespaces` when exploring the API tree from the top down
 
 This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
@@ -287,6 +290,8 @@ Example use:
 
 - Find methods related to `Sandbox.Component`
 - Search for `Ray`, `SceneTrace`, or `GameObject` by concept instead of exact id
+- Use the best result with `explain_symbol_context` before answering usage
+  questions
 
 ### `resolve_symbol`
 
@@ -313,6 +318,38 @@ Example use:
 - Resolve `Component` before inspecting members
 - Narrow `Scene` or `Transform` to the exact s&box type you need
 
+### `explain_symbol_context`
+
+Use this after `search_docs` or `resolve_symbol` when the user asks what a
+symbol is, how to use an API, or needs enough context to choose the next lookup.
+It intentionally returns a compact envelope instead of loading full guide pages.
+
+Typical input:
+
+```json
+{
+  "symbol": "Sandbox.Component",
+  "memberLimit": 24
+}
+```
+
+Typical TOON output includes:
+
+- Symbol summary, signature, remarks, and declaration context
+- Top related guide titles and `docs://guide/...` handles
+- Compact type member handles when the symbol is a type
+- `workflow.resource` for the canonical `docs://type/...` or
+  `docs://member/...` page
+- `workflow.next` recommendations such as `get_type_members`,
+  `get_related_guides`, `get_method_details`, or `get_examples`
+
+Example use:
+
+- Ask "what is `NetworkMode`?" and receive the enum metadata plus related guide
+  handles without loading full guide text
+- Ask "how do I use `Sandbox.Component`?" and receive member and guide handles
+  that point to the next focused lookup
+
 ### `get_symbol`
 
 Use this to inspect one resolved symbol. It returns structured metadata for a
@@ -332,11 +369,14 @@ Typical TOON output includes:
 - Symbol kind such as class, struct, enum, method, or property
 - Signature and summary
 - URLs, inheritance or declaration context when available
+- `guideCount` and `workflow.next` when broader guide context exists
 
 Example use:
 
 - Read the summary for `Sandbox.Component`
 - Inspect a property or exact member after resolving its symbol id
+- Follow `workflow.next` to `get_related_guides` before explaining conceptual
+  usage
 
 ### `get_type_members`
 
@@ -517,9 +557,11 @@ behaved agent will usually:
 
 1. Use `search_docs` with a query like `component update every frame`
 2. Use `resolve_symbol` if it needs to confirm `Component` means `Sandbox.Component`
-3. Use `get_symbol` to inspect the type summary
-4. Use `get_type_members` to find lifecycle members such as `OnUpdate`
-5. Use `get_related_guides` to find the most relevant Guide pages for
+3. Use `explain_symbol_context` to get compact type, member, guide, and
+   workflow hints
+4. Use `get_type_members` to find lifecycle members such as `OnUpdate` if the
+   compact member handles are not enough
+5. Use `get_related_guides` when `workflow.next` recommends it for
    `Sandbox.Component` or `Sandbox.Component.OnUpdate()`
 6. Read `docs://member/Sandbox.Component.OnUpdate` for the canonical API
    contract

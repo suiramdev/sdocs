@@ -1,0 +1,47 @@
+{
+  "name": "explain_symbol_context",
+  "description": "Best first tool for understanding a resolved symbol. Returns compact symbol details, top member handles, related guide handles, resource URI, and recommended next tools without loading full guide pages.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "detail": {
+        "type": "string",
+        "enum": ["compact", "full"],
+        "description": "MCP response detail level. Defaults to compact; use full for a larger payload."
+      },
+      "symbol": {
+        "type": "string",
+        "description": "Exact symbol id, fully-qualified type name, or fully-qualified member signature."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "class",
+          "struct",
+          "interface",
+          "enum",
+          "constructor",
+          "method",
+          "property"
+        ],
+        "description": "Optional expected symbol kind."
+      },
+      "includeMembers": {
+        "type": "boolean",
+        "description": "Include a compact list of type members. Defaults to true for types and false for members."
+      },
+      "memberLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "description": "Maximum number of compact type members to include in the context envelope."
+      }
+    },
+    "required": ["symbol"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/explain_symbol_context"
+  }
+}

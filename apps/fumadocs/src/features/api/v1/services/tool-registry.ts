@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import type { ToolName } from "@/features/api/v1/domain/schemas";
 import {
+  explainSymbolContextToolInputSchema,
   getExamplesToolInputSchema,
   getMethodDetailsToolInputSchema,
   getRelatedGuidesToolInputSchema,
@@ -12,6 +13,7 @@ import {
   searchDocsToolInputSchema,
 } from "@/features/api/v1/domain/schemas";
 import {
+  explainApiReferenceSymbolContext,
   getApiReferenceExamples,
   getApiReferenceMethodDetails,
   getApiReferenceRelatedGuides,
@@ -136,6 +138,45 @@ const getSymbolInputSchema: JsonSchema = {
         "property",
       ],
       type: "string",
+    },
+    symbol: {
+      description:
+        "Exact symbol id, fully-qualified type name, or fully-qualified member signature.",
+      type: "string",
+    },
+  },
+  required: ["symbol"],
+  type: "object",
+};
+
+const explainSymbolContextInputSchema: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    detail: detailModeInputProperty,
+    includeMembers: {
+      description:
+        "Include a compact list of type members. Defaults to true for types and false for members.",
+      type: "boolean",
+    },
+    kind: {
+      description: "Optional expected symbol kind.",
+      enum: [
+        "class",
+        "struct",
+        "interface",
+        "enum",
+        "constructor",
+        "method",
+        "property",
+      ],
+      type: "string",
+    },
+    memberLimit: {
+      description:
+        "Maximum number of compact type members to include in the context envelope.",
+      maximum: 50,
+      minimum: 1,
+      type: "integer",
     },
     symbol: {
       description:
@@ -273,6 +314,17 @@ const listNamespacesInputSchema: JsonSchema = {
 };
 
 const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
+  explain_symbol_context: {
+    description:
+      "Best first tool for 'what is this symbol?' or 'how do I use this API?'. Returns compact symbol details, top member handles, related guide handles, resource URI, and recommended next tools without loading full guide pages.",
+    execute: async (input) => {
+      const parsed = explainSymbolContextToolInputSchema.parse(input);
+      return await explainApiReferenceSymbolContext(parsed);
+    },
+    inputSchema: explainSymbolContextInputSchema,
+    name: "explain_symbol_context",
+    schema: explainSymbolContextToolInputSchema,
+  },
   get_examples: {
     description:
       "Fetch direct code examples for a symbol, plus declaring-type examples when available.",
@@ -297,7 +349,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
   },
   get_related_guides: {
     description:
-      "Fetch related official guides for a symbol so the agent can read broader conceptual and workflow documentation.",
+      "Use after get_symbol, get_method_details, or explain_symbol_context when guideCount is non-zero or the user needs conceptual usage, editor workflow, lifecycle, or broader method guidance.",
     execute: async (input) => {
       const parsed = getRelatedGuidesToolInputSchema.parse(input);
       return await getApiReferenceRelatedGuides(parsed);
@@ -308,7 +360,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
   },
   get_symbol: {
     description:
-      "Retrieve structured metadata for a resolved symbol or type, including declaration and documentation summary.",
+      "Retrieve structured metadata for a resolved symbol or type. If the compact result has guideCount or workflow.next includes get_related_guides, call get_related_guides before explaining conceptual usage.",
     execute: async (input) => {
       const parsed = getSymbolToolInputSchema.parse(input);
       return await getApiReferenceSymbol(parsed);
@@ -319,7 +371,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
   },
   get_type_members: {
     description:
-      "List constructors, methods, and properties for a specific type in a .NET-style member model.",
+      "List constructors, methods, and properties for a specific type. Use this for member discovery only; call get_related_guides or explain_symbol_context for conceptual context.",
     execute: async (input) => {
       const parsed = getTypeMembersToolInputSchema.parse(input);
       return await getApiReferenceTypeMembers(parsed);
@@ -352,7 +404,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
   },
   search_docs: {
     description:
-      "Search the indexed s&box API docs first, then inspect specific types and members with the other documentation tools.",
+      "Search the indexed s&box API docs first. For a symbol result, prefer explain_symbol_context next; use get_symbol for raw metadata, get_type_members for member discovery, and get_related_guides for conceptual docs.",
     execute: async (input) => {
       const parsed = searchDocsToolInputSchema.parse(input);
       return await searchApiReference(parsed);
@@ -366,6 +418,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
 const toolRuntime = Object.freeze([
   toolRuntimeByName.search_docs,
   toolRuntimeByName.resolve_symbol,
+  toolRuntimeByName.explain_symbol_context,
   toolRuntimeByName.get_symbol,
   toolRuntimeByName.get_type_members,
   toolRuntimeByName.get_method_details,

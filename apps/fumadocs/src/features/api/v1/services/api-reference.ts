@@ -6,6 +6,7 @@ import { ApiV1Error } from "@/features/api/v1/domain/errors";
 import type { SearchDocsToolInput } from "@/features/api/v1/domain/schemas";
 
 import {
+  explainDocumentationSymbolContext,
   getDocumentationExamples,
   getDocumentationMethodDetails,
   getDocumentationRelatedGuides,
@@ -65,6 +66,20 @@ export const getApiReferenceSymbol = (input: {
     | "struct";
   symbol: string;
 }) => getDocumentationSymbol(input);
+
+export const explainApiReferenceSymbolContext = (input: {
+  includeMembers?: boolean;
+  kind?:
+    | "class"
+    | "constructor"
+    | "enum"
+    | "interface"
+    | "method"
+    | "property"
+    | "struct";
+  memberLimit?: number;
+  symbol: string;
+}) => explainDocumentationSymbolContext(input);
 
 export const getApiReferenceTypeMembers = (input: {
   includeObsolete?: boolean;

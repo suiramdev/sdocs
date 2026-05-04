@@ -14,6 +14,7 @@ import { searchApiService } from "@/features/api/utils/service";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
 
 import { getRelatedGuidesForEntity } from "./guide-relations";
+import type { RelatedGuide } from "./guide-relations";
 
 const TYPE_KINDS = new Set<ApiEntityKind>([
   "class",
@@ -66,6 +67,11 @@ interface ResolveSymbolInput {
 interface GetSymbolInput {
   kind?: ApiEntityKind;
   symbol: string;
+}
+
+interface ExplainSymbolContextInput extends GetSymbolInput {
+  includeMembers?: boolean;
+  memberLimit?: number;
 }
 
 interface GetTypeMembersInput {
@@ -125,6 +131,11 @@ interface DocumentationSymbolDetails extends DocumentationSymbolRef {
 interface DocumentationSearchHit {
   score?: number;
   symbol: DocumentationSymbolRef;
+}
+
+interface DocumentationWorkflowHint {
+  reason: string;
+  tool: string;
 }
 
 interface ResolveSymbolMatch {
@@ -274,6 +285,50 @@ const getTypeCounts = (
   method: members.filter((member) => member.entityKind === "method").length,
   property: members.filter((member) => member.entityKind === "property").length,
 });
+
+const getSymbolResourceUri = (entity: ApiEntity): string =>
+  isTypeEntity(entity)
+    ? `docs://type/${encodeURIComponent(entity.class)}`
+    : `docs://member/${encodeURIComponent(entity.signature)}`;
+
+const getSymbolWorkflowHints = (
+  entity: ApiEntity,
+  relatedGuides: RelatedGuide[],
+  memberCount?: number
+): DocumentationWorkflowHint[] => {
+  const hints: DocumentationWorkflowHint[] = [];
+
+  if (isTypeEntity(entity) && memberCount !== undefined && memberCount > 0) {
+    hints.push({
+      reason: "Discover constructors, methods, and properties.",
+      tool: "get_type_members",
+    });
+  }
+
+  if (isMethodEntity(entity)) {
+    hints.push({
+      reason:
+        "Load exact overload, parameter, return, and exception contracts.",
+      tool: "get_method_details",
+    });
+  }
+
+  if (relatedGuides.length > 0) {
+    hints.push({
+      reason: "Read conceptual usage and workflow guidance.",
+      tool: "get_related_guides",
+    });
+  }
+
+  if (entity.examples.length > 0 || isMemberEntity(entity)) {
+    hints.push({
+      reason: "Fetch compact code samples.",
+      tool: "get_examples",
+    });
+  }
+
+  return hints;
+};
 
 const createTypeCounts = (): Record<DocumentationTypeKind, number> => ({
   class: 0,
@@ -1028,6 +1083,10 @@ export const getDocumentationSymbol = async (input: GetSymbolInput) => {
     return {
       relatedGuides,
       symbol: details,
+      workflow: {
+        nextTools: getSymbolWorkflowHints(entity, relatedGuides),
+        resource: getSymbolResourceUri(entity),
+      },
     };
   }
 
@@ -1037,6 +1096,62 @@ export const getDocumentationSymbol = async (input: GetSymbolInput) => {
     memberCounts: getTypeCounts(members),
     relatedGuides,
     symbol: details,
+    workflow: {
+      nextTools: getSymbolWorkflowHints(entity, relatedGuides, members.length),
+      resource: getSymbolResourceUri(entity),
+    },
+  };
+};
+
+export const explainDocumentationSymbolContext = async (
+  input: ExplainSymbolContextInput
+) => {
+  const entity = await resolveSymbolEntity(input);
+  const symbol = toSymbolDetails(entity);
+  const relatedGuides = await getRelatedGuidesForEntity(entity, 4);
+  const shouldIncludeMembers = input.includeMembers ?? isTypeEntity(entity);
+
+  if (!(isTypeEntity(entity) && shouldIncludeMembers)) {
+    return {
+      context: {
+        guideCount: relatedGuides.length,
+        guides: relatedGuides,
+        memberCounts: undefined,
+        members: [],
+      },
+      symbol,
+      workflow: {
+        nextTools: getSymbolWorkflowHints(entity, relatedGuides),
+        resource: getSymbolResourceUri(entity),
+      },
+    };
+  }
+
+  const members = await loadTypeMembers(entity);
+  const memberLimit = input.memberLimit ?? 24;
+  const visibleMembers = members
+    .filter((member) => member.isObsolete === false)
+    .toSorted((left, right) => left.signature.localeCompare(right.signature))
+    .slice(0, memberLimit)
+    .map((member) => ({
+      ...toSymbolRef(member),
+      returnType: member.returnType,
+    }));
+
+  return {
+    context: {
+      guideCount: relatedGuides.length,
+      guides: relatedGuides,
+      memberCounts: getTypeCounts(members),
+      members: visibleMembers,
+      returnedMembers: visibleMembers.length,
+      totalMembers: members.length,
+    },
+    symbol,
+    workflow: {
+      nextTools: getSymbolWorkflowHints(entity, relatedGuides, members.length),
+      resource: getSymbolResourceUri(entity),
+    },
   };
 };
 
@@ -1083,6 +1198,10 @@ export const getDocumentationMethodDetails = async (
   return {
     method: toSymbolDetails(methodEntity),
     relatedGuides,
+    workflow: {
+      nextTools: getSymbolWorkflowHints(methodEntity, relatedGuides),
+      resource: getSymbolResourceUri(methodEntity),
+    },
   };
 };
 

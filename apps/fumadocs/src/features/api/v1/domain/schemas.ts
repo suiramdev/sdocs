@@ -25,6 +25,7 @@ export const entityIdSchema = z.object({
 });
 
 export const toolNameSchema = z.enum([
+  "explain_symbol_context",
   "get_examples",
   "get_method_details",
   "get_related_guides",
@@ -67,6 +68,14 @@ export const resolveSymbolToolInputSchema = z.object({
 export const getSymbolToolInputSchema = z.object({
   detail: mcpDetailModeSchema,
   kind: z.enum(apiEntityKinds).optional(),
+  symbol: z.string().trim().min(1),
+});
+
+export const explainSymbolContextToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
+  includeMembers: z.boolean().optional(),
+  kind: z.enum(apiEntityKinds).optional(),
+  memberLimit: z.number().int().min(1).max(50).optional(),
   symbol: z.string().trim().min(1),
 });
 
