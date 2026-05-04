@@ -9,16 +9,19 @@ interface DocsPageHeaderProps {
   description?: ReactNode;
   descriptionClassName?: string;
   dividerClassName?: string;
+  metadata?: ReactNode;
+  metadataClassName?: string;
   title: ReactNode;
   titleClassName?: string;
+  titleIcon?: ReactNode;
 }
 
-const hasDescriptionContent = (description: ReactNode): boolean => {
-  if (typeof description === "string") {
-    return description.trim().length > 0;
+const hasContent = (content: ReactNode): boolean => {
+  if (typeof content === "string") {
+    return content.trim().length > 0;
   }
 
-  return description !== null && description !== undefined;
+  return content !== null && content !== undefined;
 };
 
 export const DocsPageHeader = ({
@@ -27,15 +30,39 @@ export const DocsPageHeader = ({
   description,
   descriptionClassName,
   dividerClassName,
+  metadata,
+  metadataClassName,
   title,
   titleClassName,
+  titleIcon,
 }: DocsPageHeaderProps) => (
   <>
-    <DocsTitle className={titleClassName}>{title}</DocsTitle>
-    {hasDescriptionContent(description) ? (
+    <DocsTitle className={titleClassName}>
+      {titleIcon ? (
+        <span className="inline-flex items-baseline gap-3">
+          <span aria-hidden="true" className="shrink-0">
+            {titleIcon}
+          </span>
+          <span>{title}</span>
+        </span>
+      ) : (
+        title
+      )}
+    </DocsTitle>
+    {hasContent(description) ? (
       <DocsDescription className={cn("mb-0", descriptionClassName)}>
         {description}
       </DocsDescription>
+    ) : null}
+    {hasContent(metadata) ? (
+      <div
+        className={cn(
+          "mt-3 text-fd-muted-foreground text-sm",
+          metadataClassName
+        )}
+      >
+        {metadata}
+      </div>
     ) : null}
     <div className={cn("border-b pb-6", dividerClassName)}>
       {actions ? (

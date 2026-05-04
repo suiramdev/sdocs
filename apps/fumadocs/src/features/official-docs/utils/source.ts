@@ -6,6 +6,8 @@ import { initSimpleSearch } from "fumadocs-core/search/server";
 import type { SearchServer } from "fumadocs-core/search/server";
 import "server-only";
 import { load as loadYaml } from "js-yaml";
+import { createElement } from "react";
+import type { ReactNode } from "react";
 import remarkGfm from "remark-gfm";
 
 const DOCS_ROOT = "docs";
@@ -68,9 +70,11 @@ interface SearchIndexEntry {
 
 export interface OfficialDocPage {
   breadcrumbs: string[];
+  createdAt?: string;
   description?: string;
   descriptionSource?: string;
   githubUrl: string;
+  icon?: string;
   markdown: string;
   rawMarkdown: string;
   repoPath: string;
@@ -78,6 +82,7 @@ export interface OfficialDocPage {
   slugs: string[];
   title: string;
   toc: Awaited<ReturnType<typeof getTableOfContents>>;
+  updatedAt?: string;
   url: string;
 }
 
@@ -279,7 +284,15 @@ const readFrontmatterString = (
   }
 
   const value = parsedYaml[key];
-  return typeof value === "string" ? value : undefined;
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return undefined;
 };
 
 const toFrontmatterData = (parsedYaml: unknown): FrontmatterData => ({
@@ -511,6 +524,35 @@ const hasMeaningfulIndexPage = async (
   return hasMeaningfulBodyContent(markdown);
 };
 
+const getOfficialDocIcon = async (
+  repoPath: string,
+  sha: string
+): Promise<string | undefined> => {
+  const rawMarkdown = await getOfficialDocRaw(repoPath, sha);
+  const { data } = parseFrontmatter(rawMarkdown);
+
+  return data.icon?.trim() || undefined;
+};
+
+const getOfficialDocSidebarIcon = async (
+  repoPath: string,
+  sha: string
+): Promise<ReactNode | undefined> => {
+  const icon = await getOfficialDocIcon(repoPath, sha);
+  if (!icon) {
+    return undefined;
+  }
+
+  return createElement(
+    "span",
+    {
+      "aria-hidden": true,
+      className: "me-0.5 inline-block shrink-0",
+    },
+    icon
+  );
+};
+
 const createOfficialFolderNode = async (
   childItems: Node[],
   indexPath: string,
@@ -526,27 +568,35 @@ const createOfficialFolderNode = async (
     type: "folder",
   };
 
-  if (tree.has(indexPath) && (await hasMeaningfulIndexPage(indexPath, sha))) {
-    folder.index = {
-      name: item.name,
-      type: "page",
-      url: toOfficialDocUrl(indexPath),
-    };
+  if (tree.has(indexPath)) {
+    const icon = await getOfficialDocSidebarIcon(indexPath, sha);
+    folder.icon = icon;
+
+    if (await hasMeaningfulIndexPage(indexPath, sha)) {
+      folder.index = {
+        icon,
+        name: item.name,
+        type: "page",
+        url: toOfficialDocUrl(indexPath),
+      };
+    }
   }
 
   return folder;
 };
 
-const buildOfficialPageNode = (
+const buildOfficialPageNode = async (
   resolvedPath: string,
   item: TocEntry,
+  sha: string,
   tree: ReadonlyMap<string, GitHubTreeEntry>
-): Item | null => {
+): Promise<Item | null> => {
   if (!tree.has(resolvedPath)) {
     return null;
   }
 
   return {
+    icon: await getOfficialDocSidebarIcon(resolvedPath, sha),
     name: item.name,
     type: "page",
     url: toOfficialDocUrl(resolvedPath),
@@ -582,7 +632,7 @@ const buildOfficialDocTreeNode = async (
     );
   }
 
-  return buildOfficialPageNode(resolvedPath, item, tree);
+  return buildOfficialPageNode(resolvedPath, item, sha, tree);
 };
 
 const buildOfficialDocTreeNodes = async (
@@ -748,9 +798,11 @@ const buildOfficialDocPage = async (
 
   return {
     breadcrumbs,
+    createdAt: data.created?.trim() || undefined,
     description: buildOfficialDocDescription(data, markdown),
     descriptionSource: getOfficialDocDescriptionSource(data, markdown),
     githubUrl: buildGitHubBlobUrl(repoPath),
+    icon: data.icon?.trim() || undefined,
     markdown,
     rawMarkdown,
     repoPath,
@@ -758,6 +810,7 @@ const buildOfficialDocPage = async (
     slugs: normalizedSlugs,
     title,
     toc: await getTableOfContents(markdown, [remarkGfm]),
+    updatedAt: data.updated?.trim() || undefined,
     url,
   };
 };
