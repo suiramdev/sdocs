@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/icon?family=Material+Icons");
 @import "tailwindcss";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-ui/css/neutral.css";
@@ -134,4 +135,22 @@
 
 .dark .shiki code span.code-token {
   color: var(--syntax-dark, var(--syntax-light, currentColor)) !important;
+}
+
+.official-doc-material-icon {
+  direction: ltr;
+  display: inline-block;
+  font-family: "Material Icons";
+  font-size: 1em;
+  font-style: normal;
+  font-feature-settings: "liga";
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  vertical-align: -0.125em;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
 }
