@@ -12,8 +12,15 @@ import type {
 } from "@/features/api/utils/schemas";
 import { searchApiService } from "@/features/api/utils/service";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
+import {
+  getOfficialDocPage,
+  getOfficialDocsSearch,
+} from "@/features/official-docs/utils/source";
 
-import { getRelatedGuidesForEntity } from "./guide-relations";
+import {
+  getGuideRelatedSymbols,
+  getRelatedGuidesForEntity,
+} from "./guide-relations";
 import type { RelatedGuide } from "./guide-relations";
 
 const TYPE_KINDS = new Set<ApiEntityKind>([
@@ -55,6 +62,24 @@ interface DocumentationSearchInput {
   query: string;
   typeName?: string;
   useHybrid?: boolean;
+}
+
+interface SearchDocumentationInput {
+  includeGuides?: boolean;
+  includeSymbols?: boolean;
+  limit?: number;
+  query: string;
+}
+
+interface ReadDocumentationInput {
+  includeContent?: boolean;
+  includeReferences?: boolean;
+  target: string;
+}
+
+interface ExpandDocumentationInput {
+  limit?: number;
+  target: string;
 }
 
 interface ResolveSymbolInput {
@@ -133,9 +158,25 @@ interface DocumentationSearchHit {
   symbol: DocumentationSymbolRef;
 }
 
+interface DocumentationSearchResult {
+  handle: string;
+  kind: ApiEntityKind | "guide";
+  next: string;
+  score?: number;
+  source: "api" | "guide";
+  summary: string;
+  title: string;
+  url: string;
+}
+
 interface DocumentationWorkflowHint {
   reason: string;
   tool: string;
+}
+
+interface DocumentationWorkflowPolicy {
+  answerRequiresGuideLookup: boolean;
+  notes: string[];
 }
 
 interface ResolveSymbolMatch {
@@ -233,6 +274,75 @@ const getQualifiedMemberName = (entity: ApiEntity): string =>
 const getCanonicalFullName = (entity: ApiEntity): string =>
   isTypeEntity(entity) ? getQualifiedTypeName(entity) : entity.signature;
 
+const guideResourceUriFromUrl = (url: string): string => {
+  const path = url
+    .replace(/^https?:\/\/[^/]+/u, "")
+    .replace(/^\/docs\/?/u, "")
+    .replace(/^\/+/u, "")
+    .replace(/\/+$/u, "");
+
+  return `docs://guide/${path || "index"}`;
+};
+
+const guideSlugsFromTarget = (target: string): string[] => {
+  const rawPath = target
+    .replace(/^docs:\/\/guide\/?/u, "")
+    .replace(/^https?:\/\/[^/]+\/docs\/?/u, "")
+    .replace(/^\/docs\/?/u, "")
+    .replace(/^\/+/u, "")
+    .replace(/\/+$/u, "");
+
+  return rawPath.length === 0 || rawPath === "index"
+    ? []
+    : rawPath.split("/").map((segment) => decodeURIComponent(segment));
+};
+
+const readUnknownRecordString = (
+  value: unknown,
+  key: string
+): string | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return;
+  }
+
+  const child = (value as Record<string, unknown>)[key];
+  return typeof child === "string" && child.length > 0 ? child : undefined;
+};
+
+const readUnknownRecordNumber = (
+  value: unknown,
+  key: string
+): number | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return;
+  }
+
+  const child = (value as Record<string, unknown>)[key];
+  return typeof child === "number" && Number.isFinite(child)
+    ? child
+    : undefined;
+};
+
+const toGuideSearchResult = (result: unknown): DocumentationSearchResult => {
+  const url = readUnknownRecordString(result, "url") ?? "/docs";
+  const title = readUnknownRecordString(result, "content") ?? "Guide";
+  const summary =
+    readUnknownRecordString(result, "description") ??
+    readUnknownRecordString(result, "content") ??
+    "Official guide page.";
+
+  return {
+    handle: guideResourceUriFromUrl(url),
+    kind: "guide",
+    next: "Call read_doc with this handle to read the guide and inspect referenced API symbols.",
+    score: readUnknownRecordNumber(result, "score"),
+    source: "guide",
+    summary,
+    title,
+    url,
+  };
+};
+
 const matchesTypeReference = (typeName: string, reference: string): boolean => {
   const normalizedReference = normalizeLookup(reference);
 
@@ -291,6 +401,20 @@ const getSymbolResourceUri = (entity: ApiEntity): string =>
     ? `docs://type/${encodeURIComponent(entity.class)}`
     : `docs://member/${encodeURIComponent(entity.signature)}`;
 
+const toApiSearchResult = (
+  entity: ApiEntity,
+  score?: number
+): DocumentationSearchResult => ({
+  handle: getSymbolResourceUri(entity),
+  kind: entity.entityKind,
+  next: "Call read_doc with this handle to read the API entity and inspect related references.",
+  score,
+  source: "api",
+  summary: toSummary(entity),
+  title: getCanonicalFullName(entity),
+  url: entity.url,
+});
+
 const getSymbolWorkflowHints = (
   entity: ApiEntity,
   relatedGuides: RelatedGuide[],
@@ -298,7 +422,12 @@ const getSymbolWorkflowHints = (
 ): DocumentationWorkflowHint[] => {
   const hints: DocumentationWorkflowHint[] = [];
 
-  if (isTypeEntity(entity) && memberCount !== undefined && memberCount > 0) {
+  if (
+    isTypeEntity(entity) &&
+    entity.entityKind !== "enum" &&
+    memberCount !== undefined &&
+    memberCount > 0
+  ) {
     hints.push({
       reason: "Discover constructors, methods, and properties.",
       tool: "get_type_members",
@@ -329,6 +458,40 @@ const getSymbolWorkflowHints = (
 
   return hints;
 };
+
+const getSymbolWorkflowPolicy = (
+  entity: ApiEntity,
+  relatedGuides: RelatedGuide[]
+): DocumentationWorkflowPolicy => {
+  const notes: string[] = [];
+
+  if (entity.entityKind === "enum") {
+    notes.push(
+      "Enum values are not modeled as get_type_members results in this index."
+    );
+  }
+
+  if (relatedGuides.length > 0) {
+    notes.push(
+      "Call get_related_guides before answering conceptual or usage questions."
+    );
+  }
+
+  return {
+    answerRequiresGuideLookup: relatedGuides.length > 0,
+    notes,
+  };
+};
+
+const getSymbolWorkflow = (
+  entity: ApiEntity,
+  relatedGuides: RelatedGuide[],
+  memberCount?: number
+) => ({
+  nextTools: getSymbolWorkflowHints(entity, relatedGuides, memberCount),
+  policy: getSymbolWorkflowPolicy(entity, relatedGuides),
+  resource: getSymbolResourceUri(entity),
+});
 
 const createTypeCounts = (): Record<DocumentationTypeKind, number> => ({
   class: 0,
@@ -996,6 +1159,227 @@ const resolveSymbolEntity = async (
   return await resolveFallbackSymbolEntity(input.symbol);
 };
 
+const symbolFromDocumentationTarget = (target: string): string => {
+  if (target.startsWith("docs://type/")) {
+    return decodeURIComponent(target.replace("docs://type/", ""));
+  }
+
+  if (target.startsWith("docs://member/")) {
+    return decodeURIComponent(target.replace("docs://member/", ""));
+  }
+
+  return target;
+};
+
+const isGuideDocumentationTarget = (target: string): boolean =>
+  target.startsWith("docs://guide/") ||
+  target.startsWith("/docs/") ||
+  target.startsWith("https://sbox.game/docs/") ||
+  target.startsWith("https://sbox.facepunch.com/docs/");
+
+const getGuideResourceName = (target: string): string => {
+  const slugs = guideSlugsFromTarget(target);
+  return slugs.length > 0 ? slugs.join("/") : "index";
+};
+
+export const searchDocumentationAcrossSources = async (
+  input: SearchDocumentationInput
+) => {
+  const limit = input.limit ?? 8;
+  const includeSymbols = input.includeSymbols ?? true;
+  const includeGuides = input.includeGuides ?? true;
+  const [apiResponse, guideResponse] = await Promise.all([
+    includeSymbols
+      ? searchApiService({
+          limit,
+          query: input.query,
+          useHybrid: true,
+        })
+      : Promise.resolve(null),
+    includeGuides
+      ? getOfficialDocsSearch()
+          .then((search) => search.search(input.query) as Promise<unknown[]>)
+          .catch(() => [])
+      : Promise.resolve([]),
+  ]);
+  const apiEntities = apiResponse
+    ? await Promise.all(
+        apiResponse.results.map((result) => getEntityById(result.id))
+      )
+    : [];
+  const apiResults =
+    apiResponse?.results
+      .map((result, index) => {
+        const entity = apiEntities.at(index);
+        return entity ? toApiSearchResult(entity, result.score) : null;
+      })
+      .filter((result): result is DocumentationSearchResult => result !== null)
+      .slice(0, limit) ?? [];
+  const guideResults = guideResponse.slice(0, limit).map(toGuideSearchResult);
+  const results = [...apiResults, ...guideResults].slice(0, limit);
+
+  return {
+    query: input.query,
+    results,
+    returned: results.length,
+    workflow: {
+      loop: [
+        "Call read_doc on the best handle.",
+        "Inspect read_doc references and call read_doc again on handles that look relevant.",
+        "Repeat read_doc on references until the answer has enough exact API and guide context.",
+      ],
+      nextTool: "read_doc",
+    },
+  };
+};
+
+export const expandDocumentationReferences = async (
+  input: ExpandDocumentationInput
+) => {
+  const limit = input.limit ?? 20;
+
+  if (isGuideDocumentationTarget(input.target)) {
+    const resourceName = getGuideResourceName(input.target);
+    const symbols = await getGuideRelatedSymbols(resourceName);
+
+    return {
+      references: symbols.slice(0, limit).map((symbol) => ({
+        handle: symbol.resourceUri,
+        kind: symbol.kind,
+        relation: "guide_mentions_symbol",
+        summary: symbol.summary,
+        tip: "Call read_doc on this API handle if the guide mention is relevant.",
+        title: symbol.fullName,
+        url: symbol.docsUrl,
+      })),
+      target: input.target,
+      workflow: {
+        next: "Call read_doc on the most relevant returned handle.",
+        nextTool: "read_doc",
+      },
+    };
+  }
+
+  const entity = await resolveSymbolEntity({
+    symbol: symbolFromDocumentationTarget(input.target),
+  });
+  const [relatedGuides, members] = await Promise.all([
+    getRelatedGuidesForEntity(entity, limit),
+    isTypeEntity(entity) ? loadTypeMembers(entity) : Promise.resolve([]),
+  ]);
+  const references = [
+    ...relatedGuides.map((guide) => ({
+      handle: guide.resourceUri,
+      kind: "guide" as const,
+      relation: "related_guide",
+      summary: guide.description ?? "",
+      tip: "Call read_doc on this guide handle for conceptual or workflow context.",
+      title: guide.title,
+      url: guide.url,
+    })),
+    ...members.slice(0, limit).map((member) => ({
+      handle: getSymbolResourceUri(member),
+      kind: member.entityKind,
+      relation: "type_member",
+      summary: toSummary(member),
+      tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
+      title: getCanonicalFullName(member),
+      url: member.url,
+    })),
+  ].slice(0, limit);
+
+  return {
+    references,
+    target: getSymbolResourceUri(entity),
+    workflow: {
+      next: "Call read_doc on the most relevant returned handle.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+export const readDocumentationTarget = async (
+  input: ReadDocumentationInput
+) => {
+  if (isGuideDocumentationTarget(input.target)) {
+    const slugs = guideSlugsFromTarget(input.target);
+    const page = await getOfficialDocPage(slugs);
+    if (!page) {
+      return throwNotFoundError("Guide not found.", input.target);
+    }
+
+    return {
+      document: {
+        breadcrumbs: page.breadcrumbs,
+        content:
+          input.includeContent === false
+            ? undefined
+            : page.markdown.slice(0, 8000),
+        contentTruncated:
+          input.includeContent === false
+            ? undefined
+            : page.markdown.length > 8000,
+        handle: guideResourceUriFromUrl(page.url),
+        kind: "guide",
+        sourceUrl: page.githubUrl,
+        summary: page.description,
+        tip: "Inspect the references below and call read_doc on relevant API handles.",
+        title: page.title,
+        url: page.url,
+      },
+      references:
+        input.includeReferences === false
+          ? undefined
+          : await expandDocumentationReferences({
+              limit: 12,
+              target: guideResourceUriFromUrl(page.url),
+            }),
+      workflow: {
+        next: "If more context is needed, call read_doc on one of the returned reference handles.",
+        nextTool: "read_doc",
+      },
+    };
+  }
+
+  const entity = await resolveSymbolEntity({
+    symbol: symbolFromDocumentationTarget(input.target),
+  });
+  const relatedGuides = await getRelatedGuidesForEntity(entity, 6);
+  const members = isTypeEntity(entity) ? await loadTypeMembers(entity) : [];
+
+  return {
+    document: {
+      details: toSymbolDetails(entity),
+      handle: getSymbolResourceUri(entity),
+      kind: entity.entityKind,
+      relatedGuides: relatedGuides.map((guide) => ({
+        ...guide,
+        tip: "Call read_doc on this guide handle for conceptual or workflow context.",
+      })),
+      summary: toSummary(entity),
+      tip: "Inspect the references below and call read_doc on relevant guide or member handles.",
+      title: getCanonicalFullName(entity),
+      topMembers: members.slice(0, 24).map((member) => ({
+        ...toSymbolRef(member),
+        returnType: member.returnType,
+        tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
+      })),
+      url: entity.url,
+    },
+    references:
+      input.includeReferences === false
+        ? undefined
+        : await expandDocumentationReferences({
+            limit: 20,
+            target: getSymbolResourceUri(entity),
+          }),
+    workflow: {
+      next: "If more context is needed, call read_doc on one of the returned reference handles.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
 export const searchDocumentation = async (input: DocumentationSearchInput) => {
   const requestedLimit = input.limit ?? 8;
   const resolvedTypeName = await maybeResolveTypeFilter(input.typeName);
@@ -1083,10 +1467,7 @@ export const getDocumentationSymbol = async (input: GetSymbolInput) => {
     return {
       relatedGuides,
       symbol: details,
-      workflow: {
-        nextTools: getSymbolWorkflowHints(entity, relatedGuides),
-        resource: getSymbolResourceUri(entity),
-      },
+      workflow: getSymbolWorkflow(entity, relatedGuides),
     };
   }
 
@@ -1096,10 +1477,7 @@ export const getDocumentationSymbol = async (input: GetSymbolInput) => {
     memberCounts: getTypeCounts(members),
     relatedGuides,
     symbol: details,
-    workflow: {
-      nextTools: getSymbolWorkflowHints(entity, relatedGuides, members.length),
-      resource: getSymbolResourceUri(entity),
-    },
+    workflow: getSymbolWorkflow(entity, relatedGuides, members.length),
   };
 };
 
@@ -1120,10 +1498,7 @@ export const explainDocumentationSymbolContext = async (
         members: [],
       },
       symbol,
-      workflow: {
-        nextTools: getSymbolWorkflowHints(entity, relatedGuides),
-        resource: getSymbolResourceUri(entity),
-      },
+      workflow: getSymbolWorkflow(entity, relatedGuides),
     };
   }
 
@@ -1148,10 +1523,7 @@ export const explainDocumentationSymbolContext = async (
       totalMembers: members.length,
     },
     symbol,
-    workflow: {
-      nextTools: getSymbolWorkflowHints(entity, relatedGuides, members.length),
-      resource: getSymbolResourceUri(entity),
-    },
+    workflow: getSymbolWorkflow(entity, relatedGuides, members.length),
   };
 };
 
@@ -1186,6 +1558,18 @@ export const getDocumentationTypeMembers = async (
     })),
     returned: members.length,
     type: toSymbolDetails(typeEntity),
+    workflow:
+      typeEntity.entityKind === "enum"
+        ? {
+            policy: {
+              answerRequiresGuideLookup: true,
+              notes: [
+                "Enum values are not modeled as get_type_members results in this index.",
+                "Call get_related_guides before answering enum usage questions.",
+              ],
+            },
+          }
+        : undefined,
   };
 };
 
@@ -1198,10 +1582,7 @@ export const getDocumentationMethodDetails = async (
   return {
     method: toSymbolDetails(methodEntity),
     relatedGuides,
-    workflow: {
-      nextTools: getSymbolWorkflowHints(methodEntity, relatedGuides),
-      resource: getSymbolResourceUri(methodEntity),
-    },
+    workflow: getSymbolWorkflow(methodEntity, relatedGuides),
   };
 };
 

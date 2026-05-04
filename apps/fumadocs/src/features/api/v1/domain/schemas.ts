@@ -26,14 +26,18 @@ export const entityIdSchema = z.object({
 
 export const toolNameSchema = z.enum([
   "explain_symbol_context",
+  "expand_documentation",
   "get_examples",
   "get_method_details",
   "get_related_guides",
   "get_symbol",
   "get_type_members",
   "list_namespaces",
+  "read_doc",
+  "read_documentation",
   "resolve_symbol",
   "search_docs",
+  "search_documentation",
 ]);
 
 export const searchDocsQuerySchema = z.object({
@@ -55,6 +59,29 @@ export const searchDocsToolInputSchema = z.object({
   query: z.string().trim().min(1),
   typeName: optionalString,
   useHybrid: z.boolean().optional(),
+});
+
+export const searchDocumentationToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
+  includeGuides: z.boolean().optional(),
+  includeSymbols: z.boolean().optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  query: z.string().trim().min(1),
+});
+
+export const readDocumentationToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
+  includeContent: z.boolean().optional(),
+  includeReferences: z.boolean().optional(),
+  target: z.string().trim().min(1),
+});
+
+export const readDocToolInputSchema = readDocumentationToolInputSchema;
+
+export const expandDocumentationToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
+  limit: z.number().int().min(1).max(50).optional(),
+  target: z.string().trim().min(1),
 });
 
 export const resolveSymbolToolInputSchema = z.object({

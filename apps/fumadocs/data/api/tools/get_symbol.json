@@ -1,6 +1,6 @@
 {
   "name": "get_symbol",
-  "description": "Get structured metadata for a resolved API symbol. Follow guideCount and workflow.next when broader context exists.",
+  "description": "Focused metadata lookup only. For questions like 'what is NetworkMode?', prefer explain_symbol_context. Follow guideCount, workflow.next, and workflow.policy before answering conceptual usage.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,

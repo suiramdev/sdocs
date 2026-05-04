@@ -220,6 +220,7 @@ const compactWorkflow = (value: unknown): JsonRecord => {
 
   return compactValue({
     next: readArray(value, "nextTools"),
+    policy: value.policy,
     resource: readString(value, "resource"),
   }) as JsonRecord;
 };
@@ -238,15 +239,6 @@ const compactExample = (value: unknown): JsonRecord => {
     sourceKind: readString(value, "sourceKind"),
     start: readNumber(value, "lineStart"),
     symbol: compactSymbolRef(value.symbol),
-  }) as JsonRecord;
-};
-
-const compactSearchResult = (value: unknown): JsonRecord => {
-  const symbol = readRecord(value, "symbol");
-
-  return compactValue({
-    score: isRecord(value) ? readNumber(value, "score") : undefined,
-    ...compactSymbolRef(symbol),
   }) as JsonRecord;
 };
 
@@ -272,21 +264,6 @@ const compactNamespace = (value: unknown): JsonRecord => {
     name: readString(value, "fullName") ?? readString(value, "name"),
     parent: readString(value, "parent"),
   }) as JsonRecord;
-};
-
-const compactSearchDocsResult = (result: unknown): unknown => {
-  if (!isRecord(result)) {
-    return compactValue(result);
-  }
-
-  return compactValue({
-    query: readString(result, "query"),
-    results: readArray(result, "results").map(compactSearchResult),
-    returned: readNumber(result, "returned"),
-    source: readString(result, "source"),
-    total: readNumber(result, "total"),
-    workflow: result.workflow,
-  });
 };
 
 const compactResolveSymbolResult = (result: unknown): unknown => {
@@ -353,6 +330,7 @@ const compactGetTypeMembersResult = (result: unknown): unknown => {
     ),
     returned: readNumber(result, "returned"),
     type: compactSymbolRef(result.type),
+    workflow: compactWorkflow(result.workflow),
   });
 };
 
@@ -407,6 +385,7 @@ const compactListNamespacesResult = (result: unknown): unknown => {
 };
 
 const toolResultCompactors: Record<ToolName, (result: unknown) => unknown> = {
+  expand_documentation: compactValue,
   explain_symbol_context: compactExplainSymbolContextResult,
   get_examples: compactGetExamplesResult,
   get_method_details: compactGetMethodDetailsResult,
@@ -414,8 +393,11 @@ const toolResultCompactors: Record<ToolName, (result: unknown) => unknown> = {
   get_symbol: compactGetSymbolResult,
   get_type_members: compactGetTypeMembersResult,
   list_namespaces: compactListNamespacesResult,
+  read_doc: compactValue,
+  read_documentation: compactValue,
   resolve_symbol: compactResolveSymbolResult,
-  search_docs: compactSearchDocsResult,
+  search_docs: compactValue,
+  search_documentation: compactValue,
 };
 
 export const compactMcpToolResult = (

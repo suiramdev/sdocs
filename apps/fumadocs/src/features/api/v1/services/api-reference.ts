@@ -6,6 +6,7 @@ import { ApiV1Error } from "@/features/api/v1/domain/errors";
 import type { SearchDocsToolInput } from "@/features/api/v1/domain/schemas";
 
 import {
+  expandDocumentationReferences,
   explainDocumentationSymbolContext,
   getDocumentationExamples,
   getDocumentationMethodDetails,
@@ -13,12 +14,32 @@ import {
   getDocumentationSymbol,
   getDocumentationTypeMembers,
   listDocumentationNamespaces,
+  readDocumentationTarget,
   resolveDocumentationSymbol,
   searchDocumentation,
+  searchDocumentationAcrossSources,
 } from "./documentation-tools";
 
 export const searchApiReference = (input: SearchDocsToolInput) =>
   searchDocumentation(input);
+
+export const searchApiReferenceDocumentation = (input: {
+  includeGuides?: boolean;
+  includeSymbols?: boolean;
+  limit?: number;
+  query: string;
+}) => searchDocumentationAcrossSources(input);
+
+export const readApiReferenceDocumentation = (input: {
+  includeContent?: boolean;
+  includeReferences?: boolean;
+  target: string;
+}) => readDocumentationTarget(input);
+
+export const expandApiReferenceDocumentation = (input: {
+  limit?: number;
+  target: string;
+}) => expandDocumentationReferences(input);
 
 export const getApiEntityById = async (id: string) => {
   const result = await describeApiEntityService({ id });

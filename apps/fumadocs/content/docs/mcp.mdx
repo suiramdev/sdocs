@@ -174,16 +174,11 @@ workflow:
 
 In practice, an agent will usually:
 
-1. Call `search_docs` to find the most relevant symbols for a question
-2. Call `resolve_symbol` if a short name like `Component` or `Scene` is ambiguous
-3. Call `explain_symbol_context` for compact symbol metadata, guide handles,
-   member handles, and next-tool hints
-4. Follow `workflow.next` from compact outputs when deeper context is needed
-5. Call `get_symbol` or `get_type_members` for focused API inspection
-6. Call `get_method_details` to inspect one exact overload
-7. Call `get_related_guides` when broader usage context is recommended
-8. Call `get_examples` when sample code is needed
-9. Call `list_namespaces` when exploring the API tree from the top down
+1. Call `search_docs` to find relevant guides and API entities
+2. Call `read_doc` on the best returned handle
+3. Inspect the returned references and tips
+4. Call `read_doc` again on any reference that looks relevant
+5. Repeat until it has enough exact API and guide context to answer
 
 This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
@@ -204,24 +199,22 @@ short readable keys such as `sig`, `uri`, `params`, `returns`, and `guides`.
 Tools default to compact responses. Pass `detail: "full"` in a tool request only
 when you need the larger raw field set.
 
-For example, `resolve_symbol` returns TOON text like this:
+For example, `search_docs` returns TOON text like this:
 
 ```toon
-matches[2]:
-  - match: exact_name
-    id: "T:Sandbox.Component"
+results[2]:
+  - handle: docs://type/Sandbox.Component
     kind: class
-    name: Sandbox.Component
-    score: 110
-    sig: public abstract class Sandbox.Component
+    next: "Call read_doc with this handle to read the API entity and inspect related references."
+    source: api
     summary: "A GameObject can have many components, which are the building blocks of the game."
-  - match: prefix_name
-    id: "T:Editor.ComponentEditorWidget"
-    kind: class
-    name: Editor.ComponentEditorWidget
-    score: 88
-    sig: "public abstract class Editor.ComponentEditorWidget : Editor.Widget"
-query: Component
+    title: Sandbox.Component
+  - handle: docs://guide/scene/components
+    kind: guide
+    next: "Call read_doc with this handle to read the guide and inspect referenced API symbols."
+    source: guide
+    title: Components
+query: component update loop
 returned: 2
 ```
 
@@ -265,244 +258,62 @@ does not include a field you need.
 
 ### `search_docs`
 
-Use this first. It performs keyword or semantic search across the indexed s&box
-API docs.
+Use this first. It searches official Guides and generated API symbols together,
+including classes, structs, interfaces, enums, constructors, methods, and
+properties.
 
 Typical input:
 
 ```json
 {
   "query": "component update loop",
-  "kind": "method",
-  "typeName": "Sandbox.Component",
   "limit": 5
 }
 ```
 
 Typical TOON output includes:
 
-- Ranked results
-- Each result includes a structured symbol summary
-- Common fields include symbol id, fully-qualified name, kind, signature, URL,
-  score, and summary text
+- Mixed guide and API results
+- A stable `handle` for each result
+- The result `kind`, title, URL, summary, and source
+- A `next` tip telling the agent to call `read_doc` on the handle
 
 Example use:
 
-- Find methods related to `Sandbox.Component`
-- Search for `Ray`, `SceneTrace`, or `GameObject` by concept instead of exact id
-- Use the best result with `explain_symbol_context` before answering usage
-  questions
+- Find guides and methods related to `Sandbox.Component`
+- Search for `NetworkMode`, `Ray`, `SceneTrace`, or `GameObject` without first
+  knowing whether the answer is in a guide, enum, class, method, or property
 
-### `resolve_symbol`
+### `read_doc`
 
-Use this when a type name is short, incomplete, or ambiguous. It resolves names
-to fully-qualified API types.
+Use this on any `handle` returned by `search_docs` or by a previous `read_doc`
+response. The handle may point to a guide, enum, class, method, constructor, or
+property.
 
 Typical input:
 
 ```json
 {
-  "name": "Component",
-  "limit": 5
+  "target": "docs://type/Sandbox.Component"
 }
 ```
 
 Typical TOON output includes:
 
-- Matching types only
-- Fully-qualified names such as `Sandbox.Component`
-- Type metadata such as namespace, kind, and symbol id
+- The requested guide or API entity
+- Exact API details when the target is a symbol
+- Guide markdown excerpts when the target is a guide
+- Related references with handles
+- A `tip` on each reference explaining when to read it next
+- Workflow guidance telling the agent to keep calling `read_doc` on relevant
+  reference handles
 
 Example use:
 
-- Resolve `Component` before inspecting members
-- Narrow `Scene` or `Transform` to the exact s&box type you need
-
-### `explain_symbol_context`
-
-Use this after `search_docs` or `resolve_symbol` when the user asks what a
-symbol is, how to use an API, or needs enough context to choose the next lookup.
-It intentionally returns a compact envelope instead of loading full guide pages.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component",
-  "memberLimit": 24
-}
-```
-
-Typical TOON output includes:
-
-- Symbol summary, signature, remarks, and declaration context
-- Top related guide titles and `docs://guide/...` handles
-- Compact type member handles when the symbol is a type
-- `workflow.resource` for the canonical `docs://type/...` or
-  `docs://member/...` page
-- `workflow.next` recommendations such as `get_type_members`,
-  `get_related_guides`, `get_method_details`, or `get_examples`
-
-Example use:
-
-- Ask "what is `NetworkMode`?" and receive the enum metadata plus related guide
-  handles without loading full guide text
-- Ask "how do I use `Sandbox.Component`?" and receive member and guide handles
-  that point to the next focused lookup
-
-### `get_symbol`
-
-Use this to inspect one resolved symbol. It returns structured metadata for a
-type or exact member reference.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component"
-}
-```
-
-Typical TOON output includes:
-
-- Namespace and declaring type
-- Symbol kind such as class, struct, enum, method, or property
-- Signature and summary
-- URLs, inheritance or declaration context when available
-- `guideCount` and `workflow.next` when broader guide context exists
-
-Example use:
-
-- Read the summary for `Sandbox.Component`
-- Inspect a property or exact member after resolving its symbol id
-- Follow `workflow.next` to `get_related_guides` before explaining conceptual
-  usage
-
-### `get_type_members`
-
-Use this after `get_symbol` when you want to browse what a type exposes.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component",
-  "kind": "method",
-  "limit": 20
-}
-```
-
-Typical TOON output includes:
-
-- Member list for the target type
-- Constructors, methods, or properties
-- Structured rows with name, member kind, signature, summary, and symbol id
-
-Example use:
-
-- List lifecycle methods on `Sandbox.Component`
-- Enumerate properties on a struct or class before asking about one specific member
-
-### `get_method_details`
-
-Use this when you already know the method you want and need the exact overload
-details.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component.OnUpdate()"
-}
-```
-
-Typical TOON output includes:
-
-- Exact method signature
-- Parameters with names, types, and documentation
-- Return type and return documentation
-- Exceptions or related notes when indexed
-
-Example use:
-
-- Inspect `Sandbox.Component.OnUpdate()`
-- Read the parameters for a trace, spawn, or utility method overload
-
-### `get_examples`
-
-Use this to fetch code examples attached to a symbol. This is useful when an
-agent needs usage patterns instead of just signatures.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component.OnUpdate()",
-  "includeRelated": true
-}
-```
-
-Typical TOON output includes:
-
-- Direct examples for the symbol when available
-- Optionally related examples from the declaring type
-- Structured example snippets with source context
-
-Example use:
-
-- Get examples for a method override
-- Fall back to type-level examples when a member has no dedicated sample
-
-### `get_related_guides`
-
-Use this when the agent already knows the symbol but needs broader context than
-the generated API page provides.
-
-Typical input:
-
-```json
-{
-  "symbol": "Sandbox.Component.OnUpdate()",
-  "limit": 5
-}
-```
-
-Typical TOON output includes:
-
-- Related Guide pages ranked for that symbol
-- Match metadata showing whether the match is direct or inherited from the
-  declaring type
-- Resource URIs such as `docs://guide/scene/components`
-
-Example use:
-
-- Read workflow and editor guidance related to a method
-- Move from `Sandbox.Component` or `Sandbox.Component.OnUpdate()` to the most
-  relevant Guides before answering in prose
-
-### `list_namespaces`
-
-Use this to explore the API hierarchy from the top down.
-
-Typical input:
-
-```json
-{
-  "namespace": "Sandbox",
-  "limit": 50
-}
-```
-
-Typical TOON output includes:
-
-- Child namespaces
-- Types defined in the namespace
-- Structured namespace and type summaries for navigation
-
-Example use:
-
-- Explore what lives under `Sandbox`
-- Discover related namespaces before searching deeper
+- Read `docs://guide/scene/components`, then read the referenced
+  `Sandbox.Component` and `Sandbox.Component.OnUpdate()` handles
+- Read `docs://type/Sandbox.NetworkMode`, then read related guide handles for
+  networking behavior
 
 ## Resources
 
@@ -544,9 +355,9 @@ Depending on the resource, the payload can include:
 
 Typical usage:
 
-1. Use `search_docs` or `resolve_symbol` to identify the canonical symbol
-2. Read the matching `docs://type/...`, `docs://member/...`, or
-   `docs://guide/...` resource
+1. Use `search_docs` to identify relevant handles
+2. Use `read_doc` to read the matching `docs://type/...`,
+   `docs://member/...`, or `docs://guide/...` handle
 3. Use the TOON resource payload as the canonical page for that API
    element or guide
 
@@ -556,19 +367,10 @@ For a question like "How do I update a custom component every frame?", a well
 behaved agent will usually:
 
 1. Use `search_docs` with a query like `component update every frame`
-2. Use `resolve_symbol` if it needs to confirm `Component` means `Sandbox.Component`
-3. Use `explain_symbol_context` to get compact type, member, guide, and
-   workflow hints
-4. Use `get_type_members` to find lifecycle members such as `OnUpdate` if the
-   compact member handles are not enough
-5. Use `get_related_guides` when `workflow.next` recommends it for
-   `Sandbox.Component` or `Sandbox.Component.OnUpdate()`
-6. Read `docs://member/Sandbox.Component.OnUpdate` for the canonical API
-   contract
-7. Read a related `docs://guide/...` resource for broader workflow and usage
-   context
-8. Use `get_method_details` or `get_examples` when it needs an extra focused
-   lookup
+2. Use `read_doc` on the best returned handle
+3. Inspect the references and their `tip` fields
+4. Use `read_doc` again on relevant guide, type, or member handles
+5. Repeat until it has enough exact API contracts and guide context to answer
 
 That is the intended MCP interaction model: search broadly, inspect the right
 symbol, then combine exact API pages with related Guides when the answer needs
