@@ -4,6 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface ApiReferenceSourceState {
+  mode?: "explicit" | "latest";
+  pageUrl?: string;
+  resolvedUrl?: string;
   url: string;
   version: string;
 }

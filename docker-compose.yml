@@ -50,32 +50,33 @@ services:
       - fumadocs_api_generated:/app/content/api-generated
       - fumadocs_api_entities:/app/data/api/entities
     environment:
-      NODE_ENV: production
-      HOSTNAME: 0.0.0.0
-      PORT: 4000
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
-      NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
-      NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
-      NEXT_PUBLIC_UMAMI_HOST_URL: ${NEXT_PUBLIC_UMAMI_HOST_URL:-}
-      NEXT_PUBLIC_UMAMI_DOMAINS: ${NEXT_PUBLIC_UMAMI_DOMAINS:-}
-      NEXT_PUBLIC_UMAMI_TAG: ${NEXT_PUBLIC_UMAMI_TAG:-docs}
-      API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
-      API_JSON_DOWNLOAD_TIMEOUT_MS: ${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
-      API_JSON_DOWNLOAD_ATTEMPTS: ${API_JSON_DOWNLOAD_ATTEMPTS:-3}
-      MEILI_HOST: http://meilisearch:7700
-      MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
-      MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
-      MEILI_ENABLE_HYBRID: ${MEILI_ENABLE_HYBRID:-false}
-      MEILI_SEMANTIC_RATIO: ${MEILI_SEMANTIC_RATIO:-0.35}
-      MEILI_EMBEDDER_PROVIDER: ${MEILI_EMBEDDER_PROVIDER:-openai}
-      MEILI_EMBEDDER_MODEL: ${MEILI_EMBEDDER_MODEL:-text-embedding-3-small}
-      API_LOGGING: ${API_LOGGING:-false}
-      API_RAG_PROVIDER: ${API_RAG_PROVIDER:-openai}
-      API_RAG_MODEL: ${API_RAG_MODEL:-gpt-4.1-mini}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
-      CHUTES_API_KEY: ${CHUTES_API_KEY:-}
-      CHUTES_API_BASE_URL: ${CHUTES_API_BASE_URL:-}
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=4000
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+      - NEXT_PUBLIC_UMAMI_WEBSITE_ID=${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+      - NEXT_PUBLIC_UMAMI_SCRIPT_URL=${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
+      - NEXT_PUBLIC_UMAMI_HOST_URL=${NEXT_PUBLIC_UMAMI_HOST_URL:-}
+      - NEXT_PUBLIC_UMAMI_DOMAINS=${NEXT_PUBLIC_UMAMI_DOMAINS:-}
+      - NEXT_PUBLIC_UMAMI_TAG=${NEXT_PUBLIC_UMAMI_TAG:-docs}
+      - API_JSON_URL
+      - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
+      - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
+      - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
+      - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
+      - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
+      - MEILI_EMBEDDER_PROVIDER=${MEILI_EMBEDDER_PROVIDER:-openai}
+      - MEILI_EMBEDDER_MODEL=${MEILI_EMBEDDER_MODEL:-text-embedding-3-small}
+      - API_LOGGING=${API_LOGGING:-false}
+      - API_RAG_PROVIDER=${API_RAG_PROVIDER:-openai}
+      - API_RAG_MODEL=${API_RAG_MODEL:-gpt-4.1-mini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - CHUTES_API_KEY=${CHUTES_API_KEY:-}
+      - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
 
   fumadocs-indexer:
     build:
@@ -95,21 +96,62 @@ services:
       - fumadocs_api_generated:/app/content/api-generated
       - fumadocs_api_entities:/app/data/api/entities
     environment:
-      NODE_ENV: production
-      API_JSON_URL: ${API_JSON_URL:-https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json}
-      API_JSON_DOWNLOAD_TIMEOUT_MS: ${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
-      API_JSON_DOWNLOAD_ATTEMPTS: ${API_JSON_DOWNLOAD_ATTEMPTS:-3}
-      MEILI_HOST: http://meilisearch:7700
-      MEILI_API_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
-      MEILI_API_INDEX_NAME: ${MEILI_API_INDEX_NAME:-api_entities}
-      MEILI_ENABLE_HYBRID: ${MEILI_ENABLE_HYBRID:-false}
-      MEILI_SEMANTIC_RATIO: ${MEILI_SEMANTIC_RATIO:-0.35}
-      MEILI_EMBEDDER_PROVIDER: ${MEILI_EMBEDDER_PROVIDER:-openai}
-      MEILI_EMBEDDER_MODEL: ${MEILI_EMBEDDER_MODEL:-text-embedding-3-small}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
-      CHUTES_API_KEY: ${CHUTES_API_KEY:-}
-      CHUTES_API_BASE_URL: ${CHUTES_API_BASE_URL:-}
+      - NODE_ENV=production
+      - API_JSON_URL
+      - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
+      - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
+      - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
+      - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
+      - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
+      - MEILI_EMBEDDER_PROVIDER=${MEILI_EMBEDDER_PROVIDER:-openai}
+      - MEILI_EMBEDDER_MODEL=${MEILI_EMBEDDER_MODEL:-text-embedding-3-small}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - CHUTES_API_KEY=${CHUTES_API_KEY:-}
+      - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
+
+  fumadocs-schema-refresher:
+    build:
+      context: .
+      dockerfile: apps/fumadocs/Dockerfile
+      args:
+        APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+        NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+    restart: unless-stopped
+    depends_on:
+      fumadocs:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    command:
+      [
+        "sh",
+        "-c",
+        "while true; do bun run api:bootstrap:index; sleep ${API_SCHEMA_CHECK_INTERVAL_SECONDS:-3600}; done",
+      ]
+    volumes:
+      - fumadocs_api_generated:/app/content/api-generated
+      - fumadocs_api_entities:/app/data/api/entities
+    environment:
+      - NODE_ENV=production
+      - API_JSON_URL
+      - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
+      - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
+      - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
+      - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
+      - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
+      - MEILI_EMBEDDER_PROVIDER=${MEILI_EMBEDDER_PROVIDER:-openai}
+      - MEILI_EMBEDDER_MODEL=${MEILI_EMBEDDER_MODEL:-text-embedding-3-small}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - CHUTES_API_KEY=${CHUTES_API_KEY:-}
+      - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
 
 volumes:
   meili_data:

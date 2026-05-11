@@ -75,12 +75,15 @@ correct URLs into generated docs. For local development that is usually
 
 At startup, the app automatically:
 
-- Downloads the API dump from `API_JSON_URL`
+- Resolves the latest API dump from `API_SCHEMA_PAGE_URL`
 - Regenerates API entities + API reference docs
 
-If `API_JSON_URL` still points at the same version and the generated outputs are
-already present, bootstrap skips regeneration. The Meilisearch indexer also
-skips re-indexing and re-embedding when the generated entities and embedder
+By default `API_SCHEMA_PAGE_URL` is `https://sbox.game/api/schema`, where s&box
+publishes the latest staging API schema. Set `API_JSON_URL` only when you need
+to pin a known schema JSON URL or temporarily work around an upstream download
+page issue. If the resolved schema fingerprint still matches the generated
+outputs, bootstrap skips regeneration. The Meilisearch indexer also skips
+re-indexing and re-embedding when the generated entities and embedder
 configuration are unchanged.
 
 5. Index documents into Meilisearch (if you use Meilisearch search):
@@ -135,6 +138,9 @@ This starts:
 - `meilisearch` on `http://localhost:7700`
 - `fumadocs-indexer`, which rebuilds the Meilisearch index in the background
   after `fumadocs` has started and become healthy
+- `fumadocs-schema-refresher`, which periodically checks the latest schema,
+  regenerates API docs/entities when it changes, and refreshes the Meilisearch
+  index only when needed
 
 If those ports are already used, override them:
 
@@ -150,7 +156,14 @@ To manually rerun API indexing after deployment:
 docker compose up --build fumadocs-indexer
 ```
 
-The `fumadocs` service startup automatically downloads `API_JSON_URL` and regenerates API docs/entities before serving traffic. Regeneration is also triggered on redeploy when the repository example scraper inputs change, including updates to `data/api/example-repositories.json` and changes to the repository scraping scripts. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.
+The `fumadocs` service startup automatically resolves the latest schema and regenerates API docs/entities before serving traffic. Regeneration is also triggered on redeploy when the repository example scraper inputs change, including updates to `data/api/example-repositories.json` and changes to the repository scraping scripts. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.
+
+Long-running Docker deployments also run `fumadocs-schema-refresher`. It shares
+the generated docs/entities volumes, runs `api:bootstrap:index`, then sleeps for
+`API_SCHEMA_CHECK_INTERVAL_SECONDS` seconds. The default interval is `3600`.
+Use `API_JSON_URL` as an explicit override only when you need to pin a specific
+schema JSON artifact; otherwise leave it unset so the latest schema is resolved
+automatically.
 
 For platform deployments such as Dokploy, prefer the dedicated health endpoint
 `/api/health` instead of `/`. The home page redirects to `/docs/get-started`,
