@@ -15,6 +15,8 @@ import {
   readDocumentationTypeResource,
   toDocumentationResourceResult,
 } from "@/features/api/v1/services/documentation-resources";
+import { trackToolCallFromContext } from "@/features/api/v1/services/mcp-analytics";
+import type { McpAnalyticsContext } from "@/features/api/v1/services/mcp-analytics";
 import { compactMcpToolResult } from "@/features/api/v1/services/mcp-compact";
 import {
   encodeMcpContent,
@@ -27,7 +29,13 @@ const SERVER_VERSION = "2.1.0";
 const RESOURCE_SCHEMA_URI = "docs://schema";
 const ROOT_NAMESPACE_URI = "docs://namespace/root";
 
-export const createApiReferenceMcpServer = (): McpServer => {
+interface CreateApiReferenceMcpServerOptions {
+  analytics?: McpAnalyticsContext;
+}
+
+export const createApiReferenceMcpServer = ({
+  analytics,
+}: CreateApiReferenceMcpServerOptions = {}): McpServer => {
   const server = new McpServer(
     {
       name: SERVER_NAME,
@@ -153,17 +161,37 @@ export const createApiReferenceMcpServer = (): McpServer => {
         inputSchema: tool.schema,
       },
       async (input: unknown) => {
-        const result = await tool.execute(input);
-        const content = compactMcpToolResult(tool.name, result, input);
+        const startedAt = Date.now();
 
-        return {
-          content: [
-            {
-              text: encodeMcpContent(content),
-              type: "text" as const,
-            },
-          ],
-        };
+        try {
+          const result = await tool.execute(input);
+          const content = compactMcpToolResult(tool.name, result, input);
+
+          trackToolCallFromContext(analytics, {
+            input,
+            latencyMs: Date.now() - startedAt,
+            ok: true,
+            toolName: tool.name,
+          });
+
+          return {
+            content: [
+              {
+                text: encodeMcpContent(content),
+                type: "text" as const,
+              },
+            ],
+          };
+        } catch (error) {
+          trackToolCallFromContext(analytics, {
+            input,
+            latencyMs: Date.now() - startedAt,
+            ok: false,
+            toolName: tool.name,
+          });
+
+          throw error;
+        }
       }
     );
   }
