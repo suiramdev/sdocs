@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildGenerationCacheKey,
-  buildSourceVersion,
   entitiesFile,
   generationOutputsExist,
   getGenerateScriptHash,
@@ -14,10 +13,12 @@ import {
   readApiReferenceState,
   writeApiReferenceState,
 } from "./api-reference-state";
+import {
+  type ApiSchemaSource,
+  resolveApiSchemaSource,
+} from "./api-schema-source";
 import { getExampleRepositoriesFingerprint } from "./repository-examples";
 
-const DEFAULT_API_JSON_URL =
-  "https://cdn.sbox.game/releases/2026-03-05-14-31-39.zip.json";
 const DEFAULT_DOWNLOAD_ATTEMPTS = 3;
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = 45_000;
 
@@ -26,15 +27,6 @@ const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const getPositiveInteger = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
-
-const getApiJsonUrl = (): string => {
-  const apiJsonUrl = (process.env.API_JSON_URL ?? DEFAULT_API_JSON_URL).trim();
-  if (apiJsonUrl.length === 0) {
-    throw new Error("API_JSON_URL is empty");
-  }
-
-  return apiJsonUrl;
 };
 
 const formatError = (error: unknown): string => {
@@ -141,11 +133,17 @@ const runStep = (command: string[], stepName: string): void => {
 };
 
 const runGeneration = async (
-  apiJsonUrl: string,
+  apiSchemaSource: ApiSchemaSource,
   downloadedJsonPath: string
 ): Promise<void> => {
-  process.stdout.write(`Bootstrapping API reference from ${apiJsonUrl}...\n`);
-  await downloadApiDump(apiJsonUrl, downloadedJsonPath);
+  process.stdout.write(
+    `Bootstrapping API reference from ${apiSchemaSource.url}...\n`
+  );
+  if (apiSchemaSource.downloadedJsonPath) {
+    process.stdout.write("Using pre-resolved latest API JSON download.\n");
+  } else {
+    await downloadApiDump(apiSchemaSource.url, downloadedJsonPath);
+  }
   process.stdout.write("API JSON downloaded, starting docs generation...\n");
   runStep(
     [
@@ -176,12 +174,11 @@ interface ExpectedGenerationState {
 }
 
 const getExpectedGenerationState = async (
-  apiJsonUrl: string
+  apiSchemaSource: ApiSchemaSource
 ): Promise<ExpectedGenerationState> => {
   const generatorHash = await getGenerateScriptHash();
   const repositoryExamplesFingerprint =
     await getExampleRepositoriesFingerprint();
-  const sourceVersion = buildSourceVersion(apiJsonUrl);
 
   return {
     expectedCacheKey: buildGenerationCacheKey({
@@ -189,11 +186,11 @@ const getExpectedGenerationState = async (
       generatorHash,
       includeNonPublic: false,
       repositoryExamplesFingerprint,
-      sourceVersion,
+      sourceVersion: apiSchemaSource.version,
     }),
     generatorHash,
     repositoryExamplesFingerprint,
-    sourceVersion,
+    sourceVersion: apiSchemaSource.version,
   };
 };
 
@@ -216,10 +213,10 @@ const getCacheMismatchReason = (
 };
 
 const getGenerationDecision = async (
-  apiJsonUrl: string
+  apiSchemaSource: ApiSchemaSource
 ): Promise<GenerationDecision> => {
   const state = await readApiReferenceState();
-  const expectedState = await getExpectedGenerationState(apiJsonUrl);
+  const expectedState = await getExpectedGenerationState(apiSchemaSource);
 
   if (state?.generation?.cacheKey !== expectedState.expectedCacheKey) {
     return {
@@ -248,9 +245,11 @@ const getGenerationDecision = async (
   };
 };
 
-const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
+const updateGenerationState = async (
+  apiSchemaSource: ApiSchemaSource
+): Promise<void> => {
   const currentState = await readApiReferenceState();
-  const expectedState = await getExpectedGenerationState(apiJsonUrl);
+  const expectedState = await getExpectedGenerationState(apiSchemaSource);
   const entitiesContent = await readFile(entitiesFile, "utf8");
   const entities = JSON.parse(entitiesContent) as unknown[];
 
@@ -269,7 +268,10 @@ const updateGenerationState = async (apiJsonUrl: string): Promise<void> => {
     indexing: currentState?.indexing,
     schemaVersion: 1,
     source: {
-      url: apiJsonUrl,
+      mode: apiSchemaSource.mode,
+      pageUrl: apiSchemaSource.pageUrl,
+      resolvedUrl: apiSchemaSource.resolvedUrl,
+      url: apiSchemaSource.url,
       version: expectedState.sourceVersion,
     },
   });
@@ -289,25 +291,30 @@ const withTemporaryInputFile = async (
 };
 
 const main = async (): Promise<void> => {
-  const apiJsonUrl = getApiJsonUrl();
-  const generationDecision = await getGenerationDecision(apiJsonUrl);
-
-  if (generationDecision.shouldSkip) {
-    process.stdout.write(
-      `API reference is already generated for ${buildSourceVersion(apiJsonUrl)}. Skipping regeneration.\n`
-    );
-    return;
-  }
-
-  if (generationDecision.reason) {
-    process.stdout.write(
-      `Regenerating API reference because ${generationDecision.reason}.\n`
-    );
-  }
-
   await withTemporaryInputFile(async (downloadedJsonPath) => {
-    await runGeneration(apiJsonUrl, downloadedJsonPath);
-    await updateGenerationState(apiJsonUrl);
+    const settings = getDownloadSettings();
+    const apiSchemaSource = await resolveApiSchemaSource(
+      downloadedJsonPath,
+      settings,
+      logRetry
+    );
+    const generationDecision = await getGenerationDecision(apiSchemaSource);
+
+    if (generationDecision.shouldSkip) {
+      process.stdout.write(
+        `API reference is already generated for ${apiSchemaSource.version}. Skipping regeneration.\n`
+      );
+      return;
+    }
+
+    if (generationDecision.reason) {
+      process.stdout.write(
+        `Regenerating API reference because ${generationDecision.reason}.\n`
+      );
+    }
+
+    await runGeneration(apiSchemaSource, downloadedJsonPath);
+    await updateGenerationState(apiSchemaSource);
   });
 };
 
