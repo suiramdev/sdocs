@@ -1,6 +1,10 @@
 import { writeFile } from "node:fs/promises";
 
-import { buildSourceVersion, hashContent } from "./api-reference-state";
+import {
+  buildSourceVersion,
+  hashContent,
+  readApiReferenceState,
+} from "./api-reference-state";
 
 const DEFAULT_API_SCHEMA_PAGE_URL = "https://sbox.game/api/schema";
 
@@ -333,6 +337,62 @@ const resolveLatestWithRetries = async (
   throw new Error("Unable to resolve latest API schema");
 };
 
+const getManifestFallbackUrl = async (): Promise<string | null> => {
+  const state = await readApiReferenceState();
+  return state?.source?.resolvedUrl ?? state?.source?.url ?? null;
+};
+
+const resolveManifestFallbackSource = async (
+  pageUrl: string,
+  targetPath: string,
+  timeoutMs: number,
+  error: unknown
+): Promise<ApiSchemaSource> => {
+  const fallbackUrl = await getManifestFallbackUrl();
+  if (!fallbackUrl) {
+    throw error;
+  }
+
+  process.stdout.write(
+    `Latest API schema page could not expose a direct JSON link. Falling back to previous schema URL from manifest: ${fallbackUrl}\n`
+  );
+
+  return await resolveCandidateSource(
+    fallbackUrl,
+    pageUrl,
+    targetPath,
+    timeoutMs
+  );
+};
+
+const resolveLatestSource = async (
+  targetPath: string,
+  settings: DownloadSettings,
+  logRetry: (
+    attempt: number,
+    error: unknown,
+    maxAttempts: number
+  ) => Promise<void>
+): Promise<ApiSchemaSource> => {
+  const pageUrl = getLatestSchemaPageUrl();
+
+  try {
+    return await resolveLatestWithRetries(
+      pageUrl,
+      targetPath,
+      settings,
+      logRetry
+    );
+  } catch (error: unknown) {
+    return await resolveManifestFallbackSource(
+      pageUrl,
+      targetPath,
+      settings.timeoutMs,
+      error
+    );
+  }
+};
+
 export const resolveApiSchemaSource = async (
   targetPath: string,
   settings: DownloadSettings,
@@ -347,10 +407,5 @@ export const resolveApiSchemaSource = async (
     return explicitSource;
   }
 
-  return await resolveLatestWithRetries(
-    getLatestSchemaPageUrl(),
-    targetPath,
-    settings,
-    logRetry
-  );
+  return await resolveLatestSource(targetPath, settings, logRetry);
 };

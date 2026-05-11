@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { stateFile } from "./api-reference-state";
 import { resolveApiSchemaSource } from "./api-schema-source";
 
 const originalFetch = globalThis.fetch;
 const originalApiJsonUrl = process.env.API_JSON_URL;
 const originalApiSchemaPageUrl = process.env.API_SCHEMA_PAGE_URL;
+const originalStdoutWrite = process.stdout.write;
 const SCHEMA_PAGE_URL = "https://docs.example.com/api/schema";
 const SCHEMA_DOWNLOAD_URL = "https://cdn.example.com/releases/latest.zip.json";
+const MANIFEST_SCHEMA_URL =
+  "https://cdn.example.com/releases/previous.zip.json";
 const SCHEMA_PAGE_HTML = `<a href="${SCHEMA_DOWNLOAD_URL}">Download Api Schema</a>`;
 
 const createResponse = (
@@ -62,6 +66,23 @@ const createSchemaJsonResponse = (etag: string): Response =>
     url: SCHEMA_DOWNLOAD_URL,
   });
 
+const createPreviousSchemaJsonResponse = (): Response =>
+  createResponse('{"types":["previous"]}', {
+    headers: {
+      "content-type": "application/json",
+      etag: '"schema-previous"',
+    },
+    status: 200,
+    url: MANIFEST_SCHEMA_URL,
+  });
+
+const createBlazorShellResponse = (): Response =>
+  createResponse("<html><body>Blazor shell</body></html>", {
+    headers: { "content-type": "text/html" },
+    status: 200,
+    url: SCHEMA_PAGE_URL,
+  });
+
 const mockFetchResponses = (responses: Response[]): void => {
   const fetchMock = async (): Promise<Response> => {
     await Bun.sleep(0);
@@ -73,7 +94,33 @@ const mockFetchResponses = (responses: Response[]): void => {
       })
     );
   };
+
   globalThis.fetch = fetchMock as unknown as typeof fetch;
+};
+
+const writeManifestSource = async (url: string): Promise<void> => {
+  await mkdir(path.dirname(stateFile), { recursive: true });
+  await writeFile(
+    stateFile,
+    JSON.stringify({
+      schemaVersion: 1,
+      source: {
+        url,
+        version: "previous.zip.json",
+      },
+    })
+  );
+};
+
+const restoreManifest = async (
+  originalManifest: string | null
+): Promise<void> => {
+  if (originalManifest) {
+    await writeFile(stateFile, originalManifest);
+    return;
+  }
+
+  await rm(stateFile, { force: true });
 };
 
 const resolveTestSource = (targetPath: string) =>
@@ -94,8 +141,18 @@ const expectLatestSource = async (
   expect(await readFile(targetPath, "utf8")).toBe('{"types":[]}');
 };
 
+const expectManifestFallbackSource = async (
+  source: Awaited<ReturnType<typeof resolveTestSource>>,
+  targetPath: string
+): Promise<void> => {
+  expect(source.mode).toBe("latest");
+  expect(source.resolvedUrl).toBe(MANIFEST_SCHEMA_URL);
+  expect(await readFile(targetPath, "utf8")).toBe('{"types":["previous"]}');
+};
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  process.stdout.write = originalStdoutWrite;
 
   if (originalApiJsonUrl === undefined) {
     delete process.env.API_JSON_URL;
@@ -180,6 +237,27 @@ describe("resolveApiSchemaSource", () => {
     } finally {
       await firstTarget.cleanup();
       await secondTarget.cleanup();
+    }
+  });
+
+  it("falls back to the previous manifest URL when the schema page is Blazor-only", async () => {
+    setLatestSchemaEnv();
+    const { cleanup, targetPath } = await createTargetPath();
+    const originalManifest = await readFile(stateFile, "utf8").catch(
+      () => null
+    );
+    mockFetchResponses([
+      createBlazorShellResponse(),
+      createPreviousSchemaJsonResponse(),
+    ]);
+
+    try {
+      await writeManifestSource(MANIFEST_SCHEMA_URL);
+      const source = await resolveTestSource(targetPath);
+      await expectManifestFallbackSource(source, targetPath);
+    } finally {
+      await restoreManifest(originalManifest);
+      await cleanup();
     }
   });
 });
