@@ -38,6 +38,14 @@ auto-track page visits and route changes through Umami, and it also sends
 custom `docs_search` and `docs_search_result_click` events so you can inspect
 popular searches and which results people open.
 
+Server-side MCP analytics use the same Umami site by default. Set
+`UMAMI_WEBSITE_ID` and `UMAMI_HOST_URL` if the server should use separate
+values from the browser script. MCP events are sent as `mcp_request` and
+`mcp_tool_call`, including the MCP method, tool name, transport, latency,
+success state, client user agent, and non-sensitive input metadata such as
+query length or target kind. Set `UMAMI_MCP_ID_SALT` to add a stable hashed
+`actor_id` for repeat MCP callers without storing raw IP addresses.
+
 3. (Optional) Generate docs + normalized index docs manually:
 
 ```bash
