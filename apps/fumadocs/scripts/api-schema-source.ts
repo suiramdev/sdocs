@@ -63,69 +63,6 @@ const isJsonResponse = (response: Response): boolean => {
 const normalizeUrl = (url: string, baseUrl: string): string =>
   new URL(url.replaceAll("&amp;", "&"), baseUrl).toString();
 
-const getAttributeValue = (
-  tag: string,
-  attributeName: string
-): string | null => {
-  const attributePattern = new RegExp(
-    `${attributeName}\\s*=\\s*(?:"([^"]+)"|'([^']+)')`,
-    "i"
-  );
-  const match = attributePattern.exec(tag);
-  return match?.[1] ?? match?.[2] ?? null;
-};
-
-const addDirectDownloadUrls = (
-  urls: Set<string>,
-  html: string,
-  pageUrl: string
-): void => {
-  const directUrlPattern =
-    /https:\/\/cdn\.sbox\.game\/[^\s"'<>]+?\.json(?:\?[^\s"'<>]+)?/gi;
-
-  for (const [url] of html.matchAll(directUrlPattern)) {
-    urls.add(normalizeUrl(url, pageUrl));
-  }
-};
-
-const isDownloadTag = (tag: string): boolean => {
-  const label = tag.toLowerCase();
-  return (
-    label.includes("download") ||
-    label.includes("schema") ||
-    label.includes(".json")
-  );
-};
-
-const addTagDownloadUrls = (
-  urls: Set<string>,
-  tag: string,
-  pageUrl: string
-): void => {
-  for (const attributeName of ["href", "data-href", "data-url"]) {
-    const value = getAttributeValue(tag, attributeName);
-    if (value && value !== "#") {
-      urls.add(normalizeUrl(value, pageUrl));
-    }
-  }
-};
-
-const getCandidateDownloadUrls = (html: string, pageUrl: string): string[] => {
-  const urls = new Set<string>();
-  const tagPattern = /<(?:a|link|button)\b[^>]*>/gi;
-  addDirectDownloadUrls(urls, html, pageUrl);
-
-  for (const [tag] of html.matchAll(tagPattern)) {
-    if (!isDownloadTag(tag)) {
-      continue;
-    }
-
-    addTagDownloadUrls(urls, tag, pageUrl);
-  }
-
-  return [...urls];
-};
-
 const downloadSchema = async (
   url: string,
   targetPath: string,
@@ -189,26 +126,6 @@ const buildLatestApiSchemaSource = (
   version: buildLatestSourceVersion(pageUrl, downloadedSchema),
 });
 
-const resolveJsonPageSource = async (
-  pageUrl: string,
-  targetPath: string,
-  pageResponse: Response
-): Promise<ApiSchemaSource> => {
-  const payload = Buffer.from(await pageResponse.arrayBuffer());
-  if (payload.byteLength === 0) {
-    throw new Error(`API schema page response body is empty for ${pageUrl}`);
-  }
-
-  await writeFile(targetPath, payload);
-  return buildLatestApiSchemaSource(pageUrl, targetPath, {
-    contentHash: hashContent(payload.toString("utf8")),
-    etag: pageResponse.headers.get("etag"),
-    finalUrl: pageResponse.url,
-    lastModified: pageResponse.headers.get("last-modified"),
-    resolvedUrl: pageResponse.url,
-  });
-};
-
 const resolveCandidateSource = async (
   candidateUrl: string,
   pageUrl: string,
@@ -223,49 +140,11 @@ const resolveCandidateSource = async (
   return buildLatestApiSchemaSource(pageUrl, targetPath, downloadedSchema);
 };
 
-const buildCandidateFailureMessage = (
-  pageUrl: string,
-  failures: string[]
-): string => {
-  const failureDetails =
-    failures.length > 0 ? ` Tried candidates: ${failures.join("; ")}` : "";
-  return `Unable to find a direct API schema JSON download link on ${pageUrl}.${failureDetails} If the page only exposes the download through Blazor, set API_JSON_URL to a pinned schema JSON URL as an override.`;
-};
-
-const resolveHtmlPageSource = async (
-  pageUrl: string,
-  targetPath: string,
-  timeoutMs: number,
-  pageResponse: Response
-): Promise<ApiSchemaSource> => {
-  const html = await pageResponse.text();
-  const candidateUrls = getCandidateDownloadUrls(html, pageResponse.url);
-  const failures: string[] = [];
-
-  for (const candidateUrl of candidateUrls) {
-    try {
-      return await resolveCandidateSource(
-        candidateUrl,
-        pageUrl,
-        targetPath,
-        timeoutMs
-      );
-    } catch (error: unknown) {
-      failures.push(`${candidateUrl}: ${formatError(error)}`);
-    }
-  }
-
-  throw new Error(buildCandidateFailureMessage(pageUrl, failures));
-};
-
 const getBrowserExecutablePath = (): string =>
   (
     process.env.API_SCHEMA_BROWSER_EXECUTABLE_PATH ??
     DEFAULT_BROWSER_EXECUTABLE_PATH
   ).trim();
-
-const shouldRenderSchemaPage = (): boolean =>
-  process.env.API_SCHEMA_RENDER_BROWSER !== "false";
 
 const launchSchemaBrowser = async () => {
   const { chromium } = await import("playwright-core");
@@ -327,56 +206,6 @@ const resolveRenderedPageSource = async (
   );
 };
 
-const resolveHtmlPageWithRenderedFallback = async (
-  pageUrl: string,
-  targetPath: string,
-  timeoutMs: number,
-  pageResponse: Response
-): Promise<ApiSchemaSource> => {
-  try {
-    return await resolveHtmlPageSource(
-      pageUrl,
-      targetPath,
-      timeoutMs,
-      pageResponse
-    );
-  } catch (error: unknown) {
-    if (!shouldRenderSchemaPage()) {
-      throw error;
-    }
-
-    process.stdout.write(
-      `Static API schema page parsing failed: ${formatError(error)}. Trying rendered page fallback...\n`
-    );
-    return await resolveRenderedPageSource(pageUrl, targetPath, timeoutMs);
-  }
-};
-
-const resolveLatestSourceOnce = async (
-  pageUrl: string,
-  targetPath: string,
-  timeoutMs: number
-): Promise<ApiSchemaSource> => {
-  const pageResponse = await fetchWithTimeout(pageUrl, timeoutMs);
-
-  if (!pageResponse.ok) {
-    throw new Error(
-      `Failed to resolve API schema page ${pageUrl}: ${pageResponse.status} ${pageResponse.statusText}`
-    );
-  }
-
-  if (isJsonResponse(pageResponse)) {
-    return resolveJsonPageSource(pageUrl, targetPath, pageResponse);
-  }
-
-  return await resolveHtmlPageWithRenderedFallback(
-    pageUrl,
-    targetPath,
-    timeoutMs,
-    pageResponse
-  );
-};
-
 const getExplicitApiSchemaSource = (): ApiSchemaSource | null => {
   const explicitApiJsonUrl = process.env.API_JSON_URL;
   if (explicitApiJsonUrl === undefined) {
@@ -419,7 +248,7 @@ const resolveLatestWithRetries = async (
 ): Promise<ApiSchemaSource> => {
   for (let attempt = 1; attempt <= settings.maxAttempts; attempt += 1) {
     try {
-      return await resolveLatestSourceOnce(
+      return await resolveRenderedPageSource(
         pageUrl,
         targetPath,
         settings.timeoutMs
@@ -456,7 +285,7 @@ const resolveManifestFallbackSource = async (
   }
 
   process.stdout.write(
-    `Latest API schema page could not expose a direct JSON link. Falling back to previous schema URL from manifest: ${fallbackUrl}\n`
+    `Rendered latest API schema page could not resolve a JSON link. Falling back to previous schema URL from manifest: ${fallbackUrl}\n`
   );
 
   return await resolveCandidateSource(

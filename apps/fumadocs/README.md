@@ -81,14 +81,12 @@ At startup, the app automatically:
 By default `API_SCHEMA_PAGE_URL` is `https://sbox.game/api/schema`, where s&box
 publishes the latest staging API schema. Set `API_JSON_URL` only when you need
 to pin a known schema JSON URL or temporarily work around an upstream download
-page issue. If the schema page does not expose a direct link in the initial
-HTML, bootstrap renders it with Chromium and reads the rendered download link.
-Set `API_SCHEMA_RENDER_BROWSER=false` to disable that fallback, or
-`API_SCHEMA_BROWSER_EXECUTABLE_PATH` to use a non-default Chromium path. If the
-resolved schema fingerprint still matches the generated outputs, bootstrap
-skips regeneration. The Meilisearch indexer also skips re-indexing and
-re-embedding when the generated entities and embedder configuration are
-unchanged.
+page issue. Bootstrap renders the schema page with Chromium and reads the
+rendered download link. Set `API_SCHEMA_BROWSER_EXECUTABLE_PATH` to use a
+non-default Chromium path. If the resolved schema fingerprint still matches the
+generated outputs, bootstrap skips regeneration. The Meilisearch indexer also
+skips re-indexing and re-embedding when the generated entities and embedder
+configuration are unchanged.
 
 5. Index documents into Meilisearch (if you use Meilisearch search):
 
