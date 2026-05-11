@@ -15,8 +15,10 @@ const GITHUB_API_BASE_URL = "https://api.github.com";
 const GITHUB_BRANCH = "master";
 const GITHUB_OWNER = "Facepunch";
 const GITHUB_REPOSITORY = "sbox-docs";
+const GITHUB_COMMITS_ATOM_FEED_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/commits/${GITHUB_BRANCH}.atom`;
 const HEAD_CACHE_TTL_MS = 60_000;
 const OFFICIAL_DOCS_BASE_URL = "/docs/official";
+const OFFICIAL_DOCS_REVALIDATE_SECONDS = 60;
 
 export const OFFICIAL_DOCS_FOLDER_NAME = "Guides";
 export const OFFICIAL_DOCS_FOLDER_URL = OFFICIAL_DOCS_BASE_URL;
@@ -117,6 +119,28 @@ const officialDocRawCache = new Map<string, Promise<string>>();
 const officialDocsSearchCache = new Map<string, Promise<SearchServer>>();
 const officialDocsTreeCache = new Map<string, Promise<TreeCacheEntry>>();
 
+const getCachedPromise = <T>(
+  cache: Map<string, Promise<T>>,
+  key: string,
+  createPromise: () => Promise<T>
+): Promise<T> => {
+  const cached = cache.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
+    try {
+      return await createPromise();
+    } catch (error) {
+      cache.delete(key);
+      throw error;
+    }
+  })();
+  cache.set(key, promise);
+  return promise;
+};
+
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/u;
 const MARKDOWN_EXTENSION_PATTERN = /\.md$/u;
 const ROOT_TOC_PATH = `${DOCS_ROOT}/toc.yml`;
@@ -130,6 +154,7 @@ const DESCRIPTION_ADMONITION_OPEN_PATTERN =
   /^:{3,}[a-z]+(?:\s+\[([^\]]+)\])?\s*/gmu;
 const DESCRIPTION_ADMONITION_CLOSE_PATTERN = /^:{3,}\s*$/gmu;
 const MATERIAL_ICON_NAME_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/u;
+const COMMIT_SHA_PATTERN = /\b[0-9a-f]{40}\b/iu;
 
 const buildGitHubApiUrl = (pathname: string): string =>
   `${GITHUB_API_BASE_URL}/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}${pathname}`;
@@ -326,14 +351,53 @@ const parseFrontmatter = (
   };
 };
 
-const requestGitHubJson = async <T>(url: string): Promise<T> => {
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "sdocs-official-docs",
-    },
-  });
+interface UpstreamRequestOptions {
+  accept?: string;
+  cache?: RequestCache;
+  revalidateSeconds?: false | number;
+}
+
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const buildUpstreamRequestInit = ({
+  accept,
+  cache = "force-cache",
+  revalidateSeconds,
+}: UpstreamRequestOptions = {}): RequestInit & {
+  next?: { revalidate?: false | number };
+} => {
+  const headers: Record<string, string> = {
+    "User-Agent": "sdocs-official-docs",
+  };
+
+  if (accept) {
+    headers.Accept = accept;
+  }
+
+  const init: RequestInit & { next?: { revalidate?: false | number } } = {
+    cache,
+    headers,
+  };
+
+  if (revalidateSeconds !== undefined) {
+    init.next = { revalidate: revalidateSeconds };
+  }
+
+  return init;
+};
+
+const requestGitHubJson = async <T>(
+  url: string,
+  options?: UpstreamRequestOptions
+): Promise<T> => {
+  const response = await fetch(
+    url,
+    buildUpstreamRequestInit({
+      ...options,
+      accept: options?.accept ?? "application/vnd.github+json",
+    })
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -344,13 +408,11 @@ const requestGitHubJson = async <T>(url: string): Promise<T> => {
   return (await response.json()) as T;
 };
 
-const requestText = async (url: string): Promise<string> => {
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      "User-Agent": "sdocs-official-docs",
-    },
-  });
+const requestText = async (
+  url: string,
+  options?: UpstreamRequestOptions
+): Promise<string> => {
+  const response = await fetch(url, buildUpstreamRequestInit(options));
 
   if (!response.ok) {
     throw new Error(
@@ -361,25 +423,88 @@ const requestText = async (url: string): Promise<string> => {
   return response.text();
 };
 
+const extractLatestShaFromAtomFeed = (atomFeed: string): string | null => {
+  const firstEntry = atomFeed.match(/<entry\b[\s\S]*?<\/entry>/iu)?.[0];
+  return (firstEntry ?? atomFeed).match(COMMIT_SHA_PATTERN)?.[0] ?? null;
+};
+
+const requestLatestShaFromAtomFeed = async (): Promise<string> => {
+  const atomFeed = await requestText(GITHUB_COMMITS_ATOM_FEED_URL, {
+    accept: "application/atom+xml, application/xml;q=0.9, text/xml;q=0.8",
+    revalidateSeconds: OFFICIAL_DOCS_REVALIDATE_SECONDS,
+  });
+  const sha = extractLatestShaFromAtomFeed(atomFeed);
+
+  if (!sha) {
+    throw new Error("GitHub commits feed did not include a commit SHA");
+  }
+
+  return sha;
+};
+
+const requestLatestShaFromGitHubApi = async (): Promise<string> => {
+  const response = await requestGitHubJson<GitHubRefResponse>(
+    buildGitHubApiUrl(`/git/ref/heads/${GITHUB_BRANCH}`),
+    {
+      revalidateSeconds: OFFICIAL_DOCS_REVALIDATE_SECONDS,
+    }
+  );
+  const sha = response.object?.sha;
+
+  if (!sha) {
+    throw new Error("GitHub ref response did not include a commit SHA");
+  }
+
+  return sha;
+};
+
+const rememberLatestOfficialDocsSha = (sha: string, checkedAt: number) => {
+  latestHeadCache = {
+    checkedAt,
+    sha,
+  };
+};
+
+const requestLatestShaFromApiFallback = async (
+  feedError: unknown
+): Promise<string> => {
+  try {
+    return await requestLatestShaFromGitHubApi();
+  } catch (apiError) {
+    throw new Error(
+      `Unable to resolve latest official docs SHA. Atom feed failed: ${toErrorMessage(
+        feedError
+      )}. GitHub API fallback failed: ${toErrorMessage(apiError)}`,
+      { cause: apiError }
+    );
+  }
+};
+
+const requestLatestOfficialDocsSha = async (): Promise<string> => {
+  try {
+    return await requestLatestShaFromAtomFeed();
+  } catch (feedError) {
+    return requestLatestShaFromApiFallback(feedError);
+  }
+};
+
 export const getLatestOfficialDocsSha = async (): Promise<string> => {
   const now = Date.now();
   if (latestHeadCache && now - latestHeadCache.checkedAt < HEAD_CACHE_TTL_MS) {
     return latestHeadCache.sha;
   }
 
-  const response = await requestGitHubJson<GitHubRefResponse>(
-    buildGitHubApiUrl(`/git/ref/heads/${GITHUB_BRANCH}`)
-  );
-  const sha = response.object?.sha;
-  if (!sha) {
-    throw new Error("GitHub ref response did not include a commit SHA");
-  }
+  try {
+    const sha = await requestLatestOfficialDocsSha();
+    rememberLatestOfficialDocsSha(sha, now);
+    return sha;
+  } catch (error) {
+    if (latestHeadCache) {
+      return latestHeadCache.sha;
+    }
 
-  latestHeadCache = {
-    checkedAt: now,
-    sha,
-  };
-  return sha;
+    throw error;
+  }
 };
 
 const toDocsTreeMap = (
@@ -395,33 +520,25 @@ const toDocsTreeMap = (
 
 const getOfficialDocsTree = (
   sha: string
-): Promise<ReadonlyMap<string, GitHubTreeEntry>> => {
-  const cached = docsTreeCache.get(sha);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = (async () =>
+): Promise<ReadonlyMap<string, GitHubTreeEntry>> =>
+  getCachedPromise(docsTreeCache, sha, async () =>
     toDocsTreeMap(
       await requestGitHubJson<GitHubTreeResponse>(
-        buildGitHubApiUrl(`/git/trees/${sha}?recursive=1`)
+        buildGitHubApiUrl(`/git/trees/${sha}?recursive=1`),
+        {
+          revalidateSeconds: false,
+        }
       )
-    ))();
-
-  docsTreeCache.set(sha, promise);
-  return promise;
-};
+    )
+  );
 
 const getOfficialDocRaw = (repoPath: string, sha: string): Promise<string> => {
   const cacheKey = `${sha}:${repoPath}`;
-  const cached = officialDocRawCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = requestText(buildRawGithubUrl(repoPath, sha));
-  officialDocRawCache.set(cacheKey, promise);
-  return promise;
+  return getCachedPromise(officialDocRawCache, cacheKey, () =>
+    requestText(buildRawGithubUrl(repoPath, sha), {
+      revalidateSeconds: false,
+    })
+  );
 };
 
 const createDocRepoPathCandidates = (slugs: string[]): string[] => {
@@ -782,16 +899,10 @@ const buildOfficialDocsSectionTree = async (
 
 const getOfficialDocsSectionTreeBySha = (
   sha: string
-): Promise<TreeCacheEntry> => {
-  const cached = officialDocsTreeCache.get(sha);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = buildOfficialDocsSectionTree(sha);
-  officialDocsTreeCache.set(sha, promise);
-  return promise;
-};
+): Promise<TreeCacheEntry> =>
+  getCachedPromise(officialDocsTreeCache, sha, () =>
+    buildOfficialDocsSectionTree(sha)
+  );
 
 const buildOfficialDocPage = async (
   normalizedSlugs: string[],
@@ -898,26 +1009,16 @@ export const getOfficialDocPage = async (
   const sha = await getLatestOfficialDocsSha();
   const normalizedSlugs = normalizeRequestedSlugs(slugs);
   const cacheKey = `${sha}:${normalizedSlugs.join("/")}`;
-  const cached = officialDocPageCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = buildOfficialDocPage(normalizedSlugs, sha);
-  officialDocPageCache.set(cacheKey, promise);
-  return promise;
+  return getCachedPromise(officialDocPageCache, cacheKey, () =>
+    buildOfficialDocPage(normalizedSlugs, sha)
+  );
 };
 
 export const getOfficialDocsSearch = async (): Promise<SearchServer> => {
   const sha = await getLatestOfficialDocsSha();
-  const cached = officialDocsSearchCache.get(sha);
-  if (cached) {
-    return cached;
-  }
-
-  const promise = buildOfficialDocsSearchServer(sha);
-  officialDocsSearchCache.set(sha, promise);
-  return promise;
+  return getCachedPromise(officialDocsSearchCache, sha, () =>
+    buildOfficialDocsSearchServer(sha)
+  );
 };
 
 const isHttpUrl = (value: string): boolean =>
