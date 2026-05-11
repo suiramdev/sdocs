@@ -9,6 +9,7 @@ import { resolveApiSchemaSource } from "./api-schema-source";
 const originalFetch = globalThis.fetch;
 const originalApiJsonUrl = process.env.API_JSON_URL;
 const originalApiSchemaPageUrl = process.env.API_SCHEMA_PAGE_URL;
+const originalApiSchemaRenderBrowser = process.env.API_SCHEMA_RENDER_BROWSER;
 const originalStdoutWrite = process.stdout.write;
 const SCHEMA_PAGE_URL = "https://docs.example.com/api/schema";
 const SCHEMA_DOWNLOAD_URL = "https://cdn.example.com/releases/latest.zip.json";
@@ -47,6 +48,33 @@ const noopRetryLogger = async (): Promise<void> => {
 const setLatestSchemaEnv = (): void => {
   delete process.env.API_JSON_URL;
   process.env.API_SCHEMA_PAGE_URL = SCHEMA_PAGE_URL;
+};
+
+const restoreApiJsonUrl = (): void => {
+  if (originalApiJsonUrl === undefined) {
+    delete process.env.API_JSON_URL;
+    return;
+  }
+
+  process.env.API_JSON_URL = originalApiJsonUrl;
+};
+
+const restoreApiSchemaPageUrl = (): void => {
+  if (originalApiSchemaPageUrl === undefined) {
+    delete process.env.API_SCHEMA_PAGE_URL;
+    return;
+  }
+
+  process.env.API_SCHEMA_PAGE_URL = originalApiSchemaPageUrl;
+};
+
+const restoreApiSchemaRenderBrowser = (): void => {
+  if (originalApiSchemaRenderBrowser === undefined) {
+    delete process.env.API_SCHEMA_RENDER_BROWSER;
+    return;
+  }
+
+  process.env.API_SCHEMA_RENDER_BROWSER = originalApiSchemaRenderBrowser;
 };
 
 const createSchemaPageResponse = (): Response =>
@@ -150,21 +178,34 @@ const expectManifestFallbackSource = async (
   expect(await readFile(targetPath, "utf8")).toBe('{"types":["previous"]}');
 };
 
+const prepareManifestFallbackTest = async (): Promise<{
+  cleanup: () => Promise<void>;
+  originalManifest: string | null;
+  targetPath: string;
+}> => {
+  setLatestSchemaEnv();
+  process.env.API_SCHEMA_RENDER_BROWSER = "false";
+  const target = await createTargetPath();
+  const originalManifest = await readFile(stateFile, "utf8").catch(() => null);
+  await writeManifestSource(MANIFEST_SCHEMA_URL);
+  mockFetchResponses([
+    createBlazorShellResponse(),
+    createPreviousSchemaJsonResponse(),
+  ]);
+
+  return {
+    cleanup: target.cleanup,
+    originalManifest,
+    targetPath: target.targetPath,
+  };
+};
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   process.stdout.write = originalStdoutWrite;
-
-  if (originalApiJsonUrl === undefined) {
-    delete process.env.API_JSON_URL;
-  } else {
-    process.env.API_JSON_URL = originalApiJsonUrl;
-  }
-
-  if (originalApiSchemaPageUrl === undefined) {
-    delete process.env.API_SCHEMA_PAGE_URL;
-  } else {
-    process.env.API_SCHEMA_PAGE_URL = originalApiSchemaPageUrl;
-  }
+  restoreApiJsonUrl();
+  restoreApiSchemaPageUrl();
+  restoreApiSchemaRenderBrowser();
 });
 
 describe("resolveApiSchemaSource", () => {
@@ -241,18 +282,10 @@ describe("resolveApiSchemaSource", () => {
   });
 
   it("falls back to the previous manifest URL when the schema page is Blazor-only", async () => {
-    setLatestSchemaEnv();
-    const { cleanup, targetPath } = await createTargetPath();
-    const originalManifest = await readFile(stateFile, "utf8").catch(
-      () => null
-    );
-    mockFetchResponses([
-      createBlazorShellResponse(),
-      createPreviousSchemaJsonResponse(),
-    ]);
+    const { cleanup, originalManifest, targetPath } =
+      await prepareManifestFallbackTest();
 
     try {
-      await writeManifestSource(MANIFEST_SCHEMA_URL);
       const source = await resolveTestSource(targetPath);
       await expectManifestFallbackSource(source, targetPath);
     } finally {

@@ -7,6 +7,9 @@ import {
 } from "./api-reference-state";
 
 const DEFAULT_API_SCHEMA_PAGE_URL = "https://sbox.game/api/schema";
+const DEFAULT_BROWSER_EXECUTABLE_PATH = "/usr/bin/chromium";
+const RENDERED_SCHEMA_LINK_SELECTOR =
+  'a[download][href$=".json"], a[href*="cdn.sbox.game"][href$=".json"]';
 
 const JSON_CONTENT_TYPES = [
   "application/json",
@@ -255,6 +258,100 @@ const resolveHtmlPageSource = async (
   throw new Error(buildCandidateFailureMessage(pageUrl, failures));
 };
 
+const getBrowserExecutablePath = (): string =>
+  (
+    process.env.API_SCHEMA_BROWSER_EXECUTABLE_PATH ??
+    DEFAULT_BROWSER_EXECUTABLE_PATH
+  ).trim();
+
+const shouldRenderSchemaPage = (): boolean =>
+  process.env.API_SCHEMA_RENDER_BROWSER !== "false";
+
+const launchSchemaBrowser = async () => {
+  const { chromium } = await import("playwright-core");
+  return await chromium.launch({
+    args: ["--disable-dev-shm-usage", "--no-sandbox"],
+    executablePath: getBrowserExecutablePath(),
+    headless: true,
+  });
+};
+
+const getRenderedLinkHref = async (
+  pageUrl: string,
+  timeoutMs: number,
+  browser: Awaited<ReturnType<typeof launchSchemaBrowser>>
+): Promise<string> => {
+  const page = await browser.newPage();
+  await page.goto(pageUrl, {
+    timeout: timeoutMs,
+    waitUntil: "domcontentloaded",
+  });
+  const link = page.locator(RENDERED_SCHEMA_LINK_SELECTOR).first();
+  await link.waitFor({ state: "attached", timeout: timeoutMs });
+  const href = await link.getAttribute("href");
+
+  if (!href) {
+    throw new Error("Rendered API schema download link has no href");
+  }
+
+  return normalizeUrl(href, page.url());
+};
+
+const getRenderedSchemaUrl = async (
+  pageUrl: string,
+  timeoutMs: number
+): Promise<string> => {
+  const browser = await launchSchemaBrowser();
+
+  try {
+    return await getRenderedLinkHref(pageUrl, timeoutMs, browser);
+  } finally {
+    await browser.close();
+  }
+};
+
+const resolveRenderedPageSource = async (
+  pageUrl: string,
+  targetPath: string,
+  timeoutMs: number
+): Promise<ApiSchemaSource> => {
+  const renderedSchemaUrl = await getRenderedSchemaUrl(pageUrl, timeoutMs);
+  process.stdout.write(
+    `Resolved rendered API schema download link: ${renderedSchemaUrl}\n`
+  );
+  return await resolveCandidateSource(
+    renderedSchemaUrl,
+    pageUrl,
+    targetPath,
+    timeoutMs
+  );
+};
+
+const resolveHtmlPageWithRenderedFallback = async (
+  pageUrl: string,
+  targetPath: string,
+  timeoutMs: number,
+  pageResponse: Response
+): Promise<ApiSchemaSource> => {
+  try {
+    return await resolveHtmlPageSource(
+      pageUrl,
+      targetPath,
+      timeoutMs,
+      pageResponse
+    );
+  } catch (error: unknown) {
+    if (!shouldRenderSchemaPage()) {
+      throw error;
+    }
+
+    process.stdout.write(
+      `Static API schema page parsing failed: ${formatError(error)}. Trying rendered page fallback...\n`
+    );
+    return await resolveRenderedPageSource(pageUrl, targetPath, timeoutMs);
+  }
+};
+
 const resolveLatestSourceOnce = async (
   pageUrl: string,
   targetPath: string,
@@ -272,7 +369,12 @@ const resolveLatestSourceOnce = async (
     return resolveJsonPageSource(pageUrl, targetPath, pageResponse);
   }
 
-  return resolveHtmlPageSource(pageUrl, targetPath, timeoutMs, pageResponse);
+  return await resolveHtmlPageWithRenderedFallback(
+    pageUrl,
+    targetPath,
+    timeoutMs,
+    pageResponse
+  );
 };
 
 const getExplicitApiSchemaSource = (): ApiSchemaSource | null => {

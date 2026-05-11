@@ -29,6 +29,7 @@
     "lucide-react": "^0.575.0",
     "meilisearch": "^0.57.0",
     "next": "16.1.6",
+    "playwright-core": "^1.59.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "server-only": "^0.0.1",
