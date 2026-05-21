@@ -45,6 +45,7 @@ export const apiDocsRoot = path.join(projectRoot, "content", "api-generated");
 export const entitiesRoot = path.join(projectRoot, "data", "api", "entities");
 export const entitiesFile = path.join(entitiesRoot, "latest.json");
 export const stateFile = path.join(entitiesRoot, "manifest.json");
+export const syncLockDir = path.join(entitiesRoot, "sync.lock");
 
 const generateScriptPath = path.join(
   projectRoot,

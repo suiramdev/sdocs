@@ -1,6 +1,7 @@
 import { getEntityById, loadApiEntities } from "@/features/api/utils/data";
 import type { ApiEntity, ApiExample } from "@/features/api/utils/schemas";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
+import { getTutorialDocPage } from "@/features/learn-docs/utils/source";
 import { getOfficialDocPage } from "@/features/official-docs/utils/source";
 
 import {
@@ -18,12 +19,25 @@ import {
 import type { RelatedGuide, RelatedGuideSymbol } from "./guide-relations";
 import { compactMcpResource } from "./mcp-compact";
 import { encodeMcpContent, MCP_TOON_MIME_TYPE } from "./mcp-format";
+import {
+  completeTutorialDocumentationResourceNames,
+  getGuideRelatedTutorials,
+  getRelatedTutorialsForEntity,
+  getTutorialRelatedGuides,
+  getTutorialRelatedSymbols,
+} from "./tutorial-relations";
+import type {
+  RelatedTutorial,
+  RelatedTutorialGuide,
+  RelatedTutorialSymbol,
+} from "./tutorial-relations";
 
 type DocumentationResourceKind =
   | "guide"
   | "member"
   | "namespace"
   | "schema"
+  | "tutorial"
   | "type";
 type DocumentationMemberKind = "constructor" | "event" | "method" | "property";
 type DocumentationTypeMemberKind = Exclude<DocumentationMemberKind, "event">;
@@ -102,6 +116,7 @@ interface TypeResourceDocument {
     summary: string;
   }[];
   relatedGuides: RelatedGuide[];
+  relatedTutorials: RelatedTutorial[];
   symbol: {
     declaration: {
       displaySignature: string;
@@ -161,6 +176,7 @@ interface MemberResourceDocument {
     summary: string;
   };
   relatedGuides: RelatedGuide[];
+  relatedTutorials: RelatedTutorial[];
 }
 
 interface GuideResourceDocument {
@@ -175,6 +191,26 @@ interface GuideResourceDocument {
   };
   links: ResourceLink[];
   relatedSymbols: RelatedGuideSymbol[];
+  relatedTutorials: RelatedTutorial[];
+}
+
+interface TutorialResourceDocument {
+  links: ResourceLink[];
+  relatedGuides: RelatedTutorialGuide[];
+  relatedSymbols: RelatedTutorialSymbol[];
+  tutorial: {
+    author?: string;
+    difficulty?: string;
+    docsUrl: string;
+    githubUrl: string;
+    markdown: string;
+    resourceUri: string;
+    slug: string;
+    summary?: string;
+    tags: string[];
+    title: string;
+    topic?: string;
+  };
 }
 
 interface ResourceCatalog {
@@ -222,6 +258,8 @@ const memberUri = (fullName: string): string =>
   `docs://member/${encodeResourceSegment(fullName)}`;
 
 const guideUri = (path: string): string => `docs://guide/${path}`;
+
+const tutorialUri = (path: string): string => `docs://tutorial/${path}`;
 
 const toToonResourceContents = (
   uri: string,
@@ -417,12 +455,21 @@ const toGuideLinks = (guides: RelatedGuide[]): ResourceLink[] =>
     uri: guide.resourceUri,
   }));
 
+const toTutorialLinks = (tutorials: RelatedTutorial[]): ResourceLink[] =>
+  tutorials.map((tutorial) => ({
+    docsUrl: tutorial.url,
+    rel: "tutorial",
+    title: tutorial.title,
+    uri: tutorial.resourceUri,
+  }));
+
 const buildSchemaResource = (): ResourceEnvelope<ResourceSchemaDocument> => ({
   data: {
     notes: [
       "Resources complement the MCP tools. Start with search_docs for discovery, then read a docs:// resource when you know the canonical target symbol.",
       "Namespace URIs use docs://namespace/{name}. Use docs://namespace/root for the root namespace listing.",
       "Type URIs use docs://type/{full_name}. Member URIs use docs://member/{full_name}, typically with a fully-qualified member reference such as Sandbox.Component.OnUpdate.",
+      "Tutorial URIs use docs://tutorial/{path}. Search them with search_tutorials, then read the tutorial resource to follow linked API symbols and official guides.",
     ],
     resources: [
       {
@@ -483,11 +530,25 @@ const buildSchemaResource = (): ResourceEnvelope<ResourceSchemaDocument> => ({
         whenToUse:
           "Use after following a related guide link from a type/member resource or get_related_guides.",
       },
+      {
+        description:
+          "Mirrored community tutorial with backlinks to referenced guides and API symbols.",
+        kind: "tutorial",
+        returns: [
+          "tutorial markdown content",
+          "tutorial metadata",
+          "related official guides",
+          "related API symbols",
+        ],
+        uriTemplate: "docs://tutorial/{path}",
+        whenToUse:
+          "Use after search_tutorials or when an API or guide resource links to a tutorial.",
+      },
     ],
     workflow: {
       nextStep:
-        "Load a docs:// resource after tool-based discovery to retrieve the canonical structured page or a related guide with broader usage context.",
-      startWith: "search_docs",
+        "Load a docs:// resource after tool-based discovery to retrieve the canonical structured page or a linked tutorial/guide with broader usage context.",
+      startWith: "search_docs or search_tutorials",
     },
   },
   resource: {
@@ -528,6 +589,11 @@ export const completeMemberResourceNames = async (
 export const completeGuideDocumentationResourceNames = async (
   prefix: string
 ): Promise<string[]> => await completeGuideResourceNames(prefix);
+
+export const completeTutorialDocumentationResourcePaths = async (
+  prefix: string
+): Promise<string[]> =>
+  await completeTutorialDocumentationResourceNames(prefix);
 
 export const readDocumentationSchemaResource = () => buildSchemaResource();
 
@@ -616,7 +682,10 @@ export const readDocumentationTypeResource = async (
     limit: Number.MAX_SAFE_INTEGER,
     symbol: symbolResult.symbol.fullName,
   });
-  const relatedGuides = await getRelatedGuidesForEntity(entity);
+  const [relatedGuides, relatedTutorials] = await Promise.all([
+    getRelatedGuidesForEntity(entity),
+    getRelatedTutorialsForEntity(entity),
+  ]);
 
   return {
     data: {
@@ -629,6 +698,7 @@ export const readDocumentationTypeResource = async (
           uri: namespaceUri(symbolResult.symbol.namespace),
         },
         ...toGuideLinks(relatedGuides),
+        ...toTutorialLinks(relatedTutorials),
         ...membersResult.members.map((member) => ({
           docsUrl: member.url,
           rel: "member",
@@ -653,6 +723,7 @@ export const readDocumentationTypeResource = async (
           summary: member.summary,
         })),
       relatedGuides,
+      relatedTutorials,
       symbol: {
         declaration: symbolResult.symbol.declaration,
         description: getEntityDescription(entity),
@@ -698,7 +769,10 @@ export const readDocumentationMemberResource = async (
     limit: Number.MAX_SAFE_INTEGER,
     symbol: symbolResult.symbol.fullName,
   });
-  const relatedGuides = await getRelatedGuidesForEntity(entity);
+  const [relatedGuides, relatedTutorials] = await Promise.all([
+    getRelatedGuidesForEntity(entity),
+    getRelatedTutorialsForEntity(entity),
+  ]);
 
   return {
     data: {
@@ -717,6 +791,7 @@ export const readDocumentationMemberResource = async (
           namespace: symbolResult.symbol.namespace,
         }),
         ...toGuideLinks(relatedGuides),
+        ...toTutorialLinks(relatedTutorials),
       ],
       member: {
         declaration: memberDetails.declaration,
@@ -736,6 +811,7 @@ export const readDocumentationMemberResource = async (
         summary: memberDetails.summary,
       },
       relatedGuides,
+      relatedTutorials,
     },
     resource: {
       description:
@@ -765,7 +841,10 @@ export const readDocumentationGuideResource = async (
     });
   }
 
-  const relatedSymbols = await getGuideRelatedSymbols(resourceName);
+  const [relatedSymbols, relatedTutorials] = await Promise.all([
+    getGuideRelatedSymbols(resourceName),
+    getGuideRelatedTutorials(resourceName),
+  ]);
 
   return {
     data: {
@@ -778,13 +857,17 @@ export const readDocumentationGuideResource = async (
         resourceUri: guideUri(resourceName),
         title: page.title,
       },
-      links: relatedSymbols.map((symbol) => ({
-        docsUrl: symbol.docsUrl,
-        rel: "symbol",
-        title: symbol.fullName,
-        uri: symbol.resourceUri,
-      })),
+      links: [
+        ...relatedSymbols.map((symbol) => ({
+          docsUrl: symbol.docsUrl,
+          rel: "symbol",
+          title: symbol.fullName,
+          uri: symbol.resourceUri,
+        })),
+        ...toTutorialLinks(relatedTutorials),
+      ],
       relatedSymbols,
+      relatedTutorials,
     },
     resource: {
       description: "Official guide page related to the indexed s&box API.",
@@ -797,11 +880,75 @@ export const readDocumentationGuideResource = async (
   };
 };
 
+export const readDocumentationTutorialResource = async (
+  rawPath: string
+): Promise<ResourceEnvelope<TutorialResourceDocument>> => {
+  const slug = decodeResourceSegment(rawPath).trim();
+  const tutorial = await getTutorialDocPage(slug);
+  if (!tutorial) {
+    throw new ApiV1Error({
+      code: "NOT_FOUND",
+      details: { path: slug },
+      message: "Tutorial not found.",
+      status: 404,
+    });
+  }
+
+  const [relatedGuides, relatedSymbols] = await Promise.all([
+    getTutorialRelatedGuides(tutorial.slug),
+    getTutorialRelatedSymbols(tutorial.slug),
+  ]);
+
+  return {
+    data: {
+      links: [
+        ...relatedGuides.map((guide) => ({
+          docsUrl: guide.url,
+          rel: "guide",
+          title: guide.title,
+          uri: guide.resourceUri,
+        })),
+        ...relatedSymbols.map((symbol) => ({
+          docsUrl: symbol.docsUrl,
+          rel: "symbol",
+          title: symbol.fullName,
+          uri: symbol.resourceUri,
+        })),
+      ],
+      relatedGuides,
+      relatedSymbols,
+      tutorial: {
+        author: tutorial.author,
+        difficulty: tutorial.difficulty,
+        docsUrl: tutorial.url,
+        githubUrl: tutorial.githubUrl,
+        markdown: tutorial.markdown,
+        resourceUri: tutorialUri(tutorial.slug),
+        slug: tutorial.slug,
+        summary: tutorial.summary,
+        tags: tutorial.tags,
+        title: tutorial.title,
+        topic: tutorial.topic,
+      },
+    },
+    resource: {
+      description:
+        "Mirrored community tutorial from sbox.game/learn with linked API and guide references.",
+      docsUrl: tutorial.url,
+      kind: "tutorial",
+      mimeType: MCP_TOON_MIME_TYPE,
+      title: tutorial.title,
+      uri: tutorialUri(tutorial.slug),
+    },
+  };
+};
+
 export const toDocumentationResourceResult = (
   resource:
     | ResourceEnvelope<GuideResourceDocument>
     | ResourceEnvelope<MemberResourceDocument>
     | ResourceEnvelope<NamespaceResourceDocument>
     | ResourceEnvelope<ResourceSchemaDocument>
+    | ResourceEnvelope<TutorialResourceDocument>
     | ResourceEnvelope<TypeResourceDocument>
 ) => toToonResourceContents(resource.resource.uri, resource);

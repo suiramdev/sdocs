@@ -38,6 +38,7 @@ export const toolNameSchema = z.enum([
   "resolve_symbol",
   "search_docs",
   "search_documentation",
+  "search_tutorials",
 ]);
 
 export const searchDocsQuerySchema = z.object({
@@ -65,6 +66,12 @@ export const searchDocumentationToolInputSchema = z.object({
   detail: mcpDetailModeSchema,
   includeGuides: z.boolean().optional(),
   includeSymbols: z.boolean().optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  query: z.string().trim().min(1),
+});
+
+export const searchTutorialsToolInputSchema = z.object({
+  detail: mcpDetailModeSchema,
   limit: z.number().int().min(1).max(20).optional(),
   query: z.string().trim().min(1),
 });

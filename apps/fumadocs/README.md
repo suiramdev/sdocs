@@ -81,11 +81,6 @@ set, but Docker builds should pass both values so `next build` bakes the
 correct URLs into generated docs. For local development that is usually
 `http://localhost:4000`.
 
-At startup, the app automatically:
-
-- Resolves the latest API dump from `API_SCHEMA_PAGE_URL`
-- Regenerates API entities + API reference docs
-
 By default `API_SCHEMA_PAGE_URL` is `https://sbox.game/api/schema`, where s&box
 publishes the latest staging API schema. Set `API_JSON_URL` only when you need
 to pin a known schema JSON URL or temporarily work around an upstream download
@@ -96,15 +91,15 @@ generated outputs, bootstrap skips regeneration. The Meilisearch indexer also
 skips re-indexing and re-embedding when the generated entities and embedder
 configuration are unchanged.
 
-5. Index documents into Meilisearch (if you use Meilisearch search):
+5. Sync the latest API docs and index state:
 
 ```bash
-bun run api:index --reset
+bun run api:sync
 ```
 
 To use Chutes instead of OpenAI for hybrid embeddings, set
 `MEILI_EMBEDDER_PROVIDER=chutes`, `CHUTES_API_KEY`, and
-`CHUTES_API_BASE_URL`, then re-run the indexer so Meilisearch rebuilds
+`CHUTES_API_BASE_URL`, then re-run the sync job so Meilisearch rebuilds
 embeddings with the new provider.
 
 If you hit `EMFILE: too many open files, watch` while developing with a fully generated API tree, increase your file descriptor limit before running dev:
@@ -131,8 +126,11 @@ ulimit -n 65536
 - Entities: `data/api/entities/latest.json`
 
 The documentation toolchain is exposed as a standardized SDK-style toolset:
-`search_docs` for discovery across guides and API symbols, then `read_doc` for
-iterative deep reads on returned handles and references.
+`search_docs` for discovery across guides and API symbols, `search_tutorials`
+for community learn content mirrored from `sbox.game/learn`, then `read_doc`
+for iterative deep reads on returned handles and references across
+`docs://type/...`, `docs://member/...`, `docs://guide/...`, and
+`docs://tutorial/...`.
 
 ## Docker Deployment
 
@@ -146,8 +144,8 @@ This starts:
 
 - `fumadocs` on `http://localhost:4000`
 - `meilisearch` on `http://localhost:7700`
-- `fumadocs-indexer`, which rebuilds the Meilisearch index in the background
-  after `fumadocs` has started and become healthy
+- `fumadocs-indexer`, a one-shot sync job that bootstraps API docs/entities and
+  rebuilds the Meilisearch index in the shared Docker volumes
 - `fumadocs-schema-refresher`, which periodically checks the latest schema,
   regenerates API docs/entities when it changes, and refreshes the Meilisearch
   index only when needed
@@ -160,20 +158,33 @@ FUMADOCS_PORT=4400 MEILI_PORT=7710 docker compose up -d --build
 
 With that override, the app is available on `http://localhost:4400`.
 
-To manually rerun API indexing after deployment:
+To manually rerun the bootstrap + indexing sync job after deployment:
 
 ```bash
 docker compose up --build fumadocs-indexer
 ```
 
-The `fumadocs` service startup automatically resolves the latest schema and regenerates API docs/entities before serving traffic. Regeneration is also triggered on redeploy when the repository example scraper inputs change, including updates to `data/api/example-repositories.json` and changes to the repository scraping scripts. During Docker deployment, the separate `fumadocs-indexer` job waits for the app to become healthy, then reuses the generated entities from the shared Docker volume and rebuilds the Meilisearch index only when the API version or embedder settings changed.
+The `fumadocs` service now starts HTTP immediately and does not block on API
+bootstrap. Initial generation and re-indexing run in the separate
+`fumadocs-indexer` sync job, which reuses the shared generated-asset volumes and
+skips work when the API version, scraper inputs, or embedder settings have not
+changed. That removes long schema/bootstrap work from the web container health
+path and avoids false unhealthy deploys while the sync work is still running.
 
 Long-running Docker deployments also run `fumadocs-schema-refresher`. It shares
-the generated docs/entities volumes, runs `api:bootstrap:index`, then sleeps for
-`API_SCHEMA_CHECK_INTERVAL_SECONDS` seconds. The default interval is `3600`.
+the generated docs/entities volumes, runs the same `api:sync` pipeline behind a
+filesystem lock after each `API_SCHEMA_CHECK_INTERVAL_SECONDS` sleep interval.
+The default interval is `3600`.
 Use `API_JSON_URL` as an explicit override only when you need to pin a specific
 schema JSON artifact; otherwise leave it unset so the latest schema is resolved
 automatically.
+
+Community tutorials are pulled from the upstream
+`coffeegrind123/sbox-learn-docs` mirror at request time. Tutorial search and
+relation indexes are cached by the latest upstream commit SHA, so any new
+mirror commit automatically invalidates the in-memory tutorial corpus, rebuilds
+its search index, and refreshes API/guide/tutorial backlinks without a manual
+sync step in this repo.
 
 For platform deployments such as Dokploy, prefer the dedicated health endpoint
 `/api/health` instead of `/`. The home page redirects to `/docs/get-started`,

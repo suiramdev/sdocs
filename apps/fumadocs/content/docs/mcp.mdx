@@ -175,14 +175,19 @@ workflow:
 In practice, an agent will usually:
 
 1. Call `search_docs` to find relevant guides and API entities
-2. Call `read_doc` on the best returned handle
-3. Inspect the returned references and tips
-4. Call `read_doc` again on any reference that looks relevant
-5. Repeat until it has enough exact API and guide context to answer
+2. Call `search_tutorials` when it wants community walkthroughs or learn-site examples
+3. Call `read_doc` on the best returned handle
+4. Inspect the returned references and tips
+5. Call `read_doc` again on any reference that looks relevant
+6. Repeat until it has enough exact API, guide, and tutorial context to answer
 
 This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
 of as raw page text.
+
+On the hosted deployment, the web container now starts serving immediately while
+API bootstrap and Meilisearch refresh run in separate sync workers. That keeps
+health probes tied to HTTP readiness instead of long-running schema generation.
 
 ## Transport and Payload Format
 
@@ -218,26 +223,31 @@ query: component update loop
 returned: 2
 ```
 
-## API Docs and Guides
+## API Docs, Guides, and Tutorials
 
-The MCP server exposes two connected documentation layers:
+The MCP server exposes three connected documentation layers:
 
 - Generated API docs for namespaces, types, and members
 - Official Guides fetched live from the s&box docs repository
+- Community tutorials mirrored from `coffeegrind123/sbox-learn-docs`
 
-The relationship is built at runtime. The server scans the upstream guide
-markdown, looks for symbol mentions in headings, prose, inline code, and code
-blocks, and then scores which guide pages are most relevant to each API symbol.
+The relationship is built at runtime. The server scans upstream guide and
+tutorial markdown, looks for symbol mentions in headings, prose, inline code,
+and code blocks, and also tracks direct guide/API links coming from tutorial
+pages. Both the tutorial search index and the backlink graph are cached by the
+latest upstream tutorial mirror commit SHA, so a new mirror commit
+automatically triggers a fresh in-memory re-index.
 
 That gives agents two useful directions:
 
 1. From an API symbol like `Sandbox.Component.OnUpdate()`, they can follow
-   related Guides for conceptual context, editor workflows, and practical usage
-   patterns.
-2. From a Guide page, they can inspect the related API symbols that the guide
-   discusses and then open the canonical type or member pages.
+   related Guides and Tutorials for conceptual context, editor workflows, and
+   practical usage patterns.
+2. From a Guide or Tutorial page, they can inspect the related API symbols that
+   the page discusses and then open the canonical type or member pages.
 
-Use the API docs for exact contracts. Use Guides for surrounding context.
+Use the API docs for exact contracts. Use Guides and Tutorials for surrounding
+context.
 
 ## Tool Reference
 
@@ -284,11 +294,37 @@ Example use:
 - Search for `NetworkMode`, `Ray`, `SceneTrace`, or `GameObject` without first
   knowing whether the answer is in a guide, enum, class, method, or property
 
+### `search_tutorials`
+
+Use this when you want community tutorials mirrored from `sbox.game/learn`.
+Results are tutorial handles that can be read with `read_doc`.
+
+Typical input:
+
+```json
+{
+  "query": "networked variables ui",
+  "limit": 5
+}
+```
+
+Typical TOON output includes:
+
+- Tutorial results only
+- A stable `docs://tutorial/{path}` handle for each result
+- Tutorial title, URL, summary, and source
+- A `next` tip telling the agent to call `read_doc` on the tutorial handle
+
+Example use:
+
+- Find community walkthroughs for UI, networking, mapping, or editor setup
+- Start from a tutorial, then follow its linked API symbols and official guides
+
 ### `read_doc`
 
-Use this on any `handle` returned by `search_docs` or by a previous `read_doc`
-response. The handle may point to a guide, enum, class, method, constructor, or
-property.
+Use this on any `handle` returned by `search_docs`, `search_tutorials`, or by a
+previous `read_doc` response. The handle may point to a tutorial, guide, enum,
+class, method, constructor, or property.
 
 Typical input:
 
@@ -301,8 +337,10 @@ Typical input:
 Typical TOON output includes:
 
 - The requested guide or API entity
+- The requested tutorial when the target is `docs://tutorial/...`
 - Exact API details when the target is a symbol
 - Guide markdown excerpts when the target is a guide
+- Tutorial markdown excerpts and metadata when the target is a tutorial
 - Related references with handles
 - A `tip` on each reference explaining when to read it next
 - Workflow guidance telling the agent to keep calling `read_doc` on relevant
@@ -312,6 +350,8 @@ Example use:
 
 - Read `docs://guide/scene/components`, then read the referenced
   `Sandbox.Component` and `Sandbox.Component.OnUpdate()` handles
+- Read `docs://tutorial/gibbard/networked-variable-ui`, then read the linked
+  API and Guide handles it references
 - Read `docs://type/Sandbox.NetworkMode`, then read related guide handles for
   networking behavior
 
@@ -332,6 +372,7 @@ Available resource patterns:
 - `docs://type/{full_name}`
 - `docs://member/{full_name}`
 - `docs://guide/{path}`
+- `docs://tutorial/{path}`
 
 Examples:
 
@@ -340,6 +381,7 @@ docs://namespace/Sandbox
 docs://type/Sandbox.Component
 docs://member/Sandbox.Component.OnUpdate
 docs://guide/scene/components
+docs://tutorial/gibbard/networked-variable-ui
 ```
 
 Resources return compact TOON documentation pages. Resource wrappers omit
@@ -350,14 +392,14 @@ Depending on the resource, the payload can include:
 - Exact signatures and declarations
 - Parameters, return types, and return documentation
 - Examples
-- Child namespaces, member listings, related guide links, and related API
-  symbol links
+- Child namespaces, member listings, related guide links, related tutorial
+  links, and related API symbol links
 
 Typical usage:
 
 1. Use `search_docs` to identify relevant handles
 2. Use `read_doc` to read the matching `docs://type/...`,
-   `docs://member/...`, or `docs://guide/...` handle
+   `docs://member/...`, `docs://guide/...`, or `docs://tutorial/...` handle
 3. Use the TOON resource payload as the canonical page for that API
    element or guide
 
@@ -367,11 +409,12 @@ For a question like "How do I update a custom component every frame?", a well
 behaved agent will usually:
 
 1. Use `search_docs` with a query like `component update every frame`
-2. Use `read_doc` on the best returned handle
-3. Inspect the references and their `tip` fields
-4. Use `read_doc` again on relevant guide, type, or member handles
-5. Repeat until it has enough exact API contracts and guide context to answer
+2. Optionally use `search_tutorials` for community examples on the same topic
+3. Use `read_doc` on the best returned handle
+4. Inspect the references and their `tip` fields
+5. Use `read_doc` again on relevant tutorial, guide, type, or member handles
+6. Repeat until it has enough exact API contracts and surrounding context to answer
 
 That is the intended MCP interaction model: search broadly, inspect the right
-symbol, then combine exact API pages with related Guides when the answer needs
-more than just signatures.
+symbol, then combine exact API pages with related Guides and Tutorials when the
+answer needs more than just signatures.
