@@ -18,6 +18,7 @@ import {
   resolveDocumentationSymbol,
   searchDocumentation,
   searchDocumentationAcrossSources,
+  searchTutorials,
 } from "./documentation-tools";
 
 export const searchApiReference = (input: SearchDocsToolInput) =>
@@ -29,6 +30,11 @@ export const searchApiReferenceDocumentation = (input: {
   limit?: number;
   query: string;
 }) => searchDocumentationAcrossSources(input);
+
+export const searchApiReferenceTutorials = (input: {
+  limit?: number;
+  query: string;
+}) => searchTutorials(input);
 
 export const readApiReferenceDocumentation = (input: {
   includeContent?: boolean;

@@ -14,6 +14,7 @@ import {
   readDocumentationToolInputSchema,
   resolveSymbolToolInputSchema,
   searchDocumentationToolInputSchema,
+  searchTutorialsToolInputSchema,
 } from "@/features/api/v1/domain/schemas";
 import {
   expandApiReferenceDocumentation,
@@ -27,6 +28,7 @@ import {
   readApiReferenceDocumentation,
   resolveApiReferenceSymbol,
   searchApiReferenceDocumentation,
+  searchApiReferenceTutorials,
 } from "@/features/api/v1/services/api-reference";
 
 type JsonSchema = Record<string, unknown>;
@@ -128,6 +130,26 @@ const readDocumentationInputSchema: JsonSchema = {
     },
   },
   required: ["target"],
+  type: "object",
+};
+
+const searchTutorialsInputSchema: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    detail: detailModeInputProperty,
+    limit: {
+      description: "Maximum number of tutorial results to return.",
+      maximum: 20,
+      minimum: 1,
+      type: "integer",
+    },
+    query: {
+      description:
+        "Keyword, topic, author, tag, or natural-language tutorial search.",
+      type: "string",
+    },
+  },
+  required: ["query"],
   type: "object",
 };
 
@@ -514,10 +536,22 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
     name: "search_documentation",
     schema: searchDocumentationToolInputSchema,
   },
+  search_tutorials: {
+    description:
+      "Search mirrored community tutorials from sbox.game/learn. Returns tutorial handles for read_doc.",
+    execute: async (input) => {
+      const parsed = searchTutorialsToolInputSchema.parse(input);
+      return await searchApiReferenceTutorials(parsed);
+    },
+    inputSchema: searchTutorialsInputSchema,
+    name: "search_tutorials",
+    schema: searchTutorialsToolInputSchema,
+  },
 };
 
 const toolRuntime = Object.freeze([
   toolRuntimeByName.search_docs,
+  toolRuntimeByName.search_tutorials,
   toolRuntimeByName.read_doc,
 ]);
 

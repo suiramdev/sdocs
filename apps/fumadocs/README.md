@@ -131,8 +131,11 @@ ulimit -n 65536
 - Entities: `data/api/entities/latest.json`
 
 The documentation toolchain is exposed as a standardized SDK-style toolset:
-`search_docs` for discovery across guides and API symbols, then `read_doc` for
-iterative deep reads on returned handles and references.
+`search_docs` for discovery across guides and API symbols, `search_tutorials`
+for community learn content mirrored from `sbox.game/learn`, then `read_doc`
+for iterative deep reads on returned handles and references across
+`docs://type/...`, `docs://member/...`, `docs://guide/...`, and
+`docs://tutorial/...`.
 
 ## Docker Deployment
 
@@ -174,6 +177,13 @@ the generated docs/entities volumes, runs `api:bootstrap:index`, then sleeps for
 Use `API_JSON_URL` as an explicit override only when you need to pin a specific
 schema JSON artifact; otherwise leave it unset so the latest schema is resolved
 automatically.
+
+Community tutorials are pulled from the upstream
+`coffeegrind123/sbox-learn-docs` mirror at request time. Tutorial search and
+relation indexes are cached by the latest upstream commit SHA, so any new
+mirror commit automatically invalidates the in-memory tutorial corpus, rebuilds
+its search index, and refreshes API/guide/tutorial backlinks without a manual
+sync step in this repo.
 
 For platform deployments such as Dokploy, prefer the dedicated health endpoint
 `/api/health` instead of `/`. The home page redirects to `/docs/get-started`,

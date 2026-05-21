@@ -7,11 +7,13 @@ import {
   completeGuideDocumentationResourceNames,
   completeMemberResourceNames,
   completeNamespaceResourceNames,
+  completeTutorialDocumentationResourcePaths,
   completeTypeResourceNames,
   readDocumentationGuideResource,
   readDocumentationMemberResource,
   readDocumentationNamespaceResource,
   readDocumentationSchemaResource,
+  readDocumentationTutorialResource,
   readDocumentationTypeResource,
   toDocumentationResourceResult,
 } from "@/features/api/v1/services/documentation-resources";
@@ -25,28 +27,17 @@ import {
 import { listAgentToolRuntime } from "@/features/api/v1/services/tool-registry";
 
 const SERVER_NAME = "sdocs-api-reference";
-const SERVER_VERSION = "2.1.0";
+const SERVER_VERSION = "2.2.0";
 const RESOURCE_SCHEMA_URI = "docs://schema";
 const ROOT_NAMESPACE_URI = "docs://namespace/root";
+const SERVER_INSTRUCTIONS =
+  'You are a documentation agent for the s&box API and tutorial corpus. Tool and resource text content is compact TOON to reduce token usage; parse it as the same data model as JSON. The MCP workflow has three tools. Use search_docs for official guides and API symbols, search_tutorials for mirrored sbox.game/learn tutorials, and read_doc on the most relevant handle. read_doc supports tutorial, guide, enum, class, method, constructor, and property handles, and each document/reference includes tips for the next hop. Iterate by calling read_doc again on relevant reference handles until you have enough exact API, guide, and tutorial context to answer. Do not guess from memory when a tool or resource can verify the subject. Pass detail: "full" only when you need larger raw field sets.';
 
 interface CreateApiReferenceMcpServerOptions {
   analytics?: McpAnalyticsContext;
 }
 
-export const createApiReferenceMcpServer = ({
-  analytics,
-}: CreateApiReferenceMcpServerOptions = {}): McpServer => {
-  const server = new McpServer(
-    {
-      name: SERVER_NAME,
-      version: SERVER_VERSION,
-    },
-    {
-      instructions:
-        'You are a documentation agent for the s&box API. Tool and resource text content is compact TOON to reduce token usage; parse it as the same data model as JSON. The MCP workflow has exactly two tools. Always start with search_docs to search official guides and API symbols together. Then call read_doc on the most relevant handle, whether it is a guide, enum, class, method, constructor, or property. Every search result, document, and reference includes tips for next steps. Iterate by calling read_doc again on relevant reference handles until you have enough exact API contracts and guide context to answer. Do not guess from memory when a tool or resource can verify the subject. Pass detail: "full" only when you need larger raw field sets.',
-    }
-  );
-
+const registerDocumentationResources = (server: McpServer): void => {
   server.registerResource(
     "documentation-schema",
     RESOURCE_SCHEMA_URI,
@@ -134,6 +125,26 @@ export const createApiReferenceMcpServer = ({
   );
 
   server.registerResource(
+    "tutorial-documentation",
+    new ResourceTemplate("docs://tutorial/{path}", {
+      complete: {
+        path: completeTutorialDocumentationResourcePaths,
+      },
+      list: undefined,
+    }),
+    {
+      description:
+        "Mirrored community tutorials from sbox.game/learn with guide and API backlinks.",
+      mimeType: MCP_TOON_MIME_TYPE,
+      title: "Tutorial Documentation",
+    },
+    async (_uri, variables) =>
+      toDocumentationResourceResult(
+        await readDocumentationTutorialResource(String(variables.path ?? ""))
+      )
+  );
+
+  server.registerResource(
     "member-documentation",
     new ResourceTemplate("docs://member/{full_name}", {
       complete: {
@@ -152,7 +163,12 @@ export const createApiReferenceMcpServer = ({
         await readDocumentationMemberResource(String(variables.full_name ?? ""))
       )
   );
+};
 
+const registerAgentTools = (
+  server: McpServer,
+  analytics: McpAnalyticsContext | undefined
+): void => {
   for (const tool of listAgentToolRuntime()) {
     server.registerTool(
       tool.name,
@@ -195,6 +211,23 @@ export const createApiReferenceMcpServer = ({
       }
     );
   }
+};
+
+export const createApiReferenceMcpServer = ({
+  analytics,
+}: CreateApiReferenceMcpServerOptions = {}): McpServer => {
+  const server = new McpServer(
+    {
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    },
+    {
+      instructions: SERVER_INSTRUCTIONS,
+    }
+  );
+
+  registerDocumentationResources(server);
+  registerAgentTools(server, analytics);
 
   return server;
 };
