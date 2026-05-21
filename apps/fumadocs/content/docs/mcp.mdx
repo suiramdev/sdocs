@@ -185,6 +185,10 @@ This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
 of as raw page text.
 
+On the hosted deployment, the web container now starts serving immediately while
+API bootstrap and Meilisearch refresh run in separate sync workers. That keeps
+health probes tied to HTTP readiness instead of long-running schema generation.
+
 ## Transport and Payload Format
 
 The remote MCP endpoint uses standard MCP JSON-RPC over Streamable HTTP. That
