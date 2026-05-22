@@ -1,3 +1,4 @@
+import type { Folder, Node } from "fumadocs-core/page-tree";
 import { initSimpleSearch } from "fumadocs-core/search/server";
 import type { SearchServer } from "fumadocs-core/search/server";
 import "server-only";
@@ -9,9 +10,13 @@ const GITHUB_OWNER = "coffeegrind123";
 const GITHUB_REPOSITORY = "sbox-learn-docs";
 const HEAD_CACHE_TTL_MS = 60_000;
 const TUTORIAL_DOCS_ROOT = "docs";
+const TUTORIAL_DOCS_BASE_URL = "/docs/tutorials";
 const TUTORIAL_RESOURCE_PREFIX = "docs://tutorial/";
 const TUTORIAL_SITE_URL_PREFIX = "https://sbox.game/learn/";
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/u;
+
+export const TUTORIAL_DOCS_FOLDER_NAME = "Tutorials";
+export const TUTORIAL_DOCS_FOLDER_URL = TUTORIAL_DOCS_BASE_URL;
 
 interface GitHubRefResponse {
   object?: {
@@ -59,6 +64,7 @@ export interface TutorialDocPage {
   authorSlug?: string;
   contentType?: string;
   difficulty?: string;
+  docsUrl: string;
   githubUrl: string;
   markdown: string;
   rawMarkdown: string;
@@ -70,6 +76,12 @@ export interface TutorialDocPage {
   tags: string[];
   title: string;
   topic?: string;
+  url: string;
+}
+
+interface TutorialPageNode {
+  name: string;
+  type: "page";
   url: string;
 }
 
@@ -86,11 +98,15 @@ const tutorialDocPageCache = new Map<string, Promise<TutorialDocPage | null>>();
 const tutorialDocRawCache = new Map<string, Promise<string>>();
 const tutorialDocsPagesCache = new Map<string, Promise<TutorialDocPage[]>>();
 const tutorialDocsSearchCache = new Map<string, Promise<SearchServer>>();
+const tutorialDocsSectionTreeCache = new Map<string, Promise<Folder>>();
 
 const buildGitHubApiUrl = (pathname: string): string =>
   `${GITHUB_API_BASE_URL}/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}${pathname}`;
 
-const buildRawGithubUrl = (repoPath: string, ref: string): string =>
+export const buildTutorialRawGithubUrl = (
+  repoPath: string,
+  ref: string
+): string =>
   `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/${ref}/${repoPath}`;
 
 const buildGitHubBlobUrl = (repoPath: string): string =>
@@ -205,8 +221,18 @@ const getTutorialDocsTree = (
 
 const getTutorialDocRaw = (repoPath: string, sha: string): Promise<string> =>
   getCachedPromise(tutorialDocRawCache, `${sha}:${repoPath}`, () =>
-    requestText(buildRawGithubUrl(repoPath, sha))
+    requestText(buildTutorialRawGithubUrl(repoPath, sha))
   );
+
+const humanizeSegment = (value: string): string =>
+  value
+    .split("-")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => {
+      const [firstCharacter = "", ...rest] = segment;
+      return `${firstCharacter.toUpperCase()}${rest.join("")}`;
+    })
+    .join(" ");
 
 const toTutorialTags = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -250,6 +276,34 @@ const stripMarkdownDecorators = (value: string): string =>
     .replaceAll(/\s+/gu, " ")
     .trim();
 
+const normalizeTitleText = (value: string): string =>
+  value
+    .trim()
+    .replaceAll(/[`*_~]/gu, "")
+    .replaceAll(/\s+/gu, " ")
+    .toLowerCase();
+
+const stripLeadingTitleHeading = (content: string, title: string): string => {
+  const contentWithoutLeadingWhitespace = content.trimStart();
+  const headingMatch =
+    contentWithoutLeadingWhitespace.match(/^#\s+(.+?)\r?\n+/u);
+  if (!headingMatch) {
+    return content;
+  }
+
+  const [fullHeading, headingText] = headingMatch;
+  if (
+    typeof headingText === "string" &&
+    normalizeTitleText(headingText) === normalizeTitleText(title)
+  ) {
+    return contentWithoutLeadingWhitespace
+      .slice(fullHeading.length)
+      .trimStart();
+  }
+
+  return content;
+};
+
 const buildTutorialSummary = (
   frontmatter: TutorialFrontmatterData,
   markdown: string
@@ -278,6 +332,15 @@ const toTutorialSlug = (repoPath: string, frontmatterSlug?: string): string => {
     .replace(/\.md$/u, "");
 };
 
+export const toTutorialDocsUrl = (slug: string): string => {
+  const normalizedSlug = slug.trim().replaceAll(/^\/+|\/+$/gu, "");
+  if (normalizedSlug.length === 0) {
+    return TUTORIAL_DOCS_FOLDER_URL;
+  }
+
+  return `${TUTORIAL_DOCS_FOLDER_URL}/${normalizedSlug}`;
+};
+
 const buildTutorialDocPage = async (
   repoPath: string,
   sha: string
@@ -286,20 +349,22 @@ const buildTutorialDocPage = async (
   const { frontmatter, markdown } = parseTutorialMarkdown(rawMarkdown);
   const slug = toTutorialSlug(repoPath, frontmatter.slug);
   const title = frontmatter.title?.trim() || slug.split("/").at(-1) || slug;
+  const normalizedMarkdown = stripLeadingTitleHeading(markdown, title);
 
   return {
     author: frontmatter.author?.trim(),
     authorSlug: frontmatter.author_slug?.trim(),
     contentType: frontmatter.content_type?.trim(),
     difficulty: frontmatter.difficulty?.trim(),
+    docsUrl: toTutorialDocsUrl(slug),
     githubUrl: buildGitHubBlobUrl(repoPath),
-    markdown,
+    markdown: normalizedMarkdown,
     rawMarkdown,
     repoPath,
     resourceUri: `${TUTORIAL_RESOURCE_PREFIX}${slug}`,
     sha,
     slug,
-    summary: buildTutorialSummary(frontmatter, markdown),
+    summary: buildTutorialSummary(frontmatter, normalizedMarkdown),
     tags: toTutorialTags(frontmatter.tags),
     title,
     topic: frontmatter.topic?.trim(),
@@ -341,13 +406,8 @@ export const getTutorialDocPage = async (
   const cacheKey = `${sha}:${normalizedSlug}`;
 
   return getCachedPromise(tutorialDocPageCache, cacheKey, async () => {
-    const repoPath = `${TUTORIAL_DOCS_ROOT}/${normalizedSlug}.md`;
-    const tree = await getTutorialDocsTree(sha);
-    if (!tree.has(repoPath)) {
-      return null;
-    }
-
-    return await buildTutorialDocPage(repoPath, sha);
+    const pages = await getAllTutorialDocPages();
+    return pages.find((page) => page.slug === normalizedSlug) ?? null;
   });
 };
 
@@ -385,6 +445,147 @@ export const getTutorialDocsSearch = async (): Promise<SearchServer> => {
       indexes: pages.map(buildTutorialSearchIndexEntry),
     });
   });
+};
+
+const getTutorialFolderLabel = (
+  segment: string,
+  depth: number,
+  pages: TutorialDocPage[]
+): string => {
+  if (depth !== 0) {
+    return humanizeSegment(segment);
+  }
+
+  const authorName = pages.find(
+    (page) => page.authorSlug?.trim() === segment && page.author?.trim()
+  )?.author;
+
+  return authorName?.trim() || humanizeSegment(segment);
+};
+
+const getTutorialSlugSegments = (page: TutorialDocPage): string[] =>
+  page.slug.split("/").filter((segment) => segment.length > 0);
+
+const appendTutorialFolderGroup = (
+  folderGroups: Map<string, TutorialDocPage[]>,
+  segment: string,
+  page: TutorialDocPage
+): void => {
+  const existing = folderGroups.get(segment) ?? [];
+  existing.push(page);
+  folderGroups.set(segment, existing);
+};
+
+const collectTutorialSectionGroups = (
+  pages: TutorialDocPage[],
+  depth: number
+): {
+  folderGroups: Map<string, TutorialDocPage[]>;
+  pageNodes: TutorialPageNode[];
+} => {
+  const folderGroups = new Map<string, TutorialDocPage[]>();
+  const pageNodes: TutorialPageNode[] = [];
+
+  for (const page of pages) {
+    const segments = getTutorialSlugSegments(page);
+    if (segments.length <= depth + 1) {
+      pageNodes.push({
+        name: page.title,
+        type: "page",
+        url: page.docsUrl,
+      });
+      continue;
+    }
+
+    appendTutorialFolderGroup(folderGroups, segments[depth], page);
+  }
+
+  return {
+    folderGroups,
+    pageNodes,
+  };
+};
+
+const toTutorialFolderNode = (input: {
+  children: Node[];
+  depth: number;
+  groupPages: TutorialDocPage[];
+  segment: string;
+}): Folder => ({
+  children: input.children,
+  collapsible: true,
+  defaultOpen: false,
+  name: getTutorialFolderLabel(input.segment, input.depth, input.groupPages),
+  type: "folder",
+});
+
+const buildTutorialSectionNodes = (
+  pages: TutorialDocPage[],
+  depth: number
+): Node[] => {
+  const { folderGroups, pageNodes } = collectTutorialSectionGroups(
+    pages,
+    depth
+  );
+  const folderNodes = [...folderGroups.entries()]
+    .toSorted((left, right) => left[0].localeCompare(right[0]))
+    .map(([segment, groupPages]) =>
+      toTutorialFolderNode({
+        children: buildTutorialSectionNodes(groupPages, depth + 1),
+        depth,
+        groupPages,
+        segment,
+      })
+    );
+
+  return [
+    ...folderNodes,
+    ...pageNodes.toSorted((left, right) => left.name.localeCompare(right.name)),
+  ];
+};
+
+const buildTutorialDocsSectionTree = async (): Promise<Folder> => {
+  const pages = await getAllTutorialDocPages();
+
+  return {
+    children: buildTutorialSectionNodes(pages, 0),
+    collapsible: true,
+    defaultOpen: false,
+    index: {
+      name: TUTORIAL_DOCS_FOLDER_NAME,
+      type: "page",
+      url: TUTORIAL_DOCS_FOLDER_URL,
+    },
+    name: TUTORIAL_DOCS_FOLDER_NAME,
+    type: "folder",
+  };
+};
+
+export const getTutorialDocsSectionTree = async (): Promise<Folder> => {
+  const sha = await getLatestTutorialDocsSha();
+  return getCachedPromise(tutorialDocsSectionTreeCache, sha, () =>
+    buildTutorialDocsSectionTree()
+  );
+};
+
+export const getTutorialDocBreadcrumbs = (page: TutorialDocPage): string[] => {
+  const parentSegments = page.slug
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .slice(0, -1);
+
+  if (parentSegments.length === 0) {
+    return [TUTORIAL_DOCS_FOLDER_NAME];
+  }
+
+  return [
+    TUTORIAL_DOCS_FOLDER_NAME,
+    ...parentSegments.map((segment, index) =>
+      index === 0 && page.authorSlug?.trim() === segment && page.author?.trim()
+        ? page.author.trim()
+        : humanizeSegment(segment)
+    ),
+  ];
 };
 
 export const completeTutorialResourceNames = async (

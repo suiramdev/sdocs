@@ -3,6 +3,11 @@ import type { Folder, Root } from "fumadocs-core/page-tree";
 import { loadApiEntities } from "@/features/api/utils/data";
 import type { ApiEntity } from "@/features/api/utils/schemas";
 import {
+  getTutorialDocsSectionTree,
+  TUTORIAL_DOCS_FOLDER_NAME,
+  TUTORIAL_DOCS_FOLDER_URL,
+} from "@/features/learn-docs/utils/source";
+import {
   getOfficialDocsSectionTree,
   OFFICIAL_DOCS_FOLDER_NAME,
   OFFICIAL_DOCS_FOLDER_URL,
@@ -188,6 +193,9 @@ const getApiReferenceFolder = async (): Promise<Folder> => {
 const getOfficialDocsFolder = (): Promise<Folder> =>
   getOfficialDocsSectionTree();
 
+const getTutorialDocsFolder = (): Promise<Folder> =>
+  getTutorialDocsSectionTree();
+
 const isApiFolder = (node: Root["children"][number]): boolean =>
   node.type === "folder" &&
   (node.index?.url === API_ROOT_URL || node.name === API_FOLDER_NAME);
@@ -196,6 +204,11 @@ const isOfficialDocsFolder = (node: Root["children"][number]): boolean =>
   node.type === "folder" &&
   (node.index?.url === OFFICIAL_DOCS_FOLDER_URL ||
     node.name === OFFICIAL_DOCS_FOLDER_NAME);
+
+const isTutorialDocsFolder = (node: Root["children"][number]): boolean =>
+  node.type === "folder" &&
+  (node.index?.url === TUTORIAL_DOCS_FOLDER_URL ||
+    node.name === TUTORIAL_DOCS_FOLDER_NAME);
 
 const isGetStartedPage = (node: Root["children"][number]): boolean => {
   if (node.type === "page") {
@@ -211,10 +224,14 @@ const isGetStartedPage = (node: Root["children"][number]): boolean => {
 
 export const mergeDocsTree = async (baseTree: Root): Promise<Root> => {
   const officialDocsFolder = await getOfficialDocsFolder();
+  const tutorialDocsFolder = await getTutorialDocsFolder();
   const apiFolder = await getApiReferenceFolder();
 
   const nonManagedNodes = baseTree.children.filter(
-    (node) => !isApiFolder(node) && !isOfficialDocsFolder(node)
+    (node) =>
+      !isApiFolder(node) &&
+      !isOfficialDocsFolder(node) &&
+      !isTutorialDocsFolder(node)
   );
   const reorderedNonApiNodes = [
     ...nonManagedNodes.filter(isGetStartedPage),
@@ -223,6 +240,11 @@ export const mergeDocsTree = async (baseTree: Root): Promise<Root> => {
 
   return {
     ...baseTree,
-    children: [...reorderedNonApiNodes, officialDocsFolder, apiFolder],
+    children: [
+      ...reorderedNonApiNodes,
+      officialDocsFolder,
+      tutorialDocsFolder,
+      apiFolder,
+    ],
   };
 };

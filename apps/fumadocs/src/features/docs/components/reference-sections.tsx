@@ -1,14 +1,23 @@
 import Link from "next/link";
 
-import type {
-  RelatedGuide,
-  RelatedGuideSymbol,
-} from "@/features/api/v1/services/guide-relations";
+interface GuideSectionItem {
+  description?: string;
+  resourceUri: string;
+  title: string;
+  url: string;
+}
+
+interface ReferencedApiSymbolItem {
+  docsUrl: string;
+  fullName: string;
+  resourceUri: string;
+  summary: string;
+}
 
 export const RelatedGuidesSection = ({
   guides,
 }: {
-  guides: RelatedGuide[];
+  guides: GuideSectionItem[];
 }) => {
   if (guides.length === 0) {
     return null;
@@ -47,7 +56,7 @@ export const RelatedGuidesSection = ({
 export const ReferencedApiSymbolsSection = ({
   symbols,
 }: {
-  symbols: RelatedGuideSymbol[];
+  symbols: ReferencedApiSymbolItem[];
 }) => {
   if (symbols.length === 0) {
     return null;
