@@ -37,6 +37,7 @@ const emptyTags: NonNullable<DefaultSearchDialogProps["tags"]> = [];
 const emptyLinks: NonNullable<DefaultSearchDialogProps["links"]> = [];
 const minimumTrackedSearchLength = 2;
 const maxTrackedQueryLength = 120;
+const searchAnalyticsDebounceMs = 1200;
 
 const searchGroupOrder = [
   "guide",
@@ -180,16 +181,19 @@ const useTrackDocsSearch = ({
     const canTrackSearch =
       normalizedSearch.length >= minimumTrackedSearchLength && !isLoading;
     if (!canTrackSearch) {
-      lastTrackedSearchKeyRef.current = null;
       return;
     }
 
-    if (lastTrackedSearchKeyRef.current === trackedSearchKey) {
-      return;
-    }
+    const timeoutId = window.setTimeout(() => {
+      if (lastTrackedSearchKeyRef.current === trackedSearchKey) {
+        return;
+      }
 
-    lastTrackedSearchKeyRef.current = trackedSearchKey;
-    trackDocsSearch(activeTag, normalizedSearch, trackedSearchItemCount);
+      lastTrackedSearchKeyRef.current = trackedSearchKey;
+      trackDocsSearch(activeTag, normalizedSearch, trackedSearchItemCount);
+    }, searchAnalyticsDebounceMs);
+
+    return () => window.clearTimeout(timeoutId);
   }, [activeTag, isLoading, search, trackedSearchItemCount]);
 };
 

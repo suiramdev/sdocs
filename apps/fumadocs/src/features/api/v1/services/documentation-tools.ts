@@ -13,6 +13,10 @@ import type {
 import { searchApiService } from "@/features/api/utils/service";
 import { ApiV1Error } from "@/features/api/v1/domain/errors";
 import {
+  getTutorialDocPage,
+  getTutorialDocsSearch,
+} from "@/features/learn-docs/utils/source";
+import {
   getOfficialDocPage,
   getOfficialDocsSearch,
 } from "@/features/official-docs/utils/source";
@@ -22,6 +26,12 @@ import {
   getRelatedGuidesForEntity,
 } from "./guide-relations";
 import type { RelatedGuide } from "./guide-relations";
+import {
+  getGuideRelatedTutorials,
+  getRelatedTutorialsForEntity,
+  getTutorialRelatedGuides,
+  getTutorialRelatedSymbols,
+} from "./tutorial-relations";
 
 const TYPE_KINDS = new Set<ApiEntityKind>([
   "class",
@@ -67,6 +77,11 @@ interface DocumentationSearchInput {
 interface SearchDocumentationInput {
   includeGuides?: boolean;
   includeSymbols?: boolean;
+  limit?: number;
+  query: string;
+}
+
+interface SearchTutorialsInput {
   limit?: number;
   query: string;
 }
@@ -160,10 +175,10 @@ interface DocumentationSearchHit {
 
 interface DocumentationSearchResult {
   handle: string;
-  kind: ApiEntityKind | "guide";
+  kind: ApiEntityKind | "guide" | "tutorial";
   next: string;
   score?: number;
-  source: "api" | "guide";
+  source: "api" | "guide" | "tutorial";
   summary: string;
   title: string;
   url: string;
@@ -297,6 +312,12 @@ const guideSlugsFromTarget = (target: string): string[] => {
     : rawPath.split("/").map((segment) => decodeURIComponent(segment));
 };
 
+const tutorialSlugFromTarget = (target: string): string =>
+  target
+    .replace(/^docs:\/\/tutorial\/?/u, "")
+    .replace(/^https?:\/\/sbox\.game\/learn\/?/u, "")
+    .replaceAll(/^\/+|\/+$/gu, "");
+
 const readUnknownRecordString = (
   value: unknown,
   key: string
@@ -337,6 +358,31 @@ const toGuideSearchResult = (result: unknown): DocumentationSearchResult => {
     next: "Call read_doc with this handle to read the guide and inspect referenced API symbols.",
     score: readUnknownRecordNumber(result, "score"),
     source: "guide",
+    summary,
+    title,
+    url,
+  };
+};
+
+const toTutorialSearchResult = (result: unknown): DocumentationSearchResult => {
+  const url =
+    readUnknownRecordString(result, "url") ?? "https://sbox.game/learn";
+  const title =
+    readUnknownRecordString(result, "title") ??
+    readUnknownRecordString(result, "content") ??
+    "Tutorial";
+  const path = readUnknownRecordString(result, "path") ?? "";
+  const summary =
+    readUnknownRecordString(result, "description") ??
+    readUnknownRecordString(result, "content") ??
+    "Community tutorial.";
+
+  return {
+    handle: `docs://tutorial/${path}`,
+    kind: "tutorial",
+    next: "Call read_doc with this handle to read the tutorial and inspect linked API or guide references.",
+    score: readUnknownRecordNumber(result, "score"),
+    source: "tutorial",
     summary,
     title,
     url,
@@ -1177,9 +1223,293 @@ const isGuideDocumentationTarget = (target: string): boolean =>
   target.startsWith("https://sbox.game/docs/") ||
   target.startsWith("https://sbox.facepunch.com/docs/");
 
+const isTutorialDocumentationTarget = (target: string): boolean =>
+  target.startsWith("docs://tutorial/") ||
+  target.startsWith("https://sbox.game/learn/");
+
 const getGuideResourceName = (target: string): string => {
   const slugs = guideSlugsFromTarget(target);
   return slugs.length > 0 ? slugs.join("/") : "index";
+};
+
+const buildTutorialReferenceResults = async (target: string, limit: number) => {
+  const tutorialSlug = tutorialSlugFromTarget(target);
+  const [guides, symbols] = await Promise.all([
+    getTutorialRelatedGuides(tutorialSlug),
+    getTutorialRelatedSymbols(tutorialSlug),
+  ]);
+
+  return {
+    references: [
+      ...guides.slice(0, limit).map((guide) => ({
+        handle: guide.resourceUri,
+        kind: "guide" as const,
+        relation: "tutorial_references_guide",
+        summary: guide.description ?? "",
+        tip: "Call read_doc on this guide handle for broader official workflow documentation.",
+        title: guide.title,
+        url: guide.url,
+      })),
+      ...symbols.slice(0, limit).map((symbol) => ({
+        handle: symbol.resourceUri,
+        kind: symbol.kind,
+        relation: "tutorial_mentions_symbol",
+        summary: symbol.summary,
+        tip: "Call read_doc on this API handle for exact contracts behind the tutorial.",
+        title: symbol.fullName,
+        url: symbol.docsUrl,
+      })),
+    ].slice(0, limit),
+    target,
+    workflow: {
+      next: "Call read_doc on the most relevant returned handle.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+const buildGuideReferenceResults = async (target: string, limit: number) => {
+  const resourceName = getGuideResourceName(target);
+  const [symbols, tutorials] = await Promise.all([
+    getGuideRelatedSymbols(resourceName),
+    getGuideRelatedTutorials(resourceName, limit),
+  ]);
+
+  return {
+    references: [
+      ...tutorials.map((tutorial) => ({
+        handle: tutorial.resourceUri,
+        kind: "tutorial" as const,
+        relation: "guide_referenced_by_tutorial",
+        summary: tutorial.summary ?? "",
+        tip: "Call read_doc on this tutorial handle for community usage examples built on this guide.",
+        title: tutorial.title,
+        url: tutorial.url,
+      })),
+      ...symbols.slice(0, limit).map((symbol) => ({
+        handle: symbol.resourceUri,
+        kind: symbol.kind,
+        relation: "guide_mentions_symbol",
+        summary: symbol.summary,
+        tip: "Call read_doc on this API handle if the guide mention is relevant.",
+        title: symbol.fullName,
+        url: symbol.docsUrl,
+      })),
+    ].slice(0, limit),
+    target,
+    workflow: {
+      next: "Call read_doc on the most relevant returned handle.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+const buildSymbolReferenceResults = async (target: string, limit: number) => {
+  const entity = await resolveSymbolEntity({
+    symbol: symbolFromDocumentationTarget(target),
+  });
+  const [relatedGuides, relatedTutorials, members] = await Promise.all([
+    getRelatedGuidesForEntity(entity, limit),
+    getRelatedTutorialsForEntity(entity, limit),
+    isTypeEntity(entity) ? loadTypeMembers(entity) : Promise.resolve([]),
+  ]);
+
+  return {
+    references: [
+      ...relatedGuides.map((guide) => ({
+        handle: guide.resourceUri,
+        kind: "guide" as const,
+        relation: "related_guide",
+        summary: guide.description ?? "",
+        tip: "Call read_doc on this guide handle for conceptual or workflow context.",
+        title: guide.title,
+        url: guide.url,
+      })),
+      ...relatedTutorials.map((tutorial) => ({
+        handle: tutorial.resourceUri,
+        kind: "tutorial" as const,
+        relation: "related_tutorial",
+        summary: tutorial.summary ?? "",
+        tip: "Call read_doc on this tutorial handle for community walkthroughs that use this API.",
+        title: tutorial.title,
+        url: tutorial.url,
+      })),
+      ...members.slice(0, limit).map((member) => ({
+        handle: getSymbolResourceUri(member),
+        kind: member.entityKind,
+        relation: "type_member",
+        summary: toSummary(member),
+        tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
+        title: getCanonicalFullName(member),
+        url: member.url,
+      })),
+    ].slice(0, limit),
+    target: getSymbolResourceUri(entity),
+    workflow: {
+      next: "Call read_doc on the most relevant returned handle.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+const expandDocumentationReferencesInternal = async (
+  input: ExpandDocumentationInput
+) => {
+  const limit = input.limit ?? 20;
+
+  if (isTutorialDocumentationTarget(input.target)) {
+    return await buildTutorialReferenceResults(input.target, limit);
+  }
+
+  if (isGuideDocumentationTarget(input.target)) {
+    return await buildGuideReferenceResults(input.target, limit);
+  }
+
+  return await buildSymbolReferenceResults(input.target, limit);
+};
+
+const buildTutorialReadResult = async (input: ReadDocumentationInput) => {
+  const tutorialSlug = tutorialSlugFromTarget(input.target);
+  const tutorial = await getTutorialDocPage(tutorialSlug);
+  if (!tutorial) {
+    return throwNotFoundError("Tutorial not found.", input.target);
+  }
+
+  const [relatedGuides, relatedSymbols] = await Promise.all([
+    getTutorialRelatedGuides(tutorial.slug),
+    getTutorialRelatedSymbols(tutorial.slug),
+  ]);
+
+  return {
+    document: {
+      author: tutorial.author,
+      content:
+        input.includeContent === false
+          ? undefined
+          : tutorial.markdown.slice(0, 8000),
+      contentTruncated:
+        input.includeContent === false
+          ? undefined
+          : tutorial.markdown.length > 8000,
+      difficulty: tutorial.difficulty,
+      handle: tutorial.resourceUri,
+      kind: "tutorial",
+      relatedGuides,
+      relatedSymbols,
+      sourceUrl: tutorial.githubUrl,
+      summary: tutorial.summary,
+      tags: tutorial.tags,
+      tip: "Inspect the references below and call read_doc on relevant API or guide handles.",
+      title: tutorial.title,
+      topic: tutorial.topic,
+      tutorialUrl: tutorial.url,
+      url: tutorial.url,
+    },
+    references:
+      input.includeReferences === false
+        ? undefined
+        : await expandDocumentationReferencesInternal({
+            limit: 12,
+            target: tutorial.resourceUri,
+          }),
+    workflow: {
+      next: "If more context is needed, call read_doc on one of the returned reference handles.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+const buildGuideReadResult = async (input: ReadDocumentationInput) => {
+  const slugs = guideSlugsFromTarget(input.target);
+  const page = await getOfficialDocPage(slugs);
+  if (!page) {
+    return throwNotFoundError("Guide not found.", input.target);
+  }
+
+  const relatedTutorials = await getGuideRelatedTutorials(
+    getGuideResourceName(input.target),
+    6
+  );
+
+  return {
+    document: {
+      breadcrumbs: page.breadcrumbs,
+      content:
+        input.includeContent === false
+          ? undefined
+          : page.markdown.slice(0, 8000),
+      contentTruncated:
+        input.includeContent === false
+          ? undefined
+          : page.markdown.length > 8000,
+      handle: guideResourceUriFromUrl(page.url),
+      kind: "guide",
+      relatedTutorials,
+      sourceUrl: page.githubUrl,
+      summary: page.description,
+      tip: "Inspect the references below and call read_doc on relevant API handles.",
+      title: page.title,
+      url: page.url,
+    },
+    references:
+      input.includeReferences === false
+        ? undefined
+        : await expandDocumentationReferencesInternal({
+            limit: 12,
+            target: guideResourceUriFromUrl(page.url),
+          }),
+    workflow: {
+      next: "If more context is needed, call read_doc on one of the returned reference handles.",
+      nextTool: "read_doc",
+    },
+  };
+};
+
+const buildSymbolReadResult = async (input: ReadDocumentationInput) => {
+  const entity = await resolveSymbolEntity({
+    symbol: symbolFromDocumentationTarget(input.target),
+  });
+  const [relatedGuides, relatedTutorials] = await Promise.all([
+    getRelatedGuidesForEntity(entity, 6),
+    getRelatedTutorialsForEntity(entity, 6),
+  ]);
+  const members = isTypeEntity(entity) ? await loadTypeMembers(entity) : [];
+
+  return {
+    document: {
+      details: toSymbolDetails(entity),
+      handle: getSymbolResourceUri(entity),
+      kind: entity.entityKind,
+      relatedGuides: relatedGuides.map((guide) => ({
+        ...guide,
+        tip: "Call read_doc on this guide handle for conceptual or workflow context.",
+      })),
+      relatedTutorials: relatedTutorials.map((tutorial) => ({
+        ...tutorial,
+        tip: "Call read_doc on this tutorial handle for community walkthroughs and practical usage examples.",
+      })),
+      summary: toSummary(entity),
+      tip: "Inspect the references below and call read_doc on relevant guide or member handles.",
+      title: getCanonicalFullName(entity),
+      topMembers: members.slice(0, 24).map((member) => ({
+        ...toSymbolRef(member),
+        returnType: member.returnType,
+        tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
+      })),
+      url: entity.url,
+    },
+    references:
+      input.includeReferences === false
+        ? undefined
+        : await expandDocumentationReferencesInternal({
+            limit: 20,
+            target: getSymbolResourceUri(entity),
+          }),
+    workflow: {
+      next: "If more context is needed, call read_doc on one of the returned reference handles.",
+      nextTool: "read_doc",
+    },
+  };
 };
 
 export const searchDocumentationAcrossSources = async (
@@ -1233,151 +1563,46 @@ export const searchDocumentationAcrossSources = async (
   };
 };
 
-export const expandDocumentationReferences = async (
-  input: ExpandDocumentationInput
-) => {
-  const limit = input.limit ?? 20;
-
-  if (isGuideDocumentationTarget(input.target)) {
-    const resourceName = getGuideResourceName(input.target);
-    const symbols = await getGuideRelatedSymbols(resourceName);
-
-    return {
-      references: symbols.slice(0, limit).map((symbol) => ({
-        handle: symbol.resourceUri,
-        kind: symbol.kind,
-        relation: "guide_mentions_symbol",
-        summary: symbol.summary,
-        tip: "Call read_doc on this API handle if the guide mention is relevant.",
-        title: symbol.fullName,
-        url: symbol.docsUrl,
-      })),
-      target: input.target,
-      workflow: {
-        next: "Call read_doc on the most relevant returned handle.",
-        nextTool: "read_doc",
-      },
-    };
-  }
-
-  const entity = await resolveSymbolEntity({
-    symbol: symbolFromDocumentationTarget(input.target),
-  });
-  const [relatedGuides, members] = await Promise.all([
-    getRelatedGuidesForEntity(entity, limit),
-    isTypeEntity(entity) ? loadTypeMembers(entity) : Promise.resolve([]),
-  ]);
-  const references = [
-    ...relatedGuides.map((guide) => ({
-      handle: guide.resourceUri,
-      kind: "guide" as const,
-      relation: "related_guide",
-      summary: guide.description ?? "",
-      tip: "Call read_doc on this guide handle for conceptual or workflow context.",
-      title: guide.title,
-      url: guide.url,
-    })),
-    ...members.slice(0, limit).map((member) => ({
-      handle: getSymbolResourceUri(member),
-      kind: member.entityKind,
-      relation: "type_member",
-      summary: toSummary(member),
-      tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
-      title: getCanonicalFullName(member),
-      url: member.url,
-    })),
-  ].slice(0, limit);
+export const searchTutorials = async (input: SearchTutorialsInput) => {
+  const limit = input.limit ?? 8;
+  const tutorialResults = await getTutorialDocsSearch()
+    .then((search) => search.search(input.query) as Promise<unknown[]>)
+    .catch(() => []);
+  const results = tutorialResults
+    .slice(0, limit)
+    .map(toTutorialSearchResult)
+    .filter((result) => result.handle !== "docs://tutorial/");
 
   return {
-    references,
-    target: getSymbolResourceUri(entity),
+    query: input.query,
+    results,
+    returned: results.length,
     workflow: {
-      next: "Call read_doc on the most relevant returned handle.",
+      loop: [
+        "Call read_doc on the tutorial handle.",
+        "Inspect linked API symbols and guides returned in the references.",
+        "Loop through read_doc on the linked handles until you have enough exact context.",
+      ],
       nextTool: "read_doc",
     },
   };
 };
 
+export const expandDocumentationReferences =
+  expandDocumentationReferencesInternal;
+
 export const readDocumentationTarget = async (
   input: ReadDocumentationInput
 ) => {
-  if (isGuideDocumentationTarget(input.target)) {
-    const slugs = guideSlugsFromTarget(input.target);
-    const page = await getOfficialDocPage(slugs);
-    if (!page) {
-      return throwNotFoundError("Guide not found.", input.target);
-    }
-
-    return {
-      document: {
-        breadcrumbs: page.breadcrumbs,
-        content:
-          input.includeContent === false
-            ? undefined
-            : page.markdown.slice(0, 8000),
-        contentTruncated:
-          input.includeContent === false
-            ? undefined
-            : page.markdown.length > 8000,
-        handle: guideResourceUriFromUrl(page.url),
-        kind: "guide",
-        sourceUrl: page.githubUrl,
-        summary: page.description,
-        tip: "Inspect the references below and call read_doc on relevant API handles.",
-        title: page.title,
-        url: page.url,
-      },
-      references:
-        input.includeReferences === false
-          ? undefined
-          : await expandDocumentationReferences({
-              limit: 12,
-              target: guideResourceUriFromUrl(page.url),
-            }),
-      workflow: {
-        next: "If more context is needed, call read_doc on one of the returned reference handles.",
-        nextTool: "read_doc",
-      },
-    };
+  if (isTutorialDocumentationTarget(input.target)) {
+    return await buildTutorialReadResult(input);
   }
 
-  const entity = await resolveSymbolEntity({
-    symbol: symbolFromDocumentationTarget(input.target),
-  });
-  const relatedGuides = await getRelatedGuidesForEntity(entity, 6);
-  const members = isTypeEntity(entity) ? await loadTypeMembers(entity) : [];
+  if (isGuideDocumentationTarget(input.target)) {
+    return await buildGuideReadResult(input);
+  }
 
-  return {
-    document: {
-      details: toSymbolDetails(entity),
-      handle: getSymbolResourceUri(entity),
-      kind: entity.entityKind,
-      relatedGuides: relatedGuides.map((guide) => ({
-        ...guide,
-        tip: "Call read_doc on this guide handle for conceptual or workflow context.",
-      })),
-      summary: toSummary(entity),
-      tip: "Inspect the references below and call read_doc on relevant guide or member handles.",
-      title: getCanonicalFullName(entity),
-      topMembers: members.slice(0, 24).map((member) => ({
-        ...toSymbolRef(member),
-        returnType: member.returnType,
-        tip: "Call read_doc on this member handle for exact behavior, signature, or usage context.",
-      })),
-      url: entity.url,
-    },
-    references:
-      input.includeReferences === false
-        ? undefined
-        : await expandDocumentationReferences({
-            limit: 20,
-            target: getSymbolResourceUri(entity),
-          }),
-    workflow: {
-      next: "If more context is needed, call read_doc on one of the returned reference handles.",
-      nextTool: "read_doc",
-    },
-  };
+  return await buildSymbolReadResult(input);
 };
 
 export const searchDocumentation = async (input: DocumentationSearchInput) => {

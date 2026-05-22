@@ -29,6 +29,7 @@ const keyAliases: Record<string, string> = {
   relatedExamples: "related",
   relatedGuides: "guides",
   relatedSymbols: "symbols",
+  relatedTutorials: "tutorials",
   repositoryName: "repo",
   repositoryRef: "ref",
   repositoryUrl: "repoUrl",
@@ -398,6 +399,7 @@ const toolResultCompactors: Record<ToolName, (result: unknown) => unknown> = {
   resolve_symbol: compactResolveSymbolResult,
   search_docs: compactValue,
   search_documentation: compactValue,
+  search_tutorials: compactValue,
 };
 
 export const compactMcpToolResult = (
