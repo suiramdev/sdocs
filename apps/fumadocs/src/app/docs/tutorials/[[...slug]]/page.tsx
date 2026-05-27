@@ -32,8 +32,21 @@ import {
   toTutorialDocsUrl,
 } from "@/features/learn-docs/utils/source";
 
-export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+export async function generateStaticParams() {
+  try {
+    const pages = await getAllTutorialDocPages();
+    return [
+      { slug: [] as string[] },
+      ...pages.map((page) => ({ slug: page.slug.split("/").filter(Boolean) })),
+    ];
+  } catch {
+    return [];
+  }
+}
+
+export const dynamicParams = true;
 
 interface TutorialDocsPageProps {
   params: Promise<{

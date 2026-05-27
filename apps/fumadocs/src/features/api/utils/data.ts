@@ -4,11 +4,7 @@ import { apiConfig } from "@/features/api/utils/config";
 import { apiEntitySchema } from "@/features/api/utils/schemas";
 import type { ApiEntity } from "@/features/api/utils/schemas";
 
-let entityCache: ApiEntity[] | null = null;
-let entityByIdCache: Map<string, ApiEntity> | null = null;
-let entityByUrlCache: Map<string, ApiEntity> | null = null;
-let entitiesByClassCache: Map<string, ApiEntity[]> | null = null;
-let typeByClassCache: Map<string, ApiEntity> | null = null;
+export const API_ENTITIES_REVALIDATE_PATH = "/docs/api";
 
 function toClassKey(namespace: string, className: string): string {
   return `${namespace}::${className}`;
@@ -23,18 +19,9 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function buildCaches(): Promise<void> {
-  if (entityCache) {
-    return;
-  }
-
+async function loadApiEntitiesFromFile(): Promise<ApiEntity[]> {
   if (!(await fileExists(apiConfig.data.entitiesFile))) {
-    entityCache = [];
-    entityByIdCache = new Map();
-    entityByUrlCache = new Map();
-    entitiesByClassCache = new Map();
-    typeByClassCache = new Map();
-    return;
+    return [];
   }
 
   const raw = await readFile(apiConfig.data.entitiesFile, "utf8");
@@ -46,7 +33,25 @@ async function buildCaches(): Promise<void> {
     );
   }
 
-  const entities = parsedJson.map((item) => apiEntitySchema.parse(item));
+  return parsedJson.map((item) => apiEntitySchema.parse(item));
+}
+
+interface EntityCaches {
+  entities: ApiEntity[];
+  byId: Map<string, ApiEntity>;
+  byUrl: Map<string, ApiEntity>;
+  byClass: Map<string, ApiEntity[]>;
+  typeByClass: Map<string, ApiEntity>;
+}
+
+let requestCache: EntityCaches | null = null;
+
+async function getCaches(): Promise<EntityCaches> {
+  if (requestCache) {
+    return requestCache;
+  }
+
+  const entities = await loadApiEntitiesFromFile();
   const byId = new Map<string, ApiEntity>();
   const byUrl = new Map<string, ApiEntity>();
   const byClass = new Map<string, ApiEntity[]>();
@@ -66,40 +71,37 @@ async function buildCaches(): Promise<void> {
     }
   }
 
-  entityCache = entities;
-  entityByIdCache = byId;
-  entityByUrlCache = byUrl;
-  entitiesByClassCache = byClass;
-  typeByClassCache = typeByClass;
+  requestCache = { byClass, byId, byUrl, entities, typeByClass };
+  return requestCache;
 }
 
 export async function loadApiEntities(): Promise<ApiEntity[]> {
-  await buildCaches();
-  return entityCache ?? [];
+  return (await getCaches()).entities;
 }
 
 export async function getEntityById(id: string): Promise<ApiEntity | null> {
-  await buildCaches();
-  return entityByIdCache?.get(id) ?? null;
+  return (await getCaches()).byId.get(id) ?? null;
 }
 
 export async function getEntityByUrl(url: string): Promise<ApiEntity | null> {
-  await buildCaches();
-  return entityByUrlCache?.get(url) ?? null;
+  return (await getCaches()).byUrl.get(url) ?? null;
 }
 
 export async function getEntitiesByClass(
   namespace: string,
   className: string
 ): Promise<ApiEntity[]> {
-  await buildCaches();
-  return entitiesByClassCache?.get(toClassKey(namespace, className)) ?? [];
+  return (
+    (await getCaches()).byClass.get(toClassKey(namespace, className)) ?? []
+  );
 }
 
 export async function getTypeEntityByClass(
   namespace: string,
   className: string
 ): Promise<ApiEntity | null> {
-  await buildCaches();
-  return typeByClassCache?.get(toClassKey(namespace, className)) ?? null;
+  return (
+    (await getCaches()).typeByClass.get(toClassKey(namespace, className)) ??
+    null
+  );
 }

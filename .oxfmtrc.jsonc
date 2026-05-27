@@ -15,6 +15,7 @@
   "arrowParens": "always",
   "endOfLine": "lf",
   "experimentalSortPackageJson": true,
+  "ignorePatterns": [".cache/**", "**/.next/**"],
   "experimentalSortImports": {
     "ignoreCase": true,
     "newlinesBetween": true,

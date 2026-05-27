@@ -28,13 +28,23 @@ import {
 } from "@/features/docs/components/page-actions";
 import { ReferencedApiSymbolsSection } from "@/features/docs/components/reference-sections";
 import {
+  getAllOfficialDocSlugs,
   getOfficialDocPage,
   OFFICIAL_DOCS_FOLDER_URL,
   resolveOfficialDocsLink,
 } from "@/features/official-docs/utils/source";
 import type { OfficialDocPage } from "@/features/official-docs/utils/source";
 
-export const dynamic = "force-dynamic";
+export async function generateStaticParams() {
+  try {
+    const slugs = await getAllOfficialDocSlugs();
+    return slugs.map((slug: string[]) => ({ slug }));
+  } catch {
+    return [];
+  }
+}
+
+export const dynamicParams = true;
 
 interface OfficialDocsPageProps {
   params: Promise<{

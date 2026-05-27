@@ -30,8 +30,6 @@ const API_ROOT_URL = "/docs/api";
 const GET_STARTED_URL = "/docs/get-started";
 const API_FOLDER_NAME = "API Reference";
 
-let cachedApiFolder: Folder | null = null;
-
 const isMethodEntity = (entity: ApiEntity): entity is MethodEntity =>
   entity.type === "method";
 
@@ -323,14 +321,7 @@ const buildApiReferenceFolder = async (): Promise<Folder> => {
   };
 };
 
-const getApiReferenceFolder = async (): Promise<Folder> => {
-  if (cachedApiFolder) {
-    return cachedApiFolder;
-  }
-
-  cachedApiFolder = await buildApiReferenceFolder();
-  return cachedApiFolder;
-};
+const getApiReferenceFolder = (): Promise<Folder> => buildApiReferenceFolder();
 
 const getOfficialDocsFolder = (): Promise<Folder> =>
   getOfficialDocsSectionTree();

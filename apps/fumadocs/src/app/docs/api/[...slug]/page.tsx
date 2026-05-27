@@ -1157,7 +1157,9 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
       : "";
   const toc = buildToc(constructorGroups, methodGroups, propertyGroups);
   const selectedAnchor = buildEntityAnchor(selectedEntity);
-  const relatedGuides = await getRelatedGuidesForEntity(typeEntity, 6);
+  const relatedGuides = await getRelatedGuidesForEntity(typeEntity, 6).catch(
+    () => []
+  );
 
   const parseInheritanceList = (displaySignature: string): string[] => {
     const parts = displaySignature.split(":");
