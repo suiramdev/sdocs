@@ -58,6 +58,33 @@ const formatError = (error: unknown): string => {
 const isAlreadyExistsError = (error: unknown): boolean =>
   (error as NodeJS.ErrnoException)?.code === "EEXIST";
 
+const revalidateApiEntities = async (): Promise<void> => {
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret) {
+    logSyncProgress("Skipping revalidation: REVALIDATE_SECRET not set.");
+    return;
+  }
+
+  const baseUrl =
+    process.env.APP_BASE_URL ??
+    process.env.NEXT_PUBLIC_APP_BASE_URL ??
+    "http://localhost:4000";
+
+  const url = `${baseUrl}/api/revalidate?secret=${encodeURIComponent(secret)}&tag=api-entities`;
+
+  logSyncProgress("Triggering Next.js revalidation for API entities.");
+  const response = await fetch(url, { method: "POST" });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Revalidation request failed with status ${response.status}: ${body}`
+    );
+  }
+
+  logSyncProgress("Revalidation triggered successfully.");
+};
+
 const runStep = (scriptName: string, stepName: string): void => {
   logSyncProgress(`Starting ${stepName}.`);
   const startedAt = Date.now();
@@ -181,6 +208,7 @@ const main = async (): Promise<void> => {
   try {
     runStep("api:bootstrap", "API bootstrap");
     runStep("api:index", "API indexing");
+    await revalidateApiEntities();
     logSyncProgress("API sync completed.");
   } finally {
     await releaseLock();
