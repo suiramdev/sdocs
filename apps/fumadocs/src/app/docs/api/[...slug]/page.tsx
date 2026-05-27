@@ -1,22 +1,15 @@
 import type { TOCItemType } from "fumadocs-core/toc";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
-import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import { DocsPage } from "fumadocs-ui/layouts/notebook/page";
 import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import React from "react";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { MemberSectionSearch } from "@/features/api/components/member-section-search";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
@@ -358,59 +351,76 @@ function AdvisoryCallout({ remarks }: { remarks: string }) {
   );
 }
 
-function ParameterNotes({ parameters }: { parameters: ApiParameter[] }) {
+function ParameterNotes({
+  parameters,
+  lookup,
+}: {
+  parameters: ApiParameter[];
+  lookup: TypeLinkLookup;
+}) {
   if (parameters.length === 0) {
     return null;
   }
 
-  const entries = parameters
-    .map((parameter) => {
-      const details = parameter.description?.trim();
-      const detailsParts: string[] = [];
+  return (
+    <table className="param-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {parameters.map((p) => (
+          <tr key={`${p.name}-${p.type}`}>
+            <td>
+              {p.name}
+              {p.defaultValue && (
+                <span className="text-neutral-400 dark:text-neutral-500 font-mono text-xs">
+                  {" "}
+                  = {p.defaultValue}
+                </span>
+              )}
+            </td>
+            <td>
+              <TypeExpression lookup={lookup} value={p.type} />
+            </td>
+            <td>{p.description || "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-      if (details && details.length > 0) {
-        detailsParts.push(details);
-      }
-
-      if (parameter.defaultValue) {
-        detailsParts.push(`Default: ${parameter.defaultValue}`);
-      }
-
-      if (detailsParts.length === 0) {
-        return null;
-      }
-
-      return {
-        details: detailsParts.join(" "),
-        key: `${parameter.name}-${parameter.type}`,
-        name: parameter.name,
-      };
-    })
-    .filter((entry) => entry !== null);
-
-  if (entries.length === 0) {
+function ReturnsNotes({
+  description,
+  returnType,
+  lookup,
+}: {
+  description: string;
+  returnType: string | null;
+  lookup: TypeLinkLookup;
+}) {
+  const details = description.trim();
+  if (details.length === 0 && !returnType) {
     return null;
   }
 
   return (
-    <ul className="grid list-disc gap-1 pl-5 text-sm leading-relaxed">
-      {entries.map((entry) => (
-        <li key={entry.key}>
-          <code>{entry.name}</code>
-          <span>{`: ${entry.details}`}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="text-sm leading-relaxed mt-2">
+      <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mr-2">
+        Returns:
+      </span>
+      {returnType && (
+        <span className="font-mono text-xs text-primary font-semibold mr-2">
+          <TypeExpression lookup={lookup} value={returnType} />
+        </span>
+      )}
+      <span className="text-muted-foreground">{details || "—"}</span>
+    </div>
   );
-}
-
-function ReturnsNotes({ description }: { description: string }) {
-  const details = description.trim();
-  if (details.length === 0) {
-    return null;
-  }
-
-  return <p className="text-sm leading-relaxed">{details}</p>;
 }
 
 function ExceptionsTable({
@@ -425,24 +435,24 @@ function ExceptionsTable({
   }
 
   return (
-    <Table className="mt-2 border-y">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Exception</TableHead>
-          <TableHead>Condition</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <table className="param-table">
+      <thead>
+        <tr>
+          <th>Exception</th>
+          <th>Condition</th>
+        </tr>
+      </thead>
+      <tbody>
         {exceptions.map((exception) => (
-          <TableRow key={`${exception.type}-${exception.description ?? ""}`}>
-            <TableCell>
+          <tr key={`${exception.type}-${exception.description ?? ""}`}>
+            <td>
               <TypeExpression lookup={lookup} value={exception.type} />
-            </TableCell>
-            <TableCell>{exception.description?.trim() ?? ""}</TableCell>
-          </TableRow>
+            </td>
+            <td>{exception.description?.trim() || "—"}</td>
+          </tr>
         ))}
-      </TableBody>
-    </Table>
+      </tbody>
+    </table>
   );
 }
 
@@ -622,17 +632,197 @@ function MemberHeader({
   title,
   isObsolete,
   obsoleteMessage,
+  entity,
 }: {
   anchor: string;
   lookup: TypeLinkLookup;
   title: string;
   isObsolete: boolean;
   obsoleteMessage: string;
+  entity: ApiEntity;
 }) {
   const badgeTitle = resolveObsoleteMessage(
     obsoleteMessage,
     "This API member is obsolete."
   );
+
+  const chips: ReactNode[] = [];
+
+  const sig = entity.signature || "";
+  const displaySig = entity.displaySignature || "";
+
+  // 1. Access level
+  if (sig.includes("public ") || displaySig.includes("public ")) {
+    chips.push(
+      <Badge className="chip primary" key="public">
+        PUBLIC
+      </Badge>
+    );
+  } else if (sig.includes("protected ") || displaySig.includes("protected ")) {
+    chips.push(
+      <Badge className="chip warning" key="protected">
+        PROTECTED
+      </Badge>
+    );
+  } else if (sig.includes("private ") || displaySig.includes("private ")) {
+    chips.push(
+      <Badge className="chip" key="private">
+        PRIVATE
+      </Badge>
+    );
+  } else if (sig.includes("internal ") || displaySig.includes("internal ")) {
+    chips.push(
+      <Badge className="chip" key="internal">
+        INTERNAL
+      </Badge>
+    );
+  }
+
+  // 2. Member nature
+  if (entity.entityKind === "constructor") {
+    chips.push(
+      <Badge className="chip primary" key="constructor">
+        CONSTRUCTOR
+      </Badge>
+    );
+  }
+  if (sig.includes("static ") || displaySig.includes("static ")) {
+    chips.push(
+      <Badge className="chip success" key="static">
+        STATIC
+      </Badge>
+    );
+  }
+  if (sig.includes("virtual ") || displaySig.includes("virtual ")) {
+    chips.push(
+      <Badge className="chip" key="virtual">
+        VIRTUAL
+      </Badge>
+    );
+  }
+  if (sig.includes("override ") || displaySig.includes("override ")) {
+    chips.push(
+      <Badge className="chip" key="override">
+        OVERRIDE
+      </Badge>
+    );
+  }
+  if (sig.includes("abstract ") || displaySig.includes("abstract ")) {
+    chips.push(
+      <Badge className="chip" key="abstract">
+        ABSTRACT
+      </Badge>
+    );
+  }
+
+  // 3. Property accessors
+  if (entity.type === "property") {
+    const hasGet = displaySig.includes("get;") || displaySig.includes("get ");
+    const hasSet = displaySig.includes("set;") || displaySig.includes("set ");
+    const hasInit =
+      displaySig.includes("init;") || displaySig.includes("init ");
+    if (hasGet) {
+      chips.push(
+        <Badge className="chip info" key="get">
+          GET
+        </Badge>
+      );
+    }
+    if (hasSet) {
+      chips.push(
+        <Badge className="chip warning" key="set">
+          SET
+        </Badge>
+      );
+    }
+    if (hasInit) {
+      chips.push(
+        <Badge className="chip" key="init">
+          INIT
+        </Badge>
+      );
+    }
+  }
+
+  // 4. Custom Metadata tags (lifecycle, per-frame, fixed, ingest)
+  const nameLower = entity.name.toLowerCase();
+  const summaryLower = (entity.summary || "").toLowerCase();
+  const descriptionLower = (entity.description || "").toLowerCase();
+
+  // Lifecycle methods
+  if (
+    nameLower.startsWith("on") &&
+    (nameLower.includes("awake") ||
+      nameLower.includes("start") ||
+      nameLower.includes("enable") ||
+      nameLower.includes("disable") ||
+      nameLower.includes("destroy") ||
+      summaryLower.includes("lifecycle") ||
+      descriptionLower.includes("lifecycle"))
+  ) {
+    chips.push(
+      <Badge className="chip lifecycle" key="lifecycle">
+        LIFECYCLE
+      </Badge>
+    );
+  }
+
+  // Per-frame tick methods
+  if (
+    nameLower.includes("update") ||
+    summaryLower.includes("per frame") ||
+    summaryLower.includes("per-frame") ||
+    descriptionLower.includes("per frame") ||
+    descriptionLower.includes("per-frame")
+  ) {
+    if (nameLower.includes("fixed")) {
+      chips.push(
+        <Badge className="chip fixed" key="fixed">
+          FIXED TICK
+        </Badge>
+      );
+    } else {
+      chips.push(
+        <Badge className="chip per-frame" key="per-frame">
+          PER-FRAME
+        </Badge>
+      );
+    }
+  }
+
+  // Ingestion or input triggers
+  if (
+    nameLower.includes("input") ||
+    nameLower.includes("ingest") ||
+    summaryLower.includes("ingest") ||
+    summaryLower.includes("input trigger") ||
+    descriptionLower.includes("ingest") ||
+    descriptionLower.includes("input trigger")
+  ) {
+    chips.push(
+      <Badge className="chip ingest" key="ingest">
+        INGEST
+      </Badge>
+    );
+  }
+
+  // 5. Obsolete
+  if (isObsolete) {
+    chips.push(
+      <Badge
+        className="chip"
+        key="obsolete"
+        style={{
+          background: "rgba(207, 34, 46, 0.08)",
+          borderColor: "rgba(207, 34, 46, 0.25)",
+          color: "var(--danger)",
+        }}
+        title={badgeTitle}
+      >
+        OBSOLETE
+      </Badge>
+    );
+  }
 
   return (
     <h3 className="m-0 text-base leading-6" id={anchor}>
@@ -644,14 +834,9 @@ function MemberHeader({
           />
         </span>
         <span className="inline-flex items-center gap-2">
-          {isObsolete ? (
-            <Badge
-              className="border-destructive/40 text-destructive"
-              title={badgeTitle}
-            >
-              Obsolete
-            </Badge>
-          ) : null}
+          {chips.length > 0 && (
+            <span className="member-tags mr-2">{chips}</span>
+          )}
           <SignatureAnchorButton
             anchor={anchor}
             className="opacity-0 pointer-events-none transition-opacity group-hover/member:opacity-100 group-hover/member:pointer-events-auto group-focus-within/member:opacity-100 group-focus-within/member:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto"
@@ -682,9 +867,12 @@ function MemberReference({
   const hasParameterSection = entity.parameters.some(
     (parameter) =>
       (parameter.description?.trim().length ?? 0) > 0 ||
-      (parameter.defaultValue?.trim().length ?? 0) > 0
+      (parameter.defaultValue?.trim().length ?? 0) > 0 ||
+      (parameter.type?.trim().length ?? 0) > 0
   );
-  const hasReturnsSection = entity.returnsDescription.trim().length > 0;
+  const hasReturnsSection =
+    entity.returnsDescription.trim().length > 0 ||
+    (entity.returnType && entity.returnType.trim().length > 0);
   const builtInExamples = entity.examples.filter(
     (example) => example.sourceKind !== "repository"
   );
@@ -694,64 +882,56 @@ function MemberReference({
 
   return (
     <article
-      className="group/member"
+      className="member group/member"
       data-member-item=""
       data-member-search={buildMemberSearchText(entity)}
+      id={anchor}
     >
       <header>
         <MemberHeader
           anchor={anchor}
+          entity={entity}
           isObsolete={entity.isObsolete}
           lookup={lookup}
           obsoleteMessage={entity.obsoleteMessage}
           title={entity.displaySignature}
         />
         {summary.length > 0 ? (
-          <p className="max-w-[85ch] text-sm leading-relaxed text-muted-foreground">
-            {summary}
-          </p>
+          <p className="member-desc max-w-[85ch]">{summary}</p>
         ) : null}
         {entity.isObsolete ? (
-          <p className="max-w-[85ch] text-sm leading-relaxed font-medium text-destructive">
+          <p className="max-w-[85ch] text-sm leading-relaxed font-medium text-destructive mt-1">
             Obsolete: {obsoleteNotice}
           </p>
         ) : null}
       </header>
 
       {remarks.length > 0 ? (
-        <section>
+        <section className="mt-2.5">
           <AdvisoryCallout remarks={remarks} />
         </section>
       ) : null}
 
       {hasParameterSection ? (
-        <section aria-labelledby={`${anchor}-parameters`}>
-          <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-            id={`${anchor}-parameters`}
-          >
-            Parameters
-          </h4>
-          <ParameterNotes parameters={entity.parameters} />
+        <section aria-labelledby={`${anchor}-parameters`} className="mt-3">
+          <ParameterNotes parameters={entity.parameters} lookup={lookup} />
         </section>
       ) : null}
 
       {hasReturnsSection ? (
-        <section aria-labelledby={`${anchor}-returns`}>
-          <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-            id={`${anchor}-returns`}
-          >
-            Returns
-          </h4>
-          <ReturnsNotes description={entity.returnsDescription} />
+        <section aria-labelledby={`${anchor}-returns`} className="mt-3">
+          <ReturnsNotes
+            description={entity.returnsDescription}
+            returnType={entity.returnType}
+            lookup={lookup}
+          />
         </section>
       ) : null}
 
       {entity.exceptions.length > 0 ? (
-        <section aria-labelledby={`${anchor}-exceptions`}>
+        <section aria-labelledby={`${anchor}-exceptions`} className="mt-4">
           <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-1"
             id={`${anchor}-exceptions`}
           >
             Exceptions
@@ -761,9 +941,9 @@ function MemberReference({
       ) : null}
 
       {builtInExamples.length > 0 ? (
-        <section aria-labelledby={`${anchor}-example`}>
+        <section aria-labelledby={`${anchor}-example`} className="mt-4">
           <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-1"
             id={`${anchor}-example`}
           >
             Example
@@ -773,9 +953,9 @@ function MemberReference({
       ) : null}
 
       {implementations.length > 0 ? (
-        <section aria-labelledby={`${anchor}-implementations`}>
+        <section aria-labelledby={`${anchor}-implementations`} className="mt-4">
           <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-1"
             id={`${anchor}-implementations`}
           >
             Implementations
@@ -979,34 +1159,79 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
   const selectedAnchor = buildEntityAnchor(selectedEntity);
   const relatedGuides = await getRelatedGuidesForEntity(typeEntity, 6);
 
+  const parseInheritanceList = (displaySignature: string): string[] => {
+    const parts = displaySignature.split(":");
+    if (parts.length <= 1) {
+      return [];
+    }
+    return parts[1]
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  };
+
+  const inheritanceList = parseInheritanceList(typeEntity.displaySignature);
+
   return (
     <DocsPage toc={toc}>
-      <DocsPageHeader
-        description={summary.summary}
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            <span>
-              <SignatureText
-                className="text-[1em] leading-tight"
-                getTokenHref={(token) =>
-                  resolveSignatureTokenHref(token, typeLookup)
-                }
-                value={typeEntity.displaySignature}
-              />
+      <nav className="breadcrumb">
+        <Link href="/docs/api">API Reference</Link>
+        <span className="sep">/</span>
+        <Link href={`/docs/api#${typeEntity.namespace}`}>
+          {typeEntity.namespace}
+        </Link>
+        <span className="sep">/</span>
+        <span className="current">{typeEntity.name}</span>
+      </nav>
+
+      <h1 className="page-title text-4xl font-bold tracking-tight mb-2 page-title-wrap">
+        {typeEntity.name}
+        <Badge className="kind">{typeEntity.entityKind}</Badge>
+      </h1>
+
+      {summary.summary && <p className="page-summary">{summary.summary}</p>}
+
+      <div className="inheritance">
+        <span className="crumb">object</span>
+        {inheritanceList.map((inherited) => (
+          <React.Fragment key={inherited}>
+            <span className="arrow">→</span>
+            <span className="crumb">
+              <TypeExpression lookup={typeLookup} value={inherited} />
             </span>
-            {typeEntity.isObsolete ? (
-              <Badge
-                className="border-destructive/40 text-destructive"
-                title={typeObsoleteNotice}
-              >
-                Obsolete
-              </Badge>
-            ) : null}
-          </span>
-        }
-        titleClassName="leading-tight"
-      />
-      <DocsBody>
+          </React.Fragment>
+        ))}
+        {inheritanceList.length === 0 && (
+          <>
+            <span className="arrow">→</span>
+            <span className="crumb cur">{typeEntity.name}</span>
+          </>
+        )}
+        {inheritanceList.length > 0 && (
+          <>
+            <span className="arrow">→</span>
+            <span className="crumb cur">{typeEntity.name}</span>
+          </>
+        )}
+      </div>
+
+      <dl className="meta-grid">
+        <dt>Namespace</dt>
+        <dd>{typeEntity.namespace}</dd>
+        <dt>Assembly</dt>
+        <dd>{typeEntity.assembly}</dd>
+        <dt>Declaration</dt>
+        <dd>
+          <SignatureText
+            getTokenHref={(token) =>
+              resolveSignatureTokenHref(token, typeLookup)
+            }
+            value={typeEntity.displaySignature}
+          />
+        </dd>
+      </dl>
+
+      <div className="api-docs-body flex-1 min-w-0">
         {selectedEntity.id !== typeEntity.id ? (
           <Callout title="Info" type="info">
             <p>
@@ -1032,8 +1257,6 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
           <AdvisoryCallout remarks={summary.remarks} />
         ) : null}
 
-        <RelatedGuidesSection guides={relatedGuides} />
-
         {constructorGroups.length > 0 ? (
           <section className="pt-0" id="constructors">
             <MemberSectionSearch
@@ -1054,7 +1277,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         ) : null}
 
         {methodGroups.length > 0 ? (
-          <section className="pt-0 mt-9" id="methods">
+          <section id="methods">
             <MemberSectionSearch
               describedBy="methods-member-filter-status"
               emptyStateId="methods-member-filter-empty"
@@ -1073,7 +1296,7 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
         ) : null}
 
         {propertyGroups.length > 0 ? (
-          <section className="pt-0 mt-9" id="properties">
+          <section id="properties">
             <MemberSectionSearch
               describedBy="properties-member-filter-status"
               emptyStateId="properties-member-filter-empty"
@@ -1091,44 +1314,8 @@ export default async function ApiEntityPage(props: ApiEntityPageProps) {
           </section>
         ) : null}
 
-        <section className="pt-0 mt-9" id="metadata">
-          <h2>Metadata</h2>
-          <Table className="mt-2 border-y">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell>Namespace</TableCell>
-                <TableCell>
-                  <code>{typeEntity.namespace}</code>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell>
-                  <code>{typeEntity.entityKind}</code>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Assembly</TableCell>
-                <TableCell>
-                  <code>{typeEntity.assembly}</code>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Doc ID</TableCell>
-                <TableCell>
-                  <code>{typeEntity.docId}</code>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </section>
-      </DocsBody>
+        <RelatedGuidesSection guides={relatedGuides} />
+      </div>
     </DocsPage>
   );
 }

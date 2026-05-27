@@ -13,10 +13,8 @@ import {
   readApiReferenceState,
   writeApiReferenceState,
 } from "./api-reference-state";
-import {
-  type ApiSchemaSource,
-  resolveApiSchemaSource,
-} from "./api-schema-source";
+import { resolveApiSchemaSource } from "./api-schema-source";
+import type { ApiSchemaSource } from "./api-schema-source";
 import { getExampleRepositoriesFingerprint } from "./repository-examples";
 
 const DEFAULT_DOWNLOAD_ATTEMPTS = 3;

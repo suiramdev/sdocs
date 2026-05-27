@@ -20,7 +20,7 @@ const HEAD_CACHE_TTL_MS = 60_000;
 const OFFICIAL_DOCS_BASE_URL = "/docs/official";
 const OFFICIAL_DOCS_REVALIDATE_SECONDS = 60;
 
-export const OFFICIAL_DOCS_FOLDER_NAME = "Guides";
+export const OFFICIAL_DOCS_FOLDER_NAME = "Documentation";
 export const OFFICIAL_DOCS_FOLDER_URL = OFFICIAL_DOCS_BASE_URL;
 
 interface GitHubRefResponse {

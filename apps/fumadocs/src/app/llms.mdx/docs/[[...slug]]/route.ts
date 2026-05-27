@@ -47,6 +47,4 @@ export const GET = async (
   return markdownResponse(await getGuideLLMText(page));
 };
 
-export const generateStaticParams = () => {
-  return source.generateParams();
-};
+export const generateStaticParams = () => source.generateParams();

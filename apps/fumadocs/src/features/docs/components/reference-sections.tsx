@@ -24,28 +24,27 @@ export const RelatedGuidesSection = ({
   }
 
   return (
-    <section aria-labelledby="related-guides-heading" className="pt-0 mt-7">
-      <div className="mb-3 grid gap-0.5">
-        <h2 id="related-guides-heading">Related Guides</h2>
-        <p className="max-w-[72ch] text-sm leading-snug text-muted-foreground">
-          Broader workflow and conceptual references connected to this API.
-        </p>
+    <section
+      aria-labelledby="related-guides-heading"
+      className="pt-0 mt-12 border-t"
+    >
+      <div className="mb-2 mt-4 grid gap-0.5">
+        <h3
+          className="m-0 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+          id="related-guides-heading"
+        >
+          Related Guides
+        </h3>
       </div>
-      <div className="grid gap-2">
+      <div className="flex flex-wrap gap-2">
         {guides.map((guide) => (
           <Link
-            className="group block rounded-lg border px-3 py-2.5 no-underline transition-colors hover:bg-muted/30"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs font-mono text-muted-foreground no-underline transition-colors hover:bg-bg-hover hover:text-text"
             href={guide.url}
             key={guide.resourceUri}
           >
-            <div className="text-sm font-medium text-foreground group-hover:underline">
-              {guide.title}
-            </div>
-            {guide.description ? (
-              <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">
-                {guide.description}
-              </p>
-            ) : null}
+            <span>→</span>
+            <span className="font-semibold text-text">{guide.title}</span>
           </Link>
         ))}
       </div>
@@ -63,26 +62,26 @@ export const ReferencedApiSymbolsSection = ({
   }
 
   return (
-    <section aria-labelledby="referenced-api-heading" className="pt-0 mt-7">
-      <div className="mb-3 grid gap-0.5">
-        <h2 id="referenced-api-heading">Referenced API</h2>
-        <p className="max-w-[72ch] text-sm leading-snug text-muted-foreground">
-          Canonical API pages mentioned in this guide.
-        </p>
+    <section
+      aria-labelledby="referenced-api-heading"
+      className="pt-0 mt-12 border-t"
+    >
+      <div className="mb-2 mt-4 grid gap-0.5">
+        <h3
+          className="m-0 text-sm font-semibold tracking-wide text-muted-foreground uppercase"
+          id="referenced-api-heading"
+        >
+          Referenced API
+        </h3>
       </div>
-      <div className="grid gap-2">
+      <div className="flex flex-wrap gap-2">
         {symbols.map((symbol) => (
           <Link
-            className="group block rounded-lg border px-3 py-2.5 no-underline transition-colors hover:bg-muted/30"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs font-mono text-muted-foreground no-underline transition-colors hover:bg-bg-hover hover:text-text"
             href={symbol.docsUrl}
             key={`${symbol.resourceUri}-${symbol.fullName}`}
           >
-            <div className="text-sm font-medium text-foreground group-hover:underline">
-              {symbol.fullName}
-            </div>
-            <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">
-              {symbol.summary}
-            </p>
+            <span>{symbol.fullName.split(".").at(-1) || symbol.fullName}</span>
           </Link>
         ))}
       </div>

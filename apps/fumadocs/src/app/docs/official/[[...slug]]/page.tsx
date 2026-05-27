@@ -1,6 +1,6 @@
 import { createMarkdownRenderer } from "fumadocs-core/content/md";
 import { Callout } from "fumadocs-ui/components/callout";
-import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import { DocsBody, DocsPage } from "fumadocs-ui/layouts/notebook/page";
 import GithubSlugger from "github-slugger";
 import type { Nodes } from "hast";
 import { toJsxRuntime } from "hast-util-to-jsx-runtime";
