@@ -1,0 +1,395 @@
+/* s&box docs — design tokens + shared styles */
+
+:root[data-theme="dark"] {
+  --bg: #0a0b0d;
+  --bg-elevated: #111317;
+  --bg-card: #15171c;
+  --bg-hover: #1c1f25;
+  --bg-active: #232730;
+  --border: #25282f;
+  --border-strong: #34373f;
+  --text: #e8eaed;
+  --text-muted: #9aa0a8;
+  --text-faint: #5e6470;
+  --primary: #3273eb;
+  --primary-hover: #4a85f0;
+  --primary-faint: rgba(50, 115, 235, 0.14);
+  --primary-line: rgba(50, 115, 235, 0.35);
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --code-bg: #0d0e11;
+  --code-border: #1f2127;
+  --syn-kw: #c084fc;
+  --syn-str: #f0a96b;
+  --syn-cmt: #5e6470;
+  --syn-type: #4ec9b0;
+  --syn-fn: #e2c08d;
+  --syn-num: #b5cea8;
+  --syn-attr: #9cdcfe;
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --kbd-bg: #1c1f25;
+  --kbd-border: #34373f;
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elevated: #f8f9fb;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f3f6;
+  --bg-active: #e8ebf0;
+  --border: #e4e6ea;
+  --border-strong: #c9cdd4;
+  --text: #0a0b0d;
+  --text-muted: #5e6470;
+  --text-faint: #8a8f99;
+  --primary: #3273eb;
+  --primary-hover: #2861d4;
+  --primary-faint: rgba(50, 115, 235, 0.08);
+  --primary-line: rgba(50, 115, 235, 0.25);
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --code-bg: #0d0e11;
+  --code-border: #1f2127;
+  --syn-kw: #c084fc;
+  --syn-str: #f0a96b;
+  --syn-cmt: #6e7681;
+  --syn-type: #4ec9b0;
+  --syn-fn: #e2c08d;
+  --syn-num: #b5cea8;
+  --syn-attr: #9cdcfe;
+  --shadow-md: 0 4px 16px rgba(15, 17, 20, 0.08);
+  --shadow-lg: 0 24px 48px rgba(15, 17, 20, 0.12);
+  --kbd-bg: #f1f3f6;
+  --kbd-border: #c9cdd4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+code,
+pre,
+.mono {
+  font-family: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "ss01";
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+::selection {
+  background: var(--primary-faint);
+  color: var(--text);
+}
+
+/* scrollbar */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* shared chrome */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 3px;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: "Geist Mono", monospace;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.chip.primary {
+  color: var(--primary);
+  background: var(--primary-faint);
+  border-color: var(--primary-line);
+}
+.chip.success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+.chip.warning {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  text-decoration: none;
+}
+.btn.primary {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.btn.primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover {
+  background: var(--bg-hover);
+}
+.btn.sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.btn.lg {
+  height: 44px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* code block */
+.code-block {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: "Geist Mono", monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #e8eaed;
+}
+.code-block .ch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--code-border);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11.5px;
+  color: #9aa0a8;
+  font-family: "Geist Mono", monospace;
+  letter-spacing: 0.02em;
+}
+.code-block .ch-header .file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.code-block .ch-header .file svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+.code-block .ch-body {
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.code-block pre {
+  margin: 0;
+  font-family: inherit;
+}
+
+.tok-kw {
+  color: var(--syn-kw);
+}
+.tok-str {
+  color: var(--syn-str);
+}
+.tok-cmt {
+  color: var(--syn-cmt);
+  font-style: italic;
+}
+.tok-type {
+  color: var(--syn-type);
+}
+.tok-fn {
+  color: var(--syn-fn);
+}
+.tok-num {
+  color: var(--syn-num);
+}
+.tok-attr {
+  color: var(--syn-attr);
+}
+.tok-punc {
+  color: #9aa0a8;
+}
+.tok-id {
+  color: #e8eaed;
+}
+
+/* utility */
+.mono-tag {
+  font-family: "Geist Mono", monospace;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 32px 0;
+}
+
+/* focus ring */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* brand (shared across docs + landing) */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.brand:hover {
+  text-decoration: none;
+  color: var(--text);
+}
+.brand .mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: "Geist Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  flex-shrink: 0;
+}
+.brand .ver {
+  font-family: "Geist Mono", monospace;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  background: var(--bg-elevated);
+}

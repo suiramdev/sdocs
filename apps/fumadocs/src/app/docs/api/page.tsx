@@ -1,15 +1,7 @@
 import { Callout } from "fumadocs-ui/components/callout";
-import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import { DocsPage } from "fumadocs-ui/layouts/notebook/page";
 import type { Metadata } from "next";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { loadApiEntities } from "@/features/api/utils/data";
 import { DocsPageHeader } from "@/features/docs/components/docs-page-header";
 
@@ -46,7 +38,7 @@ export default async function ApiIndexPage() {
         description={apiReferenceDescription}
         title="API Reference"
       />
-      <DocsBody>
+      <div className="api-docs-body flex-1 min-w-0">
         <section id="overview">
           <h2>Overview</h2>
           <Callout title="Note" type="info">
@@ -60,36 +52,36 @@ export default async function ApiIndexPage() {
 
         <section id="coverage">
           <h2>Coverage</h2>
-          <Table className="mt-2 border-y">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead>Count</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell>Classes / Structs / Interfaces</TableCell>
-                <TableCell>{classCount}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Enums</TableCell>
-                <TableCell>{enumCount}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Methods (incl. constructors)</TableCell>
-                <TableCell>{methodCount}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Properties</TableCell>
-                <TableCell>{propertyCount}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>Total entities</TableCell>
-                <TableCell>{entities.length}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+          <table className="param-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Classes / Structs / Interfaces</td>
+                <td>{classCount}</td>
+              </tr>
+              <tr>
+                <td>Enums</td>
+                <td>{enumCount}</td>
+              </tr>
+              <tr>
+                <td>Methods (incl. constructors)</td>
+                <td>{methodCount}</td>
+              </tr>
+              <tr>
+                <td>Properties</td>
+                <td>{propertyCount}</td>
+              </tr>
+              <tr>
+                <td>Total entities</td>
+                <td>{entities.length}</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <section id="navigation">
@@ -109,7 +101,7 @@ export default async function ApiIndexPage() {
             natural language queries.
           </p>
         </section>
-      </DocsBody>
+      </div>
     </DocsPage>
   );
 }

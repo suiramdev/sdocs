@@ -1,8 +1,8 @@
 import { posix } from "node:path";
 
-import { getTableOfContents } from "fumadocs-core/content/toc";
 import { createMarkdownRenderer } from "fumadocs-core/content/md";
-import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import { getTableOfContents } from "fumadocs-core/content/toc";
+import { DocsBody, DocsPage } from "fumadocs-ui/layouts/notebook/page";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -32,8 +32,21 @@ import {
   toTutorialDocsUrl,
 } from "@/features/learn-docs/utils/source";
 
-export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+export async function generateStaticParams() {
+  try {
+    const pages = await getAllTutorialDocPages();
+    return [
+      { slug: [] as string[] },
+      ...pages.map((page) => ({ slug: page.slug.split("/").filter(Boolean) })),
+    ];
+  } catch {
+    return [];
+  }
+}
+
+export const dynamicParams = true;
 
 interface TutorialDocsPageProps {
   params: Promise<{
@@ -114,7 +127,9 @@ const rewritePrefixedHref = (
 
 const rewriteGuideHref = (href: string): string | null =>
   rewritePrefixedHref(href, GUIDE_SITE_PREFIXES, (relativePath) =>
-    relativePath.length > 0 ? `/docs/official/${relativePath}` : "/docs/official"
+    relativePath.length > 0
+      ? `/docs/official/${relativePath}`
+      : "/docs/official"
   );
 
 const rewriteTutorialHref = (href: string): string | null =>
@@ -344,11 +359,7 @@ const TutorialIndexPage = async () => {
   );
 };
 
-const TutorialDetailPage = async ({
-  slug,
-}: {
-  slug: string;
-}) => {
+const TutorialDetailPage = async ({ slug }: { slug: string }) => {
   const page = await getTutorialDocPage(slug);
   if (!page) {
     notFound();
@@ -368,7 +379,10 @@ const TutorialDetailPage = async ({
         actions={
           <>
             <LLMCopyButton markdownUrl={rawMarkdownUrl} />
-            <ViewOptions githubUrl={page.githubUrl} markdownUrl={rawMarkdownUrl} />
+            <ViewOptions
+              githubUrl={page.githubUrl}
+              markdownUrl={rawMarkdownUrl}
+            />
           </>
         }
         description={page.summary}

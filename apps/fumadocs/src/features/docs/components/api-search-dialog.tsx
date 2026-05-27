@@ -25,101 +25,12 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { trackUmamiEvent } from "@/features/analytics/utils/umami";
 
 type NonActionSearchItem = Exclude<SearchItemType, { type: "action" }>;
-type SearchGroupKey =
-  | "class"
-  | "enum"
-  | "guide"
-  | "method"
-  | "property"
-  | "other";
 
 const emptyTags: NonNullable<DefaultSearchDialogProps["tags"]> = [];
 const emptyLinks: NonNullable<DefaultSearchDialogProps["links"]> = [];
 const minimumTrackedSearchLength = 2;
 const maxTrackedQueryLength = 120;
 const searchAnalyticsDebounceMs = 1200;
-
-const searchGroupOrder = [
-  "guide",
-  "class",
-  "enum",
-  "method",
-  "property",
-  "other",
-] as const satisfies readonly SearchGroupKey[];
-
-const searchGroupLabels: Record<Exclude<SearchGroupKey, "other">, string> = {
-  class: "CLASS",
-  enum: "ENUMS",
-  guide: "GUIDES",
-  method: "METHODS",
-  property: "PROPERTIES",
-};
-
-const isKnownSearchGroupKey = (
-  value: string
-): value is Exclude<SearchGroupKey, "guide" | "other"> =>
-  value === "class" ||
-  value === "enum" ||
-  value === "method" ||
-  value === "property";
-
-const isGuideSearchResult = (item: SearchItemType): boolean =>
-  item.type !== "action" &&
-  "url" in item &&
-  typeof item.url === "string" &&
-  item.url.startsWith("/docs") &&
-  !item.url.startsWith("/docs/api");
-
-const getEntitySearchGroupKey = (
-  item: NonActionSearchItem
-): Exclude<SearchGroupKey, "guide" | "other"> | null => {
-  const entityType = item.breadcrumbs?.at(-1);
-  if (typeof entityType !== "string") {
-    return null;
-  }
-
-  const normalizedEntityType = entityType.toLowerCase();
-  return isKnownSearchGroupKey(normalizedEntityType)
-    ? normalizedEntityType
-    : null;
-};
-
-const getSearchGroupKey = (item: SearchItemType): SearchGroupKey => {
-  if (item.type === "action") {
-    return "other";
-  }
-
-  if (isGuideSearchResult(item)) {
-    return "guide";
-  }
-
-  return getEntitySearchGroupKey(item) ?? "other";
-};
-
-const createGroupedEntries = (): Map<SearchGroupKey, SearchItemType[]> => {
-  const groupedEntries = new Map<SearchGroupKey, SearchItemType[]>();
-  for (const groupKey of searchGroupOrder) {
-    groupedEntries.set(groupKey, []);
-  }
-
-  return groupedEntries;
-};
-
-const populateGroupedEntries = (
-  groupedEntries: Map<SearchGroupKey, SearchItemType[]>,
-  items: SearchItemType[]
-) => {
-  for (const item of items) {
-    const groupItems = groupedEntries.get(getSearchGroupKey(item));
-    if (groupItems) {
-      groupItems.push(item);
-    }
-  }
-};
-
-const getGroupHeadingLabel = (groupKey: SearchGroupKey): string | undefined =>
-  groupKey === "other" ? undefined : searchGroupLabels[groupKey];
 
 const normalizeSearchTerm = (value: string): string =>
   value.trim().replaceAll(/\s+/g, " ");
@@ -216,53 +127,6 @@ const trackDocsSearchResultClick = (
   });
 };
 
-const appendGroupedSearchItems = (
-  groupHeadings: Map<string, string>,
-  groupedEntries: Map<SearchGroupKey, SearchItemType[]>,
-  groupedItems: SearchItemType[]
-) => {
-  for (const groupKey of searchGroupOrder) {
-    const groupItems = groupedEntries.get(groupKey) ?? [];
-    if (groupItems.length === 0) {
-      continue;
-    }
-
-    const label = getGroupHeadingLabel(groupKey);
-    if (label) {
-      const [firstItem] = groupItems;
-      if (firstItem) {
-        groupHeadings.set(firstItem.id, label);
-      }
-    }
-
-    groupedItems.push(...groupItems);
-  }
-};
-
-const createGroupedSearchItems = (items: SearchItemType[]) => {
-  const groupedEntries = createGroupedEntries();
-  const groupedItems: SearchItemType[] = [];
-  const groupHeadings = new Map<string, string>();
-  populateGroupedEntries(groupedEntries, items);
-  appendGroupedSearchItems(groupHeadings, groupedEntries, groupedItems);
-
-  return {
-    groupHeadings,
-    groupedItems,
-  };
-};
-
-const sortSearchItems = (items: SearchItemType[] | null | undefined) => {
-  if (!items) {
-    return {
-      groupHeadings: new Map<string, string>(),
-      groupedItems: items,
-    };
-  }
-
-  return createGroupedSearchItems(items);
-};
-
 const isApiHtmlContent = (
   item: SearchItemType
 ): item is NonActionSearchItem & {
@@ -303,14 +167,6 @@ const getSearchItemContentClassName = (item: NonActionSearchItem): string => {
   const paddingClassName = item.type === "page" ? "" : " ps-4";
   return `min-w-0 truncate font-medium${paddingClassName}`;
 };
-
-const SearchGroupLabel = ({ label }: { label?: string }) =>
-  label ? (
-    <div className="my-3 flex items-center gap-2 px-0.5 text-[0.69rem] font-bold tracking-[0.18em] text-foreground/90 uppercase">
-      <span>{label}</span>
-      <span className="h-px flex-1 bg-border/70" />
-    </div>
-  ) : null;
 
 const SearchItemContent = ({ item }: { item: SearchItemType }) => {
   if (item.type === "action") {
@@ -359,29 +215,24 @@ const SearchItemContent = ({ item }: { item: SearchItemType }) => {
 
 const TrackedSearchDialogListItem = ({
   activeTag,
-  groupLabel,
   item,
   onClick,
   search,
 }: {
   activeTag: string | undefined;
-  groupLabel?: string;
   item: SearchItemType;
   onClick: () => void;
   search: string;
 }) => (
-  <Fragment>
-    <SearchGroupLabel label={groupLabel} />
-    <SearchDialogListItem
-      item={item}
-      onClick={() => {
-        trackDocsSearchResultClick(activeTag, item, search);
-        onClick();
-      }}
-    >
-      <SearchItemContent item={item} />
-    </SearchDialogListItem>
-  </Fragment>
+  <SearchDialogListItem
+    item={item}
+    onClick={() => {
+      trackDocsSearchResultClick(activeTag, item, search);
+      onClick();
+    }}
+  >
+    <SearchItemContent item={item} />
+  </SearchDialogListItem>
 );
 
 const ApiSearchDialog = ({
@@ -434,10 +285,6 @@ const ApiSearchDialog = ({
     );
   });
   const items = query.data === "empty" ? defaultItems : query.data;
-  const { groupedItems, groupHeadings } = useMemo(
-    () => sortSearchItems(items),
-    [items]
-  );
   useTrackDocsSearch({
     activeTag,
     isLoading: query.isLoading,
@@ -465,13 +312,12 @@ const ApiSearchDialog = ({
           Item={({ item, onClick }) => (
             <TrackedSearchDialogListItem
               activeTag={activeTag}
-              groupLabel={groupHeadings.get(item.id)}
               item={item}
               onClick={onClick}
               search={search}
             />
           )}
-          items={groupedItems}
+          items={items}
         />
       </SearchDialogContent>
       <SearchDialogFooter>

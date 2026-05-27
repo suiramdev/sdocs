@@ -1,6 +1,6 @@
 import { createMarkdownRenderer } from "fumadocs-core/content/md";
 import { Callout } from "fumadocs-ui/components/callout";
-import { DocsBody, DocsPage } from "fumadocs-ui/layouts/docs/page";
+import { DocsBody, DocsPage } from "fumadocs-ui/layouts/notebook/page";
 import GithubSlugger from "github-slugger";
 import type { Nodes } from "hast";
 import { toJsxRuntime } from "hast-util-to-jsx-runtime";
@@ -28,13 +28,23 @@ import {
 } from "@/features/docs/components/page-actions";
 import { ReferencedApiSymbolsSection } from "@/features/docs/components/reference-sections";
 import {
+  getAllOfficialDocSlugs,
   getOfficialDocPage,
   OFFICIAL_DOCS_FOLDER_URL,
   resolveOfficialDocsLink,
 } from "@/features/official-docs/utils/source";
 import type { OfficialDocPage } from "@/features/official-docs/utils/source";
 
-export const dynamic = "force-dynamic";
+export async function generateStaticParams() {
+  try {
+    const slugs = await getAllOfficialDocSlugs();
+    return slugs.map((slug: string[]) => ({ slug }));
+  } catch {
+    return [];
+  }
+}
+
+export const dynamicParams = true;
 
 interface OfficialDocsPageProps {
   params: Promise<{

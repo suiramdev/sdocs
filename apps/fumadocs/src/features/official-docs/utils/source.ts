@@ -18,9 +18,9 @@ const GITHUB_REPOSITORY = "sbox-docs";
 const GITHUB_COMMITS_ATOM_FEED_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/commits/${GITHUB_BRANCH}.atom`;
 const HEAD_CACHE_TTL_MS = 60_000;
 const OFFICIAL_DOCS_BASE_URL = "/docs/official";
-const OFFICIAL_DOCS_REVALIDATE_SECONDS = 60;
+export const OFFICIAL_DOCS_CACHE_TAG = "official-docs";
 
-export const OFFICIAL_DOCS_FOLDER_NAME = "Guides";
+export const OFFICIAL_DOCS_FOLDER_NAME = "Documentation";
 export const OFFICIAL_DOCS_FOLDER_URL = OFFICIAL_DOCS_BASE_URL;
 
 interface GitHubRefResponse {
@@ -355,6 +355,7 @@ interface UpstreamRequestOptions {
   accept?: string;
   cache?: RequestCache;
   revalidateSeconds?: false | number;
+  tags?: string[];
 }
 
 const toErrorMessage = (error: unknown): string =>
@@ -364,8 +365,9 @@ const buildUpstreamRequestInit = ({
   accept,
   cache = "force-cache",
   revalidateSeconds,
+  tags,
 }: UpstreamRequestOptions = {}): RequestInit & {
-  next?: { revalidate?: false | number };
+  next?: { revalidate?: false | number; tags?: string[] };
 } => {
   const headers: Record<string, string> = {
     "User-Agent": "sdocs-official-docs",
@@ -375,13 +377,26 @@ const buildUpstreamRequestInit = ({
     headers.Accept = accept;
   }
 
-  const init: RequestInit & { next?: { revalidate?: false | number } } = {
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    headers.Authorization = `Bearer ${githubToken}`;
+  }
+
+  const init: RequestInit & {
+    next?: { revalidate?: false | number; tags?: string[] };
+  } = {
     cache,
     headers,
   };
 
-  if (revalidateSeconds !== undefined) {
-    init.next = { revalidate: revalidateSeconds };
+  if (revalidateSeconds !== undefined || tags) {
+    init.next = {};
+    if (revalidateSeconds !== undefined) {
+      init.next.revalidate = revalidateSeconds;
+    }
+    if (tags) {
+      init.next.tags = tags;
+    }
   }
 
   return init;
@@ -431,7 +446,7 @@ const extractLatestShaFromAtomFeed = (atomFeed: string): string | null => {
 const requestLatestShaFromAtomFeed = async (): Promise<string> => {
   const atomFeed = await requestText(GITHUB_COMMITS_ATOM_FEED_URL, {
     accept: "application/atom+xml, application/xml;q=0.9, text/xml;q=0.8",
-    revalidateSeconds: OFFICIAL_DOCS_REVALIDATE_SECONDS,
+    tags: [OFFICIAL_DOCS_CACHE_TAG],
   });
   const sha = extractLatestShaFromAtomFeed(atomFeed);
 
@@ -446,7 +461,7 @@ const requestLatestShaFromGitHubApi = async (): Promise<string> => {
   const response = await requestGitHubJson<GitHubRefResponse>(
     buildGitHubApiUrl(`/git/ref/heads/${GITHUB_BRANCH}`),
     {
-      revalidateSeconds: OFFICIAL_DOCS_REVALIDATE_SECONDS,
+      tags: [OFFICIAL_DOCS_CACHE_TAG],
     }
   );
   const sha = response.object?.sha;
@@ -527,6 +542,7 @@ const getOfficialDocsTree = (
         buildGitHubApiUrl(`/git/trees/${sha}?recursive=1`),
         {
           revalidateSeconds: false,
+          tags: [OFFICIAL_DOCS_CACHE_TAG],
         }
       )
     )
@@ -537,6 +553,7 @@ const getOfficialDocRaw = (repoPath: string, sha: string): Promise<string> => {
   return getCachedPromise(officialDocRawCache, cacheKey, () =>
     requestText(buildRawGithubUrl(repoPath, sha), {
       revalidateSeconds: false,
+      tags: [OFFICIAL_DOCS_CACHE_TAG],
     })
   );
 };
@@ -1001,6 +1018,21 @@ export const getOfficialDocsSectionTree = async (): Promise<Folder> => {
   const sha = await getLatestOfficialDocsSha();
   const tree = await getOfficialDocsSectionTreeBySha(sha);
   return tree.folder;
+};
+
+export const getAllOfficialDocSlugs = async (): Promise<string[][]> => {
+  const sha = await getLatestOfficialDocsSha();
+  const tree = await getOfficialDocsTree(sha);
+  const slugs: string[][] = [];
+
+  for (const repoPath of tree.keys()) {
+    if (!repoPath.endsWith(".md")) {
+      continue;
+    }
+    slugs.push(toSiteSlugs(repoPath));
+  }
+
+  return slugs;
 };
 
 export const getOfficialDocPage = async (

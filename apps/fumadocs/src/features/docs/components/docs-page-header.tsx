@@ -1,4 +1,4 @@
-import { DocsDescription, DocsTitle } from "fumadocs-ui/layouts/docs/page";
+import { DocsDescription, DocsTitle } from "fumadocs-ui/layouts/notebook/page";
 import type { ReactNode } from "react";
 
 import { cn } from "@/shared/utils/cn";

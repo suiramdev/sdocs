@@ -3,6 +3,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import type { MDXComponents } from "mdx/types";
 
+import { McpButtonGroup } from "./mcp-button-group";
 import {
   McpClaudeDesktopConfigDownloadButton,
   McpConfigCopyButton,
@@ -23,6 +24,7 @@ export const getMDXComponents = (
 ): MDXComponents => ({
   Accordion,
   Accordions,
+  McpButtonGroup,
   McpClaudeDesktopConfigDownloadButton,
   McpConfigCopyButton,
   McpCursorConfigSnippet,

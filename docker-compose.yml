@@ -83,6 +83,7 @@ services:
       - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
       - CHUTES_API_KEY=${CHUTES_API_KEY:-}
       - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
+      - REVALIDATE_SECRET=${REVALIDATE_SECRET:-}
 
   fumadocs-indexer:
     build:
@@ -117,6 +118,8 @@ services:
       - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
       - CHUTES_API_KEY=${CHUTES_API_KEY:-}
       - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
+      - REVALIDATE_SECRET=${REVALIDATE_SECRET:-}
+      - APP_BASE_URL=${APP_BASE_URL:-http://fumadocs:${FUMADOCS_PORT:-4000}}
 
   fumadocs-schema-refresher:
     build:
@@ -156,6 +159,8 @@ services:
       - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
       - CHUTES_API_KEY=${CHUTES_API_KEY:-}
       - CHUTES_API_BASE_URL=${CHUTES_API_BASE_URL:-}
+      - REVALIDATE_SECRET=${REVALIDATE_SECRET:-}
+      - APP_BASE_URL=${APP_BASE_URL:-http://fumadocs:${FUMADOCS_PORT:-4000}}
 
 volumes:
   meili_data:

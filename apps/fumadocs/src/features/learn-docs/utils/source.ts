@@ -15,6 +15,7 @@ const TUTORIAL_RESOURCE_PREFIX = "docs://tutorial/";
 const TUTORIAL_SITE_URL_PREFIX = "https://sbox.game/learn/";
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/u;
 
+export const TUTORIAL_DOCS_CACHE_TAG = "tutorial-docs";
 export const TUTORIAL_DOCS_FOLDER_NAME = "Tutorials";
 export const TUTORIAL_DOCS_FOLDER_URL = TUTORIAL_DOCS_BASE_URL;
 
@@ -138,12 +139,21 @@ const getCachedPromise = <T>(
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+const buildGitHubHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+  };
+  const token = process.env.GITHUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 const requestGitHubJson = async <T>(url: string): Promise<T> => {
   const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/vnd.github+json",
-    },
+    headers: buildGitHubHeaders(),
+    next: { tags: [TUTORIAL_DOCS_CACHE_TAG] },
   });
 
   if (!response.ok) {
@@ -157,7 +167,7 @@ const requestGitHubJson = async <T>(url: string): Promise<T> => {
 
 const requestText = async (url: string): Promise<string> => {
   const response = await fetch(url, {
-    cache: "no-store",
+    next: { tags: [TUTORIAL_DOCS_CACHE_TAG] },
   });
 
   if (!response.ok) {

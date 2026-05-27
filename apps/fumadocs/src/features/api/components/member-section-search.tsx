@@ -99,7 +99,10 @@ export const MemberSectionSearch = ({
   return (
     <div className="mt-3 grid gap-2">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(20rem,32rem)] sm:items-baseline sm:gap-4">
-        <h2 className="m-0 leading-tight">{title}</h2>
+        <h2 className="h2 m-0 leading-tight">
+          <span>{title}</span>
+          <span className="count">{totalCount}</span>
+        </h2>
         <label className="sr-only" htmlFor={inputId}>
           {`Search ${lowerCaseTitle}`}
         </label>
