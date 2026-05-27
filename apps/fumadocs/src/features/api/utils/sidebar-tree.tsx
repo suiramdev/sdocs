@@ -1,6 +1,10 @@
 import type { Folder, Root, Node } from "fumadocs-core/page-tree";
+import { unstable_cache } from "next/cache";
 
-import { loadApiEntities } from "@/features/api/utils/data";
+import {
+  loadApiEntities,
+  API_ENTITIES_CACHE_TAG,
+} from "@/features/api/utils/data";
 import { buildApiEntityAnchor } from "@/features/api/utils/reference";
 import type { ApiEntity } from "@/features/api/utils/schemas";
 import {
@@ -321,7 +325,11 @@ const buildApiReferenceFolder = async (): Promise<Folder> => {
   };
 };
 
-const getApiReferenceFolder = (): Promise<Folder> => buildApiReferenceFolder();
+const getApiReferenceFolder = unstable_cache(
+  buildApiReferenceFolder,
+  [API_ENTITIES_CACHE_TAG],
+  { tags: [API_ENTITIES_CACHE_TAG] }
+);
 
 const getOfficialDocsFolder = (): Promise<Folder> =>
   getOfficialDocsSectionTree();

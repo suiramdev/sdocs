@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { DocsLayout } from "fumadocs-ui/layouts/notebook";
 
 import { mergeDocsTree } from "@/features/api/utils/sidebar-tree";

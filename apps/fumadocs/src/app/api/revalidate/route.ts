@@ -1,13 +1,13 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidateTag } from "next/cache";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { API_ENTITIES_REVALIDATE_PATH } from "@/features/api/utils/data";
+import { API_ENTITIES_CACHE_TAG } from "@/features/api/utils/data";
 import { TUTORIAL_DOCS_CACHE_TAG } from "@/features/learn-docs/utils/source";
 import { OFFICIAL_DOCS_CACHE_TAG } from "@/features/official-docs/utils/source";
 
 const TAG_ACTIONS: Record<string, () => void> = {
-  "api-entities": () => revalidatePath(API_ENTITIES_REVALIDATE_PATH, "layout"),
+  [API_ENTITIES_CACHE_TAG]: () => revalidateTag(API_ENTITIES_CACHE_TAG, {}),
   [OFFICIAL_DOCS_CACHE_TAG]: () => revalidateTag(OFFICIAL_DOCS_CACHE_TAG, {}),
   [TUTORIAL_DOCS_CACHE_TAG]: () => revalidateTag(TUTORIAL_DOCS_CACHE_TAG, {}),
 };
