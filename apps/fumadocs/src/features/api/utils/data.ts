@@ -4,7 +4,7 @@ import { apiConfig } from "@/features/api/utils/config";
 import { apiEntitySchema } from "@/features/api/utils/schemas";
 import type { ApiEntity } from "@/features/api/utils/schemas";
 
-export const API_ENTITIES_REVALIDATE_PATH = "/docs";
+export const API_ENTITIES_CACHE_TAG = "api-entities";
 
 function toClassKey(namespace: string, className: string): string {
   return `${namespace}::${className}`;
