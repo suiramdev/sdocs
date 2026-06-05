@@ -14,6 +14,7 @@ import {
   readDocumentationToolInputSchema,
   resolveSymbolToolInputSchema,
   searchDocumentationToolInputSchema,
+  searchExamplesToolInputSchema,
   searchTutorialsToolInputSchema,
 } from "@/features/api/v1/domain/schemas";
 import {
@@ -28,6 +29,7 @@ import {
   readApiReferenceDocumentation,
   resolveApiReferenceSymbol,
   searchApiReferenceDocumentation,
+  searchApiReferenceExamples,
   searchApiReferenceTutorials,
 } from "@/features/api/v1/services/api-reference";
 
@@ -103,6 +105,26 @@ const searchDocumentationInputSchema: JsonSchema = {
       description:
         "Keyword, symbol name, or natural-language documentation question.",
       type: "string",
+    },
+  },
+  required: ["query"],
+  type: "object",
+};
+
+const searchExamplesInputSchema: JsonSchema = {
+  additionalProperties: false,
+  properties: {
+    detail: detailModeInputProperty,
+    query: {
+      description:
+        "Keyword to find in real s&box source code, such as a type, method, or property name.",
+      type: "string",
+    },
+    skip: {
+      description:
+        "Zero-based index of the example to fetch. Increase by 1 to fetch the next example.",
+      minimum: 0,
+      type: "integer",
     },
   },
   required: ["query"],
@@ -536,6 +558,17 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
     name: "search_documentation",
     schema: searchDocumentationToolInputSchema,
   },
+  search_examples: {
+    description:
+      "Fetch ONE real-world implementation example per call, found by keyword across published s&box packages on sbox.game. Use after search_docs or read_doc when the user needs real usage code for a symbol. Each call returns a single full source file; call again with the returned nextSkip only when more examples are needed.",
+    execute: async (input) => {
+      const parsed = searchExamplesToolInputSchema.parse(input);
+      return await searchApiReferenceExamples(parsed);
+    },
+    inputSchema: searchExamplesInputSchema,
+    name: "search_examples",
+    schema: searchExamplesToolInputSchema,
+  },
   search_tutorials: {
     description:
       "Search mirrored community tutorials from sbox.game/learn. Returns tutorial handles for read_doc.",
@@ -552,6 +585,7 @@ const toolRuntimeByName: Record<ToolName, ToolRuntimeDefinition> = {
 const toolRuntime = Object.freeze([
   toolRuntimeByName.search_docs,
   toolRuntimeByName.search_tutorials,
+  toolRuntimeByName.search_examples,
   toolRuntimeByName.read_doc,
 ]);
 

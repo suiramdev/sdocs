@@ -34,17 +34,10 @@ export const apiExceptionSchema = z.object({
   type: z.string(),
 });
 
-export const apiExampleSourceKinds = ["documentation", "repository"] as const;
+export const apiExampleSourceKinds = ["documentation"] as const;
 
 const apiStructuredExampleSchema = z.object({
   code: z.string(),
-  filePath: z.string().optional(),
-  fileUrl: z.string().optional(),
-  lineEnd: z.number().int().min(1).optional(),
-  lineStart: z.number().int().min(1).optional(),
-  repositoryName: z.string().optional(),
-  repositoryRef: z.string().optional(),
-  repositoryUrl: z.string().optional(),
   sourceKind: z.enum(apiExampleSourceKinds),
 });
 
@@ -59,6 +52,22 @@ export const apiExampleSchema = z.preprocess(
   apiStructuredExampleSchema
 );
 
+const isLegacyRepositoryExample = (value: unknown): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  "sourceKind" in value &&
+  (value as { sourceKind?: unknown }).sourceKind === "repository";
+
+// Entities generated before the Facepunch code search migration still carry
+// repository-scraped examples; drop them instead of failing to parse.
+const apiExampleListSchema = z.preprocess(
+  (value) =>
+    Array.isArray(value)
+      ? value.filter((example) => !isLegacyRepositoryExample(example))
+      : value,
+  z.array(apiExampleSchema)
+);
+
 export const apiEntitySchema = z.object({
   anchor: z.string().optional(),
   assembly: z.string(),
@@ -68,7 +77,7 @@ export const apiEntitySchema = z.object({
   displaySignature: z.string(),
   docId: z.string(),
   entityKind: z.enum(apiEntityKinds),
-  examples: z.array(apiExampleSchema),
+  examples: apiExampleListSchema,
   exceptions: z.array(apiExceptionSchema).default([]),
   id: z.string(),
   isObsolete: z.boolean().default(false),

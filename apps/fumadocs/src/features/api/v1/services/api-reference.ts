@@ -18,6 +18,7 @@ import {
   resolveDocumentationSymbol,
   searchDocumentation,
   searchDocumentationAcrossSources,
+  searchDocumentationCodeExamples,
   searchTutorials,
 } from "./documentation-tools";
 
@@ -139,6 +140,11 @@ export const getApiReferenceExamples = (input: {
   limit?: number;
   symbol: string;
 }) => getDocumentationExamples(input);
+
+export const searchApiReferenceExamples = (input: {
+  query: string;
+  skip?: number;
+}) => searchDocumentationCodeExamples(input);
 
 export const listApiReferenceNamespaces = (input: {
   limit?: number;

@@ -1,3 +1,4 @@
+import { searchCodeExamples } from "@/features/api/utils/code-search";
 import {
   getEntitiesByClass,
   getEntityById,
@@ -131,6 +132,11 @@ interface GetExamplesInput {
   includeRelated?: boolean;
   limit?: number;
   symbol: string;
+}
+
+interface SearchExamplesInput {
+  query: string;
+  skip?: number;
 }
 
 interface ListNamespacesInput {
@@ -1506,7 +1512,7 @@ const buildSymbolReadResult = async (input: ReadDocumentationInput) => {
             target: getSymbolResourceUri(entity),
           }),
     workflow: {
-      next: "If more context is needed, call read_doc on one of the returned reference handles.",
+      next: "If more context is needed, call read_doc on one of the returned reference handles. For real-world usage code, call search_examples with this symbol's name to fetch one implementation example at a time.",
       nextTool: "read_doc",
     },
   };
@@ -1557,6 +1563,7 @@ export const searchDocumentationAcrossSources = async (
         "Call read_doc on the best handle.",
         "Inspect read_doc references and call read_doc again on handles that look relevant.",
         "Repeat read_doc on references until the answer has enough exact API and guide context.",
+        "When the user needs real implementation code, call search_examples with the symbol name to fetch one example at a time.",
       ],
       nextTool: "read_doc",
     },
@@ -1861,6 +1868,43 @@ export const getDocumentationExamples = async (input: GetExamplesInput) => {
     relatedExamples,
     returned: directExamples.length,
     symbol: toSymbolRef(entity),
+  };
+};
+
+export const searchDocumentationCodeExamples = async (
+  input: SearchExamplesInput
+) => {
+  const result = await searchCodeExamples({
+    query: input.query,
+    skip: input.skip,
+    take: 1,
+  });
+  const [example] = result.examples;
+  const nextSkip = result.skip + 1;
+  const hasMore = nextSkip < result.totalCount;
+
+  return {
+    example: example ?? null,
+    hasMore,
+    nextSkip: hasMore ? nextSkip : null,
+    query: result.query,
+    skip: result.skip,
+    totalCount: result.totalCount,
+    workflow: {
+      nextSteps: example
+        ? [
+            "This is one full source file from a published sbox.game package; cite packageIdent and filePath when referencing it.",
+            ...(hasMore
+              ? [
+                  `Call search_examples again with skip=${nextSkip} only if this example is not sufficient.`,
+                ]
+              : []),
+            "Use search_docs or read_doc for the official API contract behind this usage.",
+          ]
+        : [
+            "No example matched this query. Try a shorter keyword, such as the bare member or type name.",
+          ],
+    },
   };
 };
 

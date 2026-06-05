@@ -233,12 +233,8 @@ const compactExample = (value: unknown): JsonRecord => {
 
   return compactValue({
     code: readString(value, "code"),
-    end: readNumber(value, "lineEnd"),
-    file: readString(value, "filePath"),
-    repo: readString(value, "repositoryName"),
     source: readString(value, "source"),
     sourceKind: readString(value, "sourceKind"),
-    start: readNumber(value, "lineStart"),
     symbol: compactSymbolRef(value.symbol),
   }) as JsonRecord;
 };
@@ -399,6 +395,7 @@ const toolResultCompactors: Record<ToolName, (result: unknown) => unknown> = {
   resolve_symbol: compactResolveSymbolResult,
   search_docs: compactValue,
   search_documentation: compactValue,
+  search_examples: compactValue,
   search_tutorials: compactValue,
 };
 

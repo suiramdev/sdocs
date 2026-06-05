@@ -2,7 +2,6 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
 import { Callout } from "fumadocs-ui/components/callout";
 import { DocsPage } from "fumadocs-ui/layouts/notebook/page";
-import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -10,6 +9,7 @@ import React from "react";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { ImplementationExamples } from "@/features/api/components/implementation-examples";
 import { MemberSectionSearch } from "@/features/api/components/member-section-search";
 import { SignatureAnchorButton } from "@/features/api/components/signature-anchor-button";
 import { SignatureText } from "@/features/api/components/signature-text";
@@ -460,63 +460,12 @@ function buildExampleTitles(prefix: string, count: number): string[] {
   return Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`);
 }
 
-function formatExampleLineRange(example: ApiExample): string | null {
-  if (
-    example.lineStart &&
-    example.lineEnd &&
-    example.lineStart !== example.lineEnd
-  ) {
-    return `Lines ${example.lineStart}-${example.lineEnd}`;
+function buildImplementationQuery(entity: ApiEntity): string {
+  if (entity.entityKind === "constructor") {
+    return entity.class.split(".").at(-1) ?? entity.class;
   }
 
-  if (example.lineStart) {
-    return `Line ${example.lineStart}`;
-  }
-
-  return null;
-}
-
-function buildSourceExampleAccordionTitle(
-  example: ApiExample,
-  index: number
-): ReactNode {
-  const filePath = example.filePath?.trim();
-  const repositoryName = example.repositoryName?.trim();
-  const title =
-    filePath && filePath.length > 0 ? filePath : `Implementation ${index + 1}`;
-
-  return (
-    <span className="grid gap-0.5">
-      <span className="text-sm leading-6 font-semibold">{title}</span>
-      {repositoryName ? (
-        <span className="text-muted-foreground text-xs leading-5">
-          {repositoryName}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function SourceExampleLink({ example }: { example: ApiExample }) {
-  const href = example.fileUrl ?? example.repositoryUrl;
-
-  if (!href) {
-    return null;
-  }
-
-  return (
-    <p className="m-0 flex items-center text-xs leading-6">
-      <a
-        className="inline-flex items-center gap-1.5 text-muted-foreground underline underline-offset-2"
-        href={href}
-        rel="noopener"
-        target="_blank"
-      >
-        <span>Source</span>
-        <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-      </a>
-    </p>
-  );
+  return entity.name;
 }
 
 function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
@@ -550,43 +499,6 @@ function BuiltInExampleAccordionList({ examples }: { examples: ApiExample[] }) {
   );
 }
 
-function SourceExampleAccordionList({ examples }: { examples: ApiExample[] }) {
-  if (examples.length === 0) {
-    return null;
-  }
-
-  return (
-    <Accordions className="-mt-0.5" defaultValue={[]} type="multiple">
-      {examples.map((example, index) => (
-        <Accordion
-          id={`source-example-${index + 1}`}
-          key={
-            example.fileUrl ??
-            `${example.sourceKind}-${index}-${example.code.slice(0, 50)}`
-          }
-          title={buildSourceExampleAccordionTitle(example, index)}
-          value={
-            example.fileUrl ??
-            example.filePath ??
-            `${example.sourceKind}-implementation-${index + 1}`
-          }
-        >
-          <div className="grid gap-3 pt-1">
-            <div className="overflow-hidden rounded-xl border bg-muted/20 [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:text-sm [&_pre]:leading-relaxed">
-              <TreeSitterCodeBlock
-                code={example.code}
-                lang="csharp"
-                title="Code"
-              />
-            </div>
-            <SourceExampleLink example={example} />
-          </div>
-        </Accordion>
-      ))}
-    </Accordions>
-  );
-}
-
 function ExamplesBlock({ examples }: { examples: ApiExample[] }) {
   if (examples.length === 0) {
     return null;
@@ -598,30 +510,6 @@ function ExamplesBlock({ examples }: { examples: ApiExample[] }) {
         Built-in examples define the default contract and should be read first.
       </p>
       <BuiltInExampleAccordionList examples={examples} />
-    </div>
-  );
-}
-
-function ImplementationsBlock({
-  examples,
-  hasBuiltInExamples,
-}: {
-  examples: ApiExample[];
-  hasBuiltInExamples: boolean;
-}) {
-  if (examples.length === 0) {
-    return null;
-  }
-
-  return (
-    <div>
-      {hasBuiltInExamples ? (
-        <p className="max-w-[68ch] text-sm leading-relaxed font-medium text-muted-foreground">
-          Repository-derived implementations for comparison and real-world
-          context.
-        </p>
-      ) : null}
-      <SourceExampleAccordionList examples={examples} />
     </div>
   );
 }
@@ -873,12 +761,7 @@ function MemberReference({
   const hasReturnsSection =
     entity.returnsDescription.trim().length > 0 ||
     (entity.returnType && entity.returnType.trim().length > 0);
-  const builtInExamples = entity.examples.filter(
-    (example) => example.sourceKind !== "repository"
-  );
-  const implementations = entity.examples.filter(
-    (example) => example.sourceKind === "repository"
-  );
+  const builtInExamples = entity.examples;
 
   return (
     <article
@@ -952,20 +835,10 @@ function MemberReference({
         </section>
       ) : null}
 
-      {implementations.length > 0 ? (
-        <section aria-labelledby={`${anchor}-implementations`} className="mt-4">
-          <h4
-            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-1"
-            id={`${anchor}-implementations`}
-          >
-            Implementations
-          </h4>
-          <ImplementationsBlock
-            examples={implementations}
-            hasBuiltInExamples={builtInExamples.length > 0}
-          />
-        </section>
-      ) : null}
+      <ImplementationExamples
+        anchor={anchor}
+        query={buildImplementationQuery(entity)}
+      />
     </article>
   );
 }

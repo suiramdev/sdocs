@@ -61,6 +61,18 @@ interface MeiliIndexWithEmbedders {
   updateEmbedders?: (embedders: unknown) => Promise<unknown>;
 }
 
+interface MeiliIndexWithDocuments {
+  deleteDocuments: (ids: string[]) => Promise<unknown>;
+  getDocuments: (params: {
+    fields: string[];
+    limit: number;
+    offset: number;
+  }) => Promise<{
+    results: { meiliId?: string }[];
+    total: number;
+  }>;
+}
+
 const indexSettings = {
   displayedAttributes: [
     "id",
@@ -109,6 +121,7 @@ const indexSettings = {
 
 const DEFAULT_TASK_POLL_INTERVAL_MS = 250;
 const DEFAULT_TASK_TIMEOUT_MS = 30 * 60 * 1000;
+const DOCUMENT_ID_PAGE_SIZE = 1000;
 
 const formatDuration = (durationMs: number): string => {
   if (durationMs < 1000) {
@@ -477,6 +490,67 @@ const indexDocuments = async (
   }
 };
 
+const collectPageIds = (
+  page: { results: { meiliId?: string }[] },
+  ids: Set<string>
+): number => {
+  for (const result of page.results) {
+    if (result.meiliId) {
+      ids.add(result.meiliId);
+    }
+  }
+
+  return page.results.length;
+};
+
+const fetchExistingDocumentIds = async (
+  index: MeiliIndexWithDocuments
+): Promise<Set<string>> => {
+  const ids = new Set<string>();
+  let offset = 0;
+  let pageSize = DOCUMENT_ID_PAGE_SIZE;
+
+  while (pageSize === DOCUMENT_ID_PAGE_SIZE) {
+    const page = await index.getDocuments({
+      fields: ["meiliId"],
+      limit: DOCUMENT_ID_PAGE_SIZE,
+      offset,
+    });
+
+    pageSize = collectPageIds(page, ids);
+    offset += pageSize;
+  }
+
+  return ids;
+};
+
+// Upserting leaves documents behind when entities disappear from the
+// source; remove them explicitly so the index mirrors the entities file.
+const deleteStaleDocuments = async (
+  runtimeConfig: IndexRuntimeConfig,
+  taskClient: MeiliTaskClient,
+  index: MeiliIndexWithDocuments,
+  documents: SearchIndexDocument[]
+): Promise<void> => {
+  const existingIds = await fetchExistingDocumentIds(index);
+  const currentIds = new Set(documents.map((document) => document.meiliId));
+  const staleIds = [...existingIds].filter((id) => !currentIds.has(id));
+
+  if (staleIds.length === 0) {
+    logIndexProgress("no stale documents to delete");
+    return;
+  }
+
+  logIndexProgress(
+    `deleting ${staleIds.length} stale document${staleIds.length === 1 ? "" : "s"}`
+  );
+  await waitForTask(
+    runtimeConfig,
+    taskClient,
+    (await index.deleteDocuments(staleIds)) as TaskRef
+  );
+};
+
 const importMeiliSearchClient = async (runtimeConfig: IndexRuntimeConfig) => {
   const { Meilisearch } = await import("meilisearch");
 
@@ -533,24 +607,26 @@ const getExpectedIndexCacheKey = async (
   });
 };
 
+// The skip check is intentionally self-contained: expectedCacheKey embeds
+// documentsHash, which is derived from the current entities file, so it
+// fully determines whether the index matches the file. Cross-checking
+// generation.entitiesHash here would wedge the cache open forever when
+// generation state lags the entities file — a state the indexer cannot
+// repair, since reindexing reads the same file and changes nothing.
 const isIndexStateCurrent = (input: {
-  documentsHash: string;
   documentsLength: number;
   expectedCacheKey: string;
   indexStats: IndexStatsResponse | null;
   runtimeConfig: IndexRuntimeConfig;
   state: Awaited<ReturnType<typeof readApiReferenceState>>;
 }): boolean => {
-  const currentGeneration = input.state?.generation;
   const currentIndexing = input.state?.indexing;
 
   return (
     currentIndexing?.cacheKey === input.expectedCacheKey &&
     currentIndexing.documentsCount === input.documentsLength &&
     currentIndexing.indexName === input.runtimeConfig.indexName &&
-    input.indexStats?.numberOfDocuments === input.documentsLength &&
-    (!currentGeneration?.entitiesHash ||
-      currentGeneration.entitiesHash === input.documentsHash)
+    input.indexStats?.numberOfDocuments === input.documentsLength
   );
 };
 
@@ -567,7 +643,6 @@ const shouldSkipIndexing = async (
   );
 
   return isIndexStateCurrent({
-    documentsHash,
     documentsLength: documents.length,
     expectedCacheKey,
     indexStats,
@@ -597,12 +672,13 @@ const updateIndexingState = async (
   });
 };
 
+// Only wipe the index when --reset is passed. Regular runs upsert by
+// meiliId so Meilisearch keeps cached embeddings for unchanged documents
+// and only re-embeds documents whose documentTemplate output changed.
 const getShouldResetIndex = (
   options: CliOptions,
   indexStats: IndexStatsResponse | null
-): boolean =>
-  (options.reset && indexStats !== null) ||
-  (indexStats?.numberOfDocuments ?? 0) > 0;
+): boolean => options.reset && indexStats !== null;
 
 const logReindexStart = (
   runtimeConfig: IndexRuntimeConfig,
@@ -674,6 +750,23 @@ const createReindexSession = async (
   };
 };
 
+const syncIndexDocuments = async (
+  runtimeConfig: IndexRuntimeConfig,
+  taskClient: MeiliTaskClient,
+  index: ReturnType<
+    Awaited<ReturnType<typeof importMeiliSearchClient>>["index"]
+  >,
+  documents: SearchIndexDocument[]
+): Promise<void> => {
+  await indexDocuments(runtimeConfig, taskClient, index, documents);
+  await deleteStaleDocuments(
+    runtimeConfig,
+    taskClient,
+    index as unknown as MeiliIndexWithDocuments,
+    documents
+  );
+};
+
 const reindexDocuments = async (
   runtimeConfig: IndexRuntimeConfig,
   options: CliOptions,
@@ -693,7 +786,7 @@ const reindexDocuments = async (
     index,
     embedderIndex
   );
-  await indexDocuments(runtimeConfig, client.tasks, index, documents);
+  await syncIndexDocuments(runtimeConfig, client.tasks, index, documents);
   await updateIndexingState(runtimeConfig, documents, documentsHash);
   logReindexCompleted(reindexStart);
   writeSummary(runtimeConfig, documents, false);

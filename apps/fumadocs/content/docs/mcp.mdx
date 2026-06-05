@@ -41,7 +41,8 @@ In practice, an agent will usually:
 3. Call `read_doc` on the best returned handle
 4. Inspect the returned references and tips
 5. Call `read_doc` again on any reference that looks relevant
-6. Repeat until it has enough exact API, guide, and tutorial context to answer
+6. Call `search_examples` when it needs real-world implementation code, one example per call
+7. Repeat until it has enough exact API, guide, and tutorial context to answer
 
 This makes the s&box documentation MCP feel closer to a .NET API browser, where
 namespaces, types, and members are returned in a predictable structure instead
@@ -181,6 +182,34 @@ Example use:
 
 - Find community walkthroughs for UI, networking, mapping, or editor setup
 - Start from a tutorial, then follow its linked API symbols and official guides
+
+### `search_examples`
+
+Use this when you need real-world implementation code for a symbol or keyword.
+It searches published s&box packages on `sbox.game` through the Facepunch code
+search API and returns ONE full source file per call, keeping responses small.
+
+Typical input:
+
+```json
+{
+  "query": "OnUpdate",
+  "skip": 0
+}
+```
+
+Typical TOON output includes:
+
+- A single `example` with the full source file, `packageIdent`, `filePath`, and
+  a `packageUrl` link to the package on `sbox.game`
+- `totalCount` of matching files and a `nextSkip` cursor
+- Workflow guidance to call again with `nextSkip` only when more examples are
+  needed
+
+Example use:
+
+- Fetch one real usage of `Sandbox.Component.OnUpdate` after reading its docs
+- Page through implementations of `SceneTrace` one file at a time with `skip`
 
 ### `read_doc`
 
