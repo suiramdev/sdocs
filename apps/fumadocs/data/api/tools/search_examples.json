@@ -1,0 +1,29 @@
+{
+  "name": "search_examples",
+  "description": "Fetch ONE real-world implementation example per call, found by keyword across published s&box packages on sbox.game. Each call returns a single full source file; call again with the returned nextSkip only when more examples are needed.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "detail": {
+        "type": "string",
+        "enum": ["compact", "full"],
+        "description": "MCP response detail level. Defaults to compact; use full for a larger payload."
+      },
+      "query": {
+        "type": "string",
+        "description": "Keyword to find in real s&box source code, such as a type, method, or property name."
+      },
+      "skip": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Zero-based index of the example to fetch. Increase by 1 to fetch the next example."
+      }
+    },
+    "required": ["query"]
+  },
+  "execution": {
+    "method": "POST",
+    "path": "/api/v1/tools/search_examples"
+  }
+}

@@ -15,7 +15,6 @@ import {
 } from "./api-reference-state";
 import { resolveApiSchemaSource } from "./api-schema-source";
 import type { ApiSchemaSource } from "./api-schema-source";
-import { getExampleRepositoriesFingerprint } from "./repository-examples";
 
 const DEFAULT_DOWNLOAD_ATTEMPTS = 3;
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = 45_000;
@@ -167,7 +166,6 @@ interface GenerationDecision {
 interface ExpectedGenerationState {
   expectedCacheKey: string;
   generatorHash: string;
-  repositoryExamplesFingerprint: string;
   sourceVersion: string;
 }
 
@@ -175,19 +173,15 @@ const getExpectedGenerationState = async (
   apiSchemaSource: ApiSchemaSource
 ): Promise<ExpectedGenerationState> => {
   const generatorHash = await getGenerateScriptHash();
-  const repositoryExamplesFingerprint =
-    await getExampleRepositoriesFingerprint();
 
   return {
     expectedCacheKey: buildGenerationCacheKey({
       emitMdx: true,
       generatorHash,
       includeNonPublic: false,
-      repositoryExamplesFingerprint,
       sourceVersion: apiSchemaSource.version,
     }),
     generatorHash,
-    repositoryExamplesFingerprint,
     sourceVersion: apiSchemaSource.version,
   };
 };
@@ -196,13 +190,6 @@ const getCacheMismatchReason = (
   state: Awaited<ReturnType<typeof readApiReferenceState>>,
   expectedState: ExpectedGenerationState
 ): string => {
-  if (
-    state?.generation?.repositoryExamplesFingerprint !==
-    expectedState.repositoryExamplesFingerprint
-  ) {
-    return "repository example sources changed";
-  }
-
   if (state?.generation?.generatorHash !== expectedState.generatorHash) {
     return "API generation scripts changed";
   }
@@ -260,8 +247,6 @@ const updateGenerationState = async (
       generatedAt: new Date().toISOString(),
       generatorHash: expectedState.generatorHash,
       includeNonPublic: false,
-      repositoryExamplesFingerprint:
-        expectedState.repositoryExamplesFingerprint,
     },
     indexing: currentState?.indexing,
     schemaVersion: 1,

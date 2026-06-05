@@ -20,8 +20,6 @@ import type {
   ApiParameter,
 } from "@/features/api/utils/schemas";
 
-import { buildRepositoryExamplesIndex } from "./repository-examples";
-
 interface CliOptions {
   input: string;
   clean: boolean;
@@ -593,48 +591,16 @@ function renderExceptionsSection(exceptions: ApiException[]): string {
 ${rows}`;
 }
 
-function buildExampleLabel(
-  example: ApiExample,
-  index: number,
-  counts: Map<string, number>
-): string {
-  const baseLabel =
-    example.sourceKind === "repository"
-      ? (example.repositoryName ?? "Repository Example")
-      : index === 0
-        ? "Documentation"
-        : "Documentation Example";
+function buildExampleLabel(index: number, counts: Map<string, number>): string {
+  const baseLabel = index === 0 ? "Documentation" : "Documentation Example";
   const nextCount = (counts.get(baseLabel) ?? 0) + 1;
   counts.set(baseLabel, nextCount);
 
   return nextCount === 1 ? baseLabel : `${baseLabel} ${nextCount}`;
 }
 
-function renderExampleSource(example: ApiExample): string {
-  if (example.sourceKind !== "repository") {
-    return "";
-  }
-
-  const label = [example.repositoryName, example.filePath]
-    .filter(Boolean)
-    .join(" · ");
-
-  if (example.fileUrl) {
-    return `Source: [${label || "Repository example"}](${example.fileUrl})`;
-  }
-
-  if (example.repositoryUrl) {
-    return `Source: [${example.repositoryName ?? "Repository"}](${example.repositoryUrl})`;
-  }
-
-  return label.length > 0 ? `Source: ${label}` : "";
-}
-
 function renderExampleBody(example: ApiExample): string {
-  const sourceLine = renderExampleSource(example);
-  const codeBlock = `\`\`\`csharp\n${example.code}\n\`\`\``;
-
-  return sourceLine.length > 0 ? `${sourceLine}\n\n${codeBlock}` : codeBlock;
+  return `\`\`\`csharp\n${example.code}\n\`\`\``;
 }
 
 function renderExamplesSection(examples: ApiExample[]): string {
@@ -647,8 +613,8 @@ function renderExamplesSection(examples: ApiExample[]): string {
   }
 
   const labelCounts = new Map<string, number>();
-  const labels = examples.map((example, index) =>
-    buildExampleLabel(example, index, labelCounts)
+  const labels = examples.map((_example, index) =>
+    buildExampleLabel(index, labelCounts)
   );
 
   const tabs = examples
@@ -761,39 +727,6 @@ ${sections.join("\n\n")}
 async function writeTextFile(target: string, content: string): Promise<void> {
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, content, "utf8");
-}
-
-function dedupeExamples(examples: ApiExample[]): ApiExample[] {
-  const seen = new Set<string>();
-  const deduped: ApiExample[] = [];
-
-  for (const example of examples) {
-    const key = JSON.stringify({
-      code: example.code,
-      fileUrl: example.fileUrl ?? null,
-      repositoryName: example.repositoryName ?? null,
-      sourceKind: example.sourceKind,
-    });
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    deduped.push(example);
-  }
-
-  return deduped;
-}
-
-function mergeExamples(
-  existingExamples: ApiExample[],
-  repositoryExamples: ApiExample[] | undefined
-): ApiExample[] {
-  if (!repositoryExamples || repositoryExamples.length === 0) {
-    return existingExamples;
-  }
-
-  return dedupeExamples([...existingExamples, ...repositoryExamples]);
 }
 
 function toGeneratedContentPath(entityPath: string): string {
@@ -1096,16 +1029,6 @@ const main = async () => {
       entities.push(propertyEntity);
       namespaceBucket.properties += 1;
     }
-  }
-
-  const repositoryExamplesByDocId =
-    await buildRepositoryExamplesIndex(entities);
-
-  for (const entity of entities) {
-    entity.examples = mergeExamples(
-      entity.examples,
-      repositoryExamplesByDocId.get(entity.docId)
-    );
   }
 
   const namespaceItems = [...namespaceStats.entries()].toSorted((a, b) =>

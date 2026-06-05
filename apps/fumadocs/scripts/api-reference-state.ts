@@ -19,7 +19,6 @@ export interface ApiReferenceGenerationState {
   generatedAt: string;
   generatorHash: string;
   includeNonPublic: boolean;
-  repositoryExamplesFingerprint?: string;
 }
 
 export interface ApiReferenceIndexingState {
@@ -52,11 +51,6 @@ const generateScriptPath = path.join(
   "scripts",
   "generate-api-docs.ts"
 );
-const repositoryExamplesScriptPath = path.join(
-  projectRoot,
-  "scripts",
-  "repository-examples.ts"
-);
 const indexScriptPath = path.join(projectRoot, "scripts", "index-api-meili.ts");
 
 export const hashContent = (value: string): string =>
@@ -71,7 +65,6 @@ export const getGenerateScriptHash = async (): Promise<string> =>
   hashContent(
     JSON.stringify({
       generateApiDocs: await getFileHash(generateScriptPath),
-      repositoryExamples: await getFileHash(repositoryExamplesScriptPath),
     })
   );
 
@@ -93,7 +86,6 @@ export const buildGenerationCacheKey = (input: {
   emitMdx: boolean;
   generatorHash: string;
   includeNonPublic: boolean;
-  repositoryExamplesFingerprint?: string;
   sourceVersion: string;
 }): string =>
   hashContent(
@@ -101,8 +93,6 @@ export const buildGenerationCacheKey = (input: {
       emitMdx: input.emitMdx,
       generatorHash: input.generatorHash,
       includeNonPublic: input.includeNonPublic,
-      repositoryExamplesFingerprint:
-        input.repositoryExamplesFingerprint ?? null,
       sourceVersion: input.sourceVersion,
     })
   );

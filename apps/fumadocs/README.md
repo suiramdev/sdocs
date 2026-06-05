@@ -127,8 +127,10 @@ ulimit -n 65536
 
 The documentation toolchain is exposed as a standardized SDK-style toolset:
 `search_docs` for discovery across guides and API symbols, `search_tutorials`
-for community learn content mirrored from `sbox.game/learn`, then `read_doc`
-for iterative deep reads on returned handles and references across
+for community learn content mirrored from `sbox.game/learn`, `search_examples`
+for fetching real-world implementation examples one at a time from published
+sbox.game packages (via the Facepunch code search API), then `read_doc` for
+iterative deep reads on returned handles and references across
 `docs://type/...`, `docs://member/...`, `docs://guide/...`, and
 `docs://tutorial/...`.
 
