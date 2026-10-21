@@ -13,7 +13,8 @@ COPY packages/config/package.json ./packages/config/package.json
 # Install deps honoring the committed lockfile for all pinned entries. We don't
 # use --frozen-lockfile because the lockfile is slightly stale for a 'latest'
 # devDependency, which would make a frozen install fail.
-RUN bun install --ignore-scripts
+# Hoisted linker is required: the build stage copies /app/node_modules into a different directory layout, which breaks the isolated linker's relative symlinks (e.g. ENOENT /app/node_modules/fflate).
+RUN bun install --ignore-scripts --linker hoisted
 
 FROM oven/bun:1.3.5 AS build
 WORKDIR /app
