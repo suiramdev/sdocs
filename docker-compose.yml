@@ -67,7 +67,6 @@ services:
       - UMAMI_SCRIPT_URL=${UMAMI_SCRIPT_URL:-}
       - UMAMI_TAG=${UMAMI_TAG:-mcp}
       - UMAMI_MCP_ID_SALT=${UMAMI_MCP_ID_SALT:-}
-      - API_JSON_URL
       - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
       - API_SCHEMA_BROWSER_EXECUTABLE_PATH=${API_SCHEMA_BROWSER_EXECUTABLE_PATH:-/usr/bin/chromium}
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
@@ -107,7 +106,6 @@ services:
       - fumadocs_api_entities:/app/data/api/entities
     environment:
       - NODE_ENV=production
-      - API_JSON_URL
       - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
       - API_SCHEMA_BROWSER_EXECUTABLE_PATH=${API_SCHEMA_BROWSER_EXECUTABLE_PATH:-/usr/bin/chromium}
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
@@ -150,7 +148,6 @@ services:
       - fumadocs_api_entities:/app/data/api/entities
     environment:
       - NODE_ENV=production
-      - API_JSON_URL
       - API_SCHEMA_PAGE_URL=${API_SCHEMA_PAGE_URL:-https://sbox.game/api/schema}
       - API_SCHEMA_BROWSER_EXECUTABLE_PATH=${API_SCHEMA_BROWSER_EXECUTABLE_PATH:-/usr/bin/chromium}
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
