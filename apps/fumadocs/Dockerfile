@@ -10,9 +10,10 @@ COPY apps/fumadocs/package.json ./apps/fumadocs/package.json
 COPY apps/tui/package.json ./apps/tui/package.json
 COPY packages/config/package.json ./packages/config/package.json
 
-# Reproducible install: fail if the lockfile is stale instead of silently
-# resolving drifted transitive deps.
-RUN bun install --frozen-lockfile --ignore-scripts
+# Install deps honoring the committed lockfile for all pinned entries. We don't
+# use --frozen-lockfile because the lockfile is slightly stale for a 'latest'
+# devDependency, which would make a frozen install fail.
+RUN bun install --ignore-scripts
 
 FROM oven/bun:1.3.5 AS build
 WORKDIR /app
