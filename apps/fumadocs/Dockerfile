@@ -3,9 +3,16 @@
 FROM oven/bun:1.3.5 AS deps
 WORKDIR /app
 
-COPY apps/fumadocs/package.json ./package.json
+# Copy the root manifest + lockfile and every workspace package.json into
+# matching paths so Bun resolves the exact, pinned dependency graph.
+COPY package.json bun.lock ./
+COPY apps/fumadocs/package.json ./apps/fumadocs/package.json
+COPY apps/tui/package.json ./apps/tui/package.json
+COPY packages/config/package.json ./packages/config/package.json
 
-RUN bun install --ignore-scripts
+# Reproducible install: fail if the lockfile is stale instead of silently
+# resolving drifted transitive deps.
+RUN bun install --frozen-lockfile --ignore-scripts
 
 FROM oven/bun:1.3.5 AS build
 WORKDIR /app
@@ -15,7 +22,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV APP_BASE_URL=$APP_BASE_URL
 ENV NEXT_PUBLIC_APP_BASE_URL=$NEXT_PUBLIC_APP_BASE_URL
 
+# Bun may hoist deps to the root (/app/node_modules) and/or keep some in the
+# workspace-local dir (/app/apps/fumadocs/node_modules). Bring in the hoisted
+# modules, then merge any workspace-local ones on top so resolution finds both.
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/fumadocs/ ./apps/fumadocs/
+RUN if [ -d ./apps/fumadocs/node_modules ]; then \
+      cp -a ./apps/fumadocs/node_modules/. ./node_modules/; \
+    fi && \
+    rm -rf ./apps/fumadocs
+
 COPY apps/fumadocs/ ./
 
 RUN bun run build
