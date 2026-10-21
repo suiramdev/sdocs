@@ -2,11 +2,11 @@ services:
   meilisearch:
     image: getmeili/meilisearch:v1.42.1
     restart: unless-stopped
-    ports:
-      - "${MEILI_PORT:-7700}:7700"
+    expose:
+      - "7700"
     environment:
       MEILI_ENV: production
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-api-dev-master-key}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}
       MEILI_NO_ANALYTICS: "true"
     healthcheck:
       test:
@@ -29,11 +29,12 @@ services:
         APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
         NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
     restart: unless-stopped
+    mem_limit: 4g
     depends_on:
       meilisearch:
         condition: service_healthy
-    ports:
-      - "${FUMADOCS_PORT:-4000}:4000"
+    expose:
+      - "4000"
     healthcheck:
       test:
         [
@@ -51,9 +52,11 @@ services:
       - fumadocs_api_entities:/app/data/api/entities
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=3072}
       - HOSTNAME=0.0.0.0
       - PORT=4000
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
+      - NEXT_PUBLIC_APP_BASE_URL=${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
       - NEXT_PUBLIC_UMAMI_WEBSITE_ID=${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
       - NEXT_PUBLIC_UMAMI_SCRIPT_URL=${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
       - NEXT_PUBLIC_UMAMI_HOST_URL=${NEXT_PUBLIC_UMAMI_HOST_URL:-}
@@ -70,7 +73,7 @@ services:
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
       - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
       - MEILI_HOST=http://meilisearch:7700
-      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}
       - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
       - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
       - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
@@ -93,6 +96,8 @@ services:
         APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
         NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
     restart: "no"
+    healthcheck:
+      disable: true
     depends_on:
       meilisearch:
         condition: service_healthy
@@ -108,7 +113,7 @@ services:
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
       - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
       - MEILI_HOST=http://meilisearch:7700
-      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}
       - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
       - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
       - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
@@ -129,6 +134,8 @@ services:
         APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
         NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:${FUMADOCS_PORT:-4000}}
     restart: unless-stopped
+    healthcheck:
+      disable: true
     depends_on:
       meilisearch:
         condition: service_healthy
@@ -149,7 +156,7 @@ services:
       - API_JSON_DOWNLOAD_TIMEOUT_MS=${API_JSON_DOWNLOAD_TIMEOUT_MS:-45000}
       - API_JSON_DOWNLOAD_ATTEMPTS=${API_JSON_DOWNLOAD_ATTEMPTS:-3}
       - MEILI_HOST=http://meilisearch:7700
-      - MEILI_API_KEY=${MEILI_MASTER_KEY:-api-dev-master-key}
+      - MEILI_API_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}
       - MEILI_API_INDEX_NAME=${MEILI_API_INDEX_NAME:-api_entities}
       - MEILI_ENABLE_HYBRID=${MEILI_ENABLE_HYBRID:-false}
       - MEILI_SEMANTIC_RATIO=${MEILI_SEMANTIC_RATIO:-0.35}
