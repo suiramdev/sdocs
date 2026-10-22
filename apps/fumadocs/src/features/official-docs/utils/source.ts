@@ -119,6 +119,24 @@ const officialDocRawCache = new Map<string, Promise<string>>();
 const officialDocsSearchCache = new Map<string, Promise<SearchServer>>();
 const officialDocsTreeCache = new Map<string, Promise<TreeCacheEntry>>();
 
+// Keys are `${sha}` or `${sha}:${rest}`. Entries from an older commit are never
+// read again once HEAD moves, so drop them instead of keeping every revision.
+const getKeySha = (key: string): string => key.split(":", 1)[0] ?? key;
+
+const pruneStaleShaEntries = (cache: Map<string, unknown>, key: string) => {
+  const sha = getKeySha(key);
+  const firstKey = cache.keys().next().value;
+  if (firstKey === undefined || getKeySha(firstKey) === sha) {
+    return;
+  }
+
+  for (const existingKey of cache.keys()) {
+    if (getKeySha(existingKey) !== sha) {
+      cache.delete(existingKey);
+    }
+  }
+};
+
 const getCachedPromise = <T>(
   cache: Map<string, Promise<T>>,
   key: string,
@@ -128,6 +146,8 @@ const getCachedPromise = <T>(
   if (cached) {
     return cached;
   }
+
+  pruneStaleShaEntries(cache, key);
 
   const promise = (async () => {
     try {

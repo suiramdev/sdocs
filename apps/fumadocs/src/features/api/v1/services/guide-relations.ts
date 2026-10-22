@@ -531,6 +531,8 @@ const buildCachedGuideRelationIndex = async (
 ): Promise<GuideRelationIndex> => {
   try {
     const promise = buildGuideRelationIndexSafe();
+    // Only the latest docs commit is ever looked up again.
+    guideRelationIndexCache.clear();
     guideRelationIndexCache.set(sha, promise);
     return await promise;
   } catch {

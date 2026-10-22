@@ -675,6 +675,8 @@ const getTutorialRelationIndex = async (): Promise<TutorialRelationIndex> => {
       return EMPTY_TUTORIAL_RELATION_INDEX;
     }
   })();
+  // Only the latest tutorials commit is ever looked up again.
+  tutorialRelationIndexCache.clear();
   tutorialRelationIndexCache.set(sha, promise);
   return promise;
 };
