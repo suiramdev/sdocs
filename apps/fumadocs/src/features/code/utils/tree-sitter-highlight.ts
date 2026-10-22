@@ -192,7 +192,7 @@ interface TreeSitterNodeCapture {
 
 interface TreeSitterParserInstance {
   delete(): void;
-  parse(source: string): { rootNode: any } | null;
+  parse(source: string): { delete(): void; rootNode: any } | null;
   setLanguage(language: TreeSitterLanguage): TreeSitterParserInstance;
 }
 
@@ -743,10 +743,12 @@ const getHighlightRanges = async ({
         };
   const { Parser } = await treeSitterModulePromise;
   const parser = new Parser();
+  // Trees live in WASM memory, outside the V8 heap and GC: free them explicitly.
+  let tree: ReturnType<TreeSitterParserInstance["parse"]> = null;
 
   try {
     parser.setLanguage(treeSitterLanguage);
-    const tree = parser.parse(parseSource.source);
+    tree = parser.parse(parseSource.source);
 
     if (!tree) {
       return [];
@@ -791,6 +793,7 @@ const getHighlightRanges = async ({
 
     return ranges;
   } finally {
+    tree?.delete();
     parser.delete();
   }
 };
